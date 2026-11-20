@@ -22,6 +22,7 @@ using companion::BlobStorage;
 constexpr std::size_t max_params = 128;  // G16H: 56 board keys + 68 t.* keys = 124 (was 120). G16J: 44 board keys + 61 t.* keys (one per threat limit) = 105; G21: + 4 head.* keys = 109;
                                          // ota.auto_s and G16N's two power.dark* keys = 112 (the old size); G16O: + 4 burst.* keys = 116;
                                          // G16P: + power.sleep_check_s = 117
+                                         // G23: + ota.auto_batt_s, power.dark_cpu_mhz: 40 literal + 18 motion.* = 58 board keys + 68 t.* keys = 126 of 128
 constexpr std::size_t max_key = 31;          // [a-z0-9._], not empty (stored blobs with shorter keys still load)
 constexpr std::uint16_t format = 1;
 constexpr std::size_t max_blob = 4 + 2 + 2 + 4 + max_params * (1 + max_key + 4) + 4;

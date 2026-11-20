@@ -5,6 +5,14 @@
 #include <cstdio>
 
 namespace guardian::power {
+
+std::uint16_t dark_cpu_mhz(float v) {
+    if (v != v) return cpu_default_mhz;                          // not a number
+    const auto dist = [v](float f) { return v > f ? v - f : f - v; };
+    if (dist(160.0f) <= dist(80.0f) && dist(160.0f) <= dist(240.0f)) return cpu_default_mhz;   // a tie keeps 160
+    return dist(80.0f) < dist(240.0f) ? 80 : 240;
+}
+std::uint16_t cpu_mhz(State s, std::uint16_t dark_mhz) { return s == State::Dark ? dark_mhz : cpu_default_mhz; }
 namespace {
 std::uint32_t crc32_bytes(std::uint32_t c, const std::uint8_t* p, std::size_t n) {
     for (std::size_t i = 0; i < n; ++i) {

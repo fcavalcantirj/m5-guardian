@@ -1,7 +1,8 @@
 # G23 delivery record
 
 Worker handoff of 2026-11-20 (attempt `20261120-003149-572201-task-44`), pending supervisor
-validation. **G23 is open.** This record separates what was measured from what is prepared and what
+validation. **G23 is open.** The second attempt of 2026-11-20 (`20261120-085148-005036-task-44`) added only the
+ledger's battery-life step: section 11. This record separates what was measured from what is prepared and what
 only the owner can run.
 
 Labels used below: **[DEVICE]** = recorded on the real StickS3 (the file is named); **[LIVE-HOST]** =
@@ -170,6 +171,7 @@ not a reading.
 | READMEs against the ledger | **Done** (root README rewritten; firmware/README.md headings and the stale lines corrected) | none |
 | G22A alert-first | Host proof exists; device proof prepared (section 8, step 5) | `ota_auto_deferred` +1 with the ALERT on the glass, then the poll after the alert |
 | Lock losses per reason | **Implemented** (host TDD) and in the delivery image | one STATUS read of `lock_loss_by=` after 30 minutes or more; then the Author rules on a fix |
+| Battery life in dark guard (Author 2026-11-20) | **Means delivered** (host TDD; section 11): two TUNE keys, BATTRUN drain segments per setting, a default-off dark-cpu image, the inventory, the duty-cycle note. No default changed | the measurement sheet of section 11.5, run by the owner; the Author rules on any default |
 
 ## 5. Stills, video, live observation
 
@@ -319,3 +321,150 @@ changed; the fix is the Author's ruling after the first read.
   is 8,192 and the line measured 3,692 characters on 2026-11-19, so it is expected to fit. Not read on
   the device.
 - The Guardian does not claim to protect a network. It reports what one 2.4 GHz receiver heard.
+- Section 11 (battery life) adds means to measure; it measures nothing itself. No drain number in it is new except
+  the owner's soak quoted from the ledger.
+
+## 11. Battery life in dark guard (Author 2026-11-20, second attempt)
+
+### 11.1 Starting point (MEASURED by the owner, quoted from the ledger)
+
+Image `guardian-20261119-221810`, owner's soak of 2026-11-20: 4144 mV / 100 % at 02:17 to 3618 mV / 39 % after
+78 min on battery, 4563 s of that in dark guard, BATTRUN `drain_mv_10min dark:60`, `sleeps=0`; no reply at the next
+read two hours later (a sleep at the 20 % dark floor is inferred, not read). Where the current goes is **not
+measured**: no current meter has been on the stick, and the BATTRUN numbers are cell-voltage drops (a voltage
+estimate; the discharge curve is not a line, so a rate depends on the state of charge).
+
+### 11.2 What this attempt built (every default = the behaviour before G23)
+
+| Item | What it does | Host proof |
+|---|---|---|
+| TUNE `ota.auto_batt_s` (-1..3600, default -1) | Update-poll period while on battery (debounced `power_source=battery`). -1 follows `ota.auto_s`; 0 = no poll on battery; USB and unknown power always use `ota.auto_s` | `guardian::ota::poll_period_ms`; tests/ota_check.cpp `poll_period_on_battery_follows_ota_auto_s_unless_set` |
+| TUNE `power.dark_cpu_mhz` (80..240, default 160) | CPU frequency while Dark (nearest of 80/160/240; 160 in every other state) | `guardian::power::dark_cpu_mhz`, `cpu_mhz`; tests/idle_check.cpp `cpu_frequency_changes_only_while_dark_and_only_to_a_supported_value` |
+| Dark-cpu image (build option, **default off**) | The SDK configuration does **not** allow a runtime change: `esp_pm_configure` returns `ESP_ERR_NOT_SUPPORTED` without `CONFIG_PM_ENABLE` [SOURCE: ESP-IDF v5.4 components/esp_pm/pm_impl.c, `esp_pm_configure`], and the Guardian's sdkconfig has `# CONFIG_PM_ENABLE is not set` (firmware/boards/sticks3/sdkconfig:1046). So the key is applied only by `build.sh build-dark-cpu` (sdkconfig.dark-cpu: `CONFIG_PM_ENABLE=y`, `CONFIG_GUARDIAN_DARK_CPU=y`, suffix `-dcpu`). It calls `esp_pm_configure` with max = min, light sleep off, on entering and leaving Dark | firmware/boards/sticks3/tests/test_build_support.py `test_dark_cpu_*` (label and options must agree; the normal defaults stay without PM). Both images built (below); neither run |
+| BATTRUN drain segments (record format 5) | A new segment with each battery run and whenever the values in effect change on battery (poll period on battery, dark MHz, dim percent); measured per screen state like the run (30 s settle, a rate after 300 s); the latest four kept, the setting values printed beside each drain | tests/battery_check.cpp `each_setting_gets_its_own_drain_segment_in_battrun`, `segments_keep_the_latest_four_and_follow_the_run`, `a_format_5_record_round_trips_the_segments_and_a_format_4_record_still_reads` |
+| STATUS | `ota_auto_batt_s= poll_s= cpu_mhz= dark_cpu_mhz= dark_cpu=built|unbuilt cpu_set_fail= cpu_switches=` (`cpu_switches`: changes `esp_pm_configure` accepted, two per dark stretch at a value other than 160) | board code (read on the device by the supervisor) |
+
+The run's own drain numbers are unchanged by segments (the run's stretch is not re-settled by a setting change; the
+test checks 1560 s for 630 + 630 + 330 s of dark). The stretch accounting was factored into one helper used by the run
+and the segment; every earlier battery case passed on the red build with that refactor in place.
+
+Host TDD, all logs in `$GUARDIAN_STORE/builds/20261120-g23-batt-tdd/` (CMake tree reused from
+`builds/20261120-g23-tdd/build-plain`; nothing in `CMakeLists.txt` changed):
+
+| Run | Result |
+|---|---|
+| Red (stubs: no segments, `poll_period_ms` 0, `dark_cpu_mhz`/`cpu_mhz` 0) | `battery_check` 4 failed cases (52 assertions; one of them the older timer-check case whose four line-end anchors now expect ` segs=`), `idle_check` 1 (17), `ota_check` 1 (9); every other case passed |
+| Python red (HEAD's build_support.py with the new tests) | 2 failed: `KeyError: 'dark_cpu_image'`, `KeyError: 'dcpu'` |
+| Green | `battery_check` 18 cases, 317 assertions, 0 failed (two test-side corrections after the first green run: a fixture that ignored the slot rule, and a resume rate of 11, not 10, for 6 mV in 330 s); `idle_check` 39 / 0; `ota_check` 30 / 0 |
+| Python suites (`tools/tests`, `boards/sticks3/tests`) | 218 passed, 2 skipped |
+| `firmware/tools/host-check.sh` (run `builds/20261120-092128-host-VtDAxd`, 09:21 to 09:58) | plain 54 of 54, ASan/UBSan 54 of 54. Of its 226 hashed sources only `boards/sticks3/main/measurement_main.cpp` differs from the final tree: the `cpu_switches` counter was added to it while the check ran; no host target compiles that file |
+| Portability rule, public tree | `portability_check.cmake`: 33 portable sources; `python3 -I tools/public_check.py --require-map`: 0 findings, private map applied |
+| Board builds (archived, signed, not installed) | normal `guardian-20261120-091829` (`# CONFIG_PM_ENABLE is not set`, no `apply_cpu` symbol); dark-cpu `guardian-20261120-091939-dcpu` (`CONFIG_PM_ENABLE=y`, `CONFIG_GUARDIAN_DARK_CPU=y`, DFS at startup off, `apply_cpu` linked). Both carry the new TUNE keys and the BATTRUN segment text. Superseded by the final builds named in the handoff |
+
+TUNE capacity after the two keys: 40 literal + 18 `motion.*` = 58 board keys, + 68 `t.*` = 126 of
+`tune::max_params` 128 (counted in the source). Two keys are left.
+
+### 11.3 Power inventory (what runs while dark and while dim)
+
+[SOURCE] lines as of this attempt. Nothing in this table is a current measurement.
+
+| Consumer | Dark | Dim | Source |
+|---|---|---|---|
+| Radio mode | Wi-Fi started, passive promiscuous receive, management frames only (data path off: TUNE `detect.datapath` 0); listening on the locked channel, hopping while no lock | same | `measurement_radio.cpp:29` (`esp_wifi_start`), `:39` (filter); `measurement_main.cpp:1693` (`detect.datapath` default 0) |
+| Radio power save | **off**: `esp_wifi_set_ps(WIFI_PS_NONE)`, the receiver never sleeps | same | `measurement_radio.cpp:29` |
+| Area sweep | off by default (`detect.sweep_ms` 0) | same | `measurement_main.cpp:1698` |
+| CPU frequency | 160 MHz fixed (no power management, no frequency scaling, no light sleep); 80/160/240 by TUNE only in the dark-cpu image | 160 MHz | `sdkconfig:1104`, `:1046`; `measurement_main.cpp:1906` (`apply_cpu`, dark-cpu image) |
+| Main loop | runs every 1 ms in every state (`vTaskDelay(1)`, 1000 Hz tick); between iterations the idle task waits for an interrupt | same | `measurement_main.cpp:2066`; `sdkconfig:1361`; [IDF] `components/esp_system/freertos_hooks.c:58` |
+| Update poll | every `ota.auto_s` = 120 s on battery too (default): leaves monitoring, joins the home network as a station (up to 3 attempts, 20 s timeout), asks for a TUNE offer (4 s), fetches the manifest, leaves, resumes listening. While dark it also draws the update screen to the panel (backlight stays 0). The poll's duration and current are not measured | same | `measurement_main.cpp:1665` (`ota.auto_s`), `:1868` (poll), `:1287` (`show_update`); `ota_board.cpp:23`, `:59`; `measurement_main.cpp:1360` |
+| Backlight | 0 % (LEDC duty 0) after a 2 s notice at the dim level | `power.dim_pct` 10 % | `sticks3_board.cpp:275`; `idle.hpp:196` (`dark_notice_ms`); `measurement_main.cpp:1673` |
+| Panel | powered and NOT in sleep (`display_sleep` would revoke the canvas until reboot); no frame drawn | one frame a second | `idle.hpp:192`; `measurement_main.cpp:429` (`dim_cadence_ms`) |
+| IMU | BMI270 read at 200 Hz over I2C at 400 kHz in every state (motion and new incidents wake the screen) | same | `adapters/imu/bmi270.hpp:42`; `imu_task.cpp:14`, `:67` |
+| PM1 battery read | once a second (I2C) | same | `measurement_main.cpp:1853` |
+| BATTRUN save | NVS write once a minute while on battery (207 bytes since format 5, 73 before) | same | `battery.cpp:303` |
+| Channel-load sample | once a second | same | `measurement_main.cpp:1849` |
+| Audio codec | powered down at boot (never used) | same | `idle.hpp:246` |
+| Bluetooth | not compiled into the Guardian image | same | `sdkconfig.defaults` (no `CONFIG_BT_ENABLED`) |
+
+What is NOT known: the share of each row in the 60 mV per 10 minutes. The measurement sheet below separates the
+poll and the CPU frequency, the two the ledger asked to make tunable; the radio's receive current (power save off)
+is the expected large term but is not measured here (inferred, no number).
+
+### 11.4 Duty-cycled listening while dark: design note only (not built; the owner's decision)
+
+A listen/off cycle (listen L seconds, radio off S seconds) would cut the receiver's share by about S/(L+S). Its
+detection cost, taken from the detectors' own windows and thresholds [SOURCE: `threats.hpp` ThreatLimits defaults,
+`measurement_main.cpp:1687-1692` (detect.* defaults), `core.hpp:389-397`, `measurement.cpp:162`]:
+
+| Detector (default window / threshold) | What an off period does |
+|---|---|
+| Disconnect burst on the owner's network, RED (20 deduplicated frames in 10 s; 1 s dedupe) and threats (11) (20 per source / 10 s, 12 per pair / 1 s, 10 broadcast / 10 s) | A burst that lies inside an off period is never seen. One that overlaps a listen period is seen only if at least 20 of its frames fall into heard time inside one 10 s window, so L < 10 s raises the needed rate to 20/L frames a second. The red face appears up to S seconds late |
+| Freshness (`Core::fresh_ms` 29 s) | An off period of 29 s or more turns the rating into "No fresh data" every cycle, unless the off time is excluded from the age. Coverage (listening coverage, G08/G13) must count the off time as not listened, or it would claim coverage it did not have |
+| Channel lock (lost after 5 s of silence, `silence_5s`) | Any S >= 5 s loses the lock every cycle unless the survey is paused while off; each relock costs a discovery hop whose duration is not measured |
+| Incident expiry (60 s after the last counted frame) | Frames during the off time are not counted, so an incident can end earlier than the traffic |
+| Probe flood (16 from 12 sources / 10 s), beacon flood (40 BSSIDs / 10 s), auth flood (60 / 5 s), name rotation (12 / 5 s), handshake harvest (3 BSSIDs / 10 s), CSA mix (2 within 10 s, 2 s apart) | Same rule as the burst: missed inside an off period; inside a listen period they need their count within the heard part of their window. Windows of 5 s need L >= 5 s to be reachable at the default rates |
+| Reconnect after a burst (handshake within 8 s), responder (60 s), OWE twin (300 s memory) | The two-part patterns need both parts heard: with S >= 8 s a burst and its handshake are split by an off period part of the time; the 60 s and 300 s windows tolerate short gaps but count fewer events |
+
+Numbers for four cycles (uniform random start of the traffic; "unheard" = the whole burst falls in one off period;
+the 130 s row is the length of the owner's prepared incident run, section 8 step 5):
+
+| Cycle L / S (s) | Receiver on | Added delay, worst | 5 s burst: chance unheard | 20 s burst: heard seconds, worst | 130 s run |
+|---|---|---|---|---|---|
+| 10 / 10 | 50 % | 10 s | (10-5)/20 = 25 % | 10 | always heard, red up to 10 s late |
+| 10 / 20 | 33 % | 20 s | (20-5)/30 = 50 % | 0 (can be missed) | always heard, up to 20 s late |
+| 10 / 50 | 17 % | 50 s | (50-5)/60 = 75 % | 0 (can be missed) | always heard, up to 50 s late; "No fresh data" every cycle (S > 29 s) |
+| 30 / 30 | 50 % | 30 s | (30-5)/60 = 42 % | 0 (can be missed) | always heard, up to 30 s late; S > 29 s: stale every cycle |
+
+The energy side of each row is not known: the receiver's current, the cost of stopping and restarting it, and
+whether light sleep is possible between listens (it needs power management and tickless idle, both off today) must
+be measured first, with the segments below, before this note becomes a plan.
+
+### 11.5 Measurement sheet (owner and supervisor)
+
+Rules: one setting changed per segment; each segment unplugged for 20 minutes or more; the stick still, face up,
+in the same place (temperature changes the cell voltage); settings interleaved A, B, A (a rate depends on the state
+of charge, so compare a B segment with the A segments before and after it, and note `start_mv`). A segment's dark
+rate exists only after 300 s measured in Dark (the screen goes dark about 90 s after the last touch: 30 s to Dim,
+60 s more to Dark, then 30 s settle). Every change is made through the signed TUNE session at the stick's next poll:
+
+```sh
+python3 tools/tune_session.py --port 8070 --seconds 900 --no-prompt \
+  --command BATTRUN --command STATUS --command 'TUNE <key>=<value>' --command 'TUNE save'
+```
+
+(`TUNE save` keeps the value across a reboot or a floor sleep; without it a reboot would start a new segment with the
+saved values.) A TUNE session lights the screen (the TUNE WI-FI screen holds it active); that time counts in the
+segment's `active` drain, not in its dark rate.
+
+**A. Update poll on battery** (normal delivery image):
+
+| Step | Do | Expect |
+|---|---|---|
+| A0 | On USB, read `STATUS` | `ota_auto_batt_s=-1 poll_s=120 cpu_mhz=160 dark_cpu_mhz=160 dark_cpu=unbuilt cpu_set_fail=0 cpu_switches=0` |
+| A1 | Unplug; 20 min | segment 1 = today's behaviour |
+| A2 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=600`, `TUNE save` | BATTRUN `segs=1 seg1=poll_s:120,dark_mhz:160,dim_pct:10,start_mv:<mV>,active:<r>/<s>,dim:<r>/<s>,dark:<r>/<s>` with dark seconds near 1000; STATUS then `ota_auto_batt_s=600 poll_s=600` |
+| A3 | 20 min (the next session can take up to 600 s to arrive) | segment 2 `poll_s:600` |
+| A4 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=-1`, `TUNE save` | `segs=2 ... seg2=poll_s:600,...`; STATUS `ota_auto_batt_s=-1 poll_s=120` |
+| A5 | 20 min | segment 3 `poll_s:120` (A again) |
+| A6 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=0`, `TUNE save` | `segs=3`; from now no session reaches the stick on battery |
+| A7 | 20 min, then plug USB (ends the run, keeps the record); session at the next USB poll: `BATTRUN`, `TUNE ota.auto_batt_s=-1`, `TUNE save` | `end=usb_returned segs=4 seg1=poll_s:120 ... seg2=poll_s:600 ... seg3=poll_s:120 ... seg4=poll_s:0,...` |
+
+The poll's cost is the difference of `dark:<r>` between seg2/seg4 and the seg1/seg3 around them.
+
+**B. CPU frequency while dark** (dark-cpu image `build.sh build-dark-cpu`; installed over the air like any image,
+which needs a version newer than the running one; going back to the normal image then needs a normal build made
+after it):
+
+| Step | Do | Expect |
+|---|---|---|
+| B0 | On USB, read `STATUS` | `dark_cpu=built cpu_mhz=160 dark_cpu_mhz=160 cpu_set_fail=0 cpu_switches=0` |
+| B1 | Unplug; 20 min | segment 1 `dark_mhz:160` (the baseline of THIS image) |
+| B2 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=80`, `TUNE save` | `segs=1 seg1=...,dark_mhz:160,...`; STATUS `dark_cpu_mhz=80` (`cpu_mhz=160` while the session holds the screen lit) |
+| B3 | 20 min | segment 2 `dark_mhz:80` |
+| B4 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=160`, `TUNE save` | `seg2=...,dark_mhz:80,...`; `cpu_set_fail=0` (a refusal of 80 MHz would show here) and `cpu_switches` 2 or more higher than at B2 (80 applied going dark, 160 going lit: the proof the frequency changed) |
+| B5 | 20 min, then plug USB; session: `BATTRUN` | `segs=3 ... seg3=...,dark_mhz:160,...` |
+
+The CPU's share is seg2's dark rate against seg1 and seg3. The dark-cpu image is compared only with itself:
+power management compiled in may change the drain on its own.
+
+Results go to `firmware/evidence/sticks3-G23-battery-<date>.log` with the image version and the read times. No
+default changes until the Author rules on the numbers.

@@ -652,6 +652,46 @@ Not proven on the stick (owner, image by OTA; evidence `firmware/evidence/sticks
    keeps its "I2C awake" bit from the last full boot; a failure shows as `check_faults`), the cost of a check in
    battery terms (BATTRUN), and the ext1 pull-ups when re-armed from the quick path (same function as the normal path).
 
+## G23 battery life in dark guard (worker 2026-11-20; ledger G23 open)
+
+The owner's overnight soak (2026-11-20, image `guardian-20261119-221810`) measured the dark drain at 60 mV per 10
+minutes (BATTRUN `drain_mv_10min dark:60`); where that current goes is not measured. This adds the means to
+measure and reduce it without a new image per trial. **Every default is the behaviour before G23**; nothing here
+claims an improvement. The power inventory, the duty-cycle design note and the owner's measurement sheet are in
+[docs/G23-delivery.md](../docs/G23-delivery.md) section 11.
+
+- **TUNE `ota.auto_batt_s`** (-1..3600, default -1): the self-fetch period while the stick runs on battery (the
+  debounced `power_source=battery`). -1 = follow `ota.auto_s` (as before); 0 = no poll on battery; USB and unknown
+  power always use `ota.auto_s`. A TUNE session reaches the stick only through that poll, so with 0 the stick is read
+  again after it is plugged in. `guardian::ota::poll_period_ms` (tests/ota_check.cpp).
+- **TUNE `power.dark_cpu_mhz`** (80..240, default 160): the CPU frequency while Dark (nearest of 80 / 160 / 240; 160
+  in every other state). Applied **only** by the dark-cpu image: a runtime change needs `esp_pm_configure`, which
+  returns `ESP_ERR_NOT_SUPPORTED` without `CONFIG_PM_ENABLE`, and the normal image does not set it.
+  `guardian::power::dark_cpu_mhz`, `cpu_mhz` (tests/idle_check.cpp).
+- **Dark-cpu image** (default off):
+
+  ```sh
+  firmware/boards/sticks3/tools/build.sh build-dark-cpu   # sdkconfig.dark-cpu: CONFIG_PM_ENABLE + CONFIG_GUARDIAN_DARK_CPU, suffix -dcpu
+  ```
+
+  Own build directory and archive (`COMPLETE.json` `dark_cpu_image: true`); `build_support.py` refuses a `-dcpu`
+  label without both options and the options without the label. It boots at 160 MHz (`CONFIG_PM_DFS_INIT_AUTO` off)
+  and calls `esp_pm_configure` with max = min (no light sleep) when the screen goes dark and again when it lights.
+  Power management itself changes the image (interrupt latency, timer accuracy: ESP-IDF Kconfig help), so compare
+  its segments with each other (the same image at 160 and at 80), not with the normal image. Not run on the stick.
+- **STATUS** `ota_auto_batt_s=<-1|s> poll_s=<the period now> cpu_mhz=<applied now> dark_cpu_mhz=<used while dark>
+  dark_cpu=<built|unbuilt> cpu_set_fail=<n> cpu_switches=<n>` (after the power fragment; `cpu_switches` counts the
+  frequency changes `esp_pm_configure` accepted: two per dark stretch at a value other than 160, always 0 in the normal
+  image).
+- **BATTRUN** (record format 5, 207 bytes; formats 1 to 4 still read) adds drain **segments**: a new segment starts
+  with each battery run and whenever the values in effect change on battery (update-poll period on battery, dark CPU
+  MHz, dim backlight percent), and is measured per screen state exactly like the run (30 s settle after the change,
+  a rate after 300 s). The latest four are kept:
+  `segs=<started> seg<n>=poll_s:<s>,dark_mhz:<MHz>,dim_pct:<%>,start_mv:<mV>,active:<mV/10min>/<s>,dim:...,dark:...`
+  ("-" before the rate, as `drain_mv_10min`). A deep-sleep wake continues the segment; USB ends it with the run. The
+  board's reply buffer is `battery::run_text_max` (1024; battery_check proves the longest line fits).
+- **TUNE capacity:** 40 literal + 18 `motion.*` = 58 board keys, + 68 `t.*` = 126 of `tune::max_params` 128.
+
 ## G16I upright by gravity and the snow-globe burst (implemented 2026-11-17; ledger G16I: accepted 2026-11-18, upright mode off by default by the owner's ruling)
 
 Owner direction (2026-11-17): "fawkes should always stand facing up, independent of the

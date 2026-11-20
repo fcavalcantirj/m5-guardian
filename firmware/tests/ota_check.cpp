@@ -4,6 +4,7 @@
 #include "ota.hpp"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -627,4 +628,22 @@ GUARDIAN_CASE(auto_poll_is_deferred_while_an_alert_is_active) {
     // Turned off while deferred: nothing is held any more.
     CHECK(p.sample(520030, 0, false, true) == D::Wait); CHECK(!p.deferred());
     CHECK(p.sample(520040, 120000, false, false) == D::Run);
+}
+
+// G23 battery life: a separate update-poll period on battery, today's behaviour by default.
+GUARDIAN_CASE(poll_period_on_battery_follows_ota_auto_s_unless_set) {
+    CHECK(follow_auto_s < 0.0f);
+    CHECK_EQ(poll_period_ms(120.0f, follow_auto_s, false), 120000u);
+    CHECK_EQ(poll_period_ms(120.0f, follow_auto_s, true), 120000u);    // the default: as before G23
+    CHECK_EQ(poll_period_ms(300.0f, -0.5f, true), 300000u);            // any value below 0 follows ota.auto_s
+    CHECK_EQ(poll_period_ms(120.0f, 600.0f, true), 600000u);           // set: it replaces ota.auto_s on battery ...
+    CHECK_EQ(poll_period_ms(120.0f, 600.0f, false), 120000u);          // ... and never on USB
+    CHECK_EQ(poll_period_ms(120.0f, 0.0f, true), 0u);                  // 0: no poll on battery
+    CHECK_EQ(poll_period_ms(120.0f, 0.0f, false), 120000u);
+    CHECK_EQ(poll_period_ms(0.0f, follow_auto_s, true), 0u);           // ota.auto_s 0 (gesture only) stays off
+    CHECK_EQ(poll_period_ms(0.0f, 900.0f, true), 900000u);
+    CHECK_EQ(poll_period_ms(2.5f, follow_auto_s, false), 2500u);       // seconds to ms as the board did
+    CHECK_EQ(poll_period_ms(-5.0f, follow_auto_s, true), 0u);
+    CHECK_EQ(poll_period_ms(std::nanf(""), follow_auto_s, false), 0u);
+    CHECK_EQ(poll_period_ms(120.0f, std::nanf(""), true), 120000u);    // not a number: not a battery period, follow
 }

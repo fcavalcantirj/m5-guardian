@@ -991,3 +991,14 @@ GUARDIAN_CASE(the_check_period_stays_inside_its_tune_range) {
     CHECK_EQ(timer_check(p, r).outcome, CheckOutcome::Slept);
     CHECK(p.calls.size() == 4 && p.calls[2] == "arm_timer 60000000");
 }
+
+// G23 battery life: the CPU frequency while dark, 160 MHz (today) unless set.
+GUARDIAN_CASE(cpu_frequency_changes_only_while_dark_and_only_to_a_supported_value) {
+    CHECK_EQ(cpu_default_mhz, 160);
+    CHECK_EQ(dark_cpu_mhz(160.0f), 160); CHECK_EQ(dark_cpu_mhz(80.0f), 80); CHECK_EQ(dark_cpu_mhz(240.0f), 240);
+    CHECK_EQ(dark_cpu_mhz(119.9f), 80); CHECK_EQ(dark_cpu_mhz(125.0f), 160); CHECK_EQ(dark_cpu_mhz(120.0f), 160);   // a tie: 160
+    CHECK_EQ(dark_cpu_mhz(200.0f), 160); CHECK_EQ(dark_cpu_mhz(201.0f), 240); CHECK_EQ(dark_cpu_mhz(300.0f), 240);
+    CHECK_EQ(dark_cpu_mhz(0.0f), 80); CHECK_EQ(dark_cpu_mhz(-5.0f), 80); CHECK_EQ(dark_cpu_mhz(std::nanf("")), 160);
+    CHECK_EQ(cpu_mhz(State::Dark, 80), 80); CHECK_EQ(cpu_mhz(State::Dark, 160), 160);
+    CHECK_EQ(cpu_mhz(State::Active, 80), 160); CHECK_EQ(cpu_mhz(State::Dim, 80), 160); CHECK_EQ(cpu_mhz(State::Sleep, 80), 160);
+}

@@ -96,7 +96,11 @@ def check_config(build,version):
     # G16Q: the art bench image (candidate portraits, no radio capture) is never mistaken for a Guardian build.
     bench='CONFIG_GUARDIAN_ART_BENCH=y' in lines
     if bench!=version.endswith('-bench'):raise ValueError('art bench image must be built by build-art-bench and carry the -bench version suffix')
-    return forced,spike,bench
+    # G23: the battery-life measurement image (power management compiled in) is never mistaken for a normal build.
+    dark_cpu='CONFIG_GUARDIAN_DARK_CPU=y' in lines
+    if dark_cpu!=version.endswith('-dcpu'):raise ValueError('dark-cpu image must be built by build-dark-cpu and carry the -dcpu version suffix')
+    if dark_cpu and 'CONFIG_PM_ENABLE=y' not in lines:raise ValueError('dark-cpu image without CONFIG_PM_ENABLE=y: esp_pm_configure would refuse every change')
+    return forced,spike,bench,dark_cpu
 
 def check_signing(build):
     """G16B: the archived flash image is the owner-signed app; its record and version agree."""
@@ -173,6 +177,16 @@ def check_bench(build,bench,bench_dir=None):
     if not bench:return None
     return {'frames':record,'frame_bytes':sum(r['bytes'] for r in record.values())}
 
+SOURCE_SUFFIXES=('.cpp','.hpp','.h','.csv','.py','.sh','.txt','.defaults','.md')
+def firmware_sources(root=ROOT):
+    """The build inputs under firmware/ for the archive's source copy. In a git checkout the git file list
+    (tracked + untracked-not-ignored, the rule of tools/public_check.py), else every file; then the suffix rule plus
+    the Kconfig menu and the sdkconfig.<variant> files (G23 review 2026-11-20), never a cache, a build tree or sdkconfig.old."""
+    try:files=[root/n for n in subprocess.run(['git','-C',str(root),'ls-files','-z','--cached','--others','--exclude-standard','--','firmware'],check=True,capture_output=True).stdout.decode().split('\0') if n]
+    except (OSError,subprocess.CalledProcessError):files=list((root/'firmware').rglob('*'))
+    return [p for p in files if p.is_file() and (p.suffix in SOURCE_SUFFIXES or p.name=='Kconfig.projbuild' or (p.name.startswith('sdkconfig.') and p.name!='sdkconfig.old'))
+            and not {'__pycache__','.pytest_cache','build'}&set(p.relative_to(root).parts)]
+
 def archive(build,out):
     build=Path(build).resolve();out=Path(out)
     if out.exists():raise ValueError('archive destination already exists')
@@ -191,7 +205,7 @@ def archive(build,out):
     for name in required:
         if not (build/name).is_file():raise ValueError('missing required output: '+name)
     version=check_signing(build)
-    selftest_fail,ble_spike,art_bench_image=check_config(build,version)
+    selftest_fail,ble_spike,art_bench_image,dark_cpu_image=check_config(build,version)
     head3d=check_head3d(build,expected=not art_bench_image)   # G21: before anything is written (G16Q: the bench leaves the head out)
     art_bench=check_bench(build,art_bench_image)
     out.mkdir(parents=True)
@@ -202,7 +216,7 @@ def archive(build,out):
     (out/'flash_args').write_text(shlex.join(args)+'\n')
     for name in ['CMakeCache.txt','project_description.json']:
         if (build/name).is_file():inputs[name]=verified_copy(build/name,out/name)
-    sources=[p for p in (ROOT/'firmware').rglob('*') if p.is_file() and p.suffix in ('.cpp','.hpp','.h','.csv','.py','.sh','.txt','.defaults','.md') and '__pycache__' not in p.parts and 'build' not in p.parts]
+    sources=firmware_sources()
     # G21: the frame sets and their manifest are build inputs (binary, so not matched by the suffix list), and the pipeline that made them.
     if Path(HEAD3D_DIR).resolve().is_relative_to(ROOT):sources += [p for p in Path(HEAD3D_DIR).glob('*') if p.is_file() and (p.suffix=='.bin' or p.name=='manifest.json')]
     sources += [p for p in (ROOT/'tools/face3d').glob('*.py')]
@@ -227,7 +241,7 @@ def archive(build,out):
     for name,h in hashes.items():
         if digest(out/name)!=h:raise ValueError('archive readback failed: '+name)
     (out/'SHA256SUMS').write_text(''.join(h+'  '+n+'\n' for n,h in sorted(hashes.items())))
-    (out/'COMPLETE.json').write_text(json.dumps({'complete':True,'app_version':version,'signed_app':SIGNED_APP,'selftest_fail_test_image':selftest_fail,'ble_spike_image':ble_spike,'art_bench_image':art_bench_image,'art_bench':art_bench,'head3d':head3d,'sha256':hashes,'hardware_verified':False},indent=2)+'\n')
+    (out/'COMPLETE.json').write_text(json.dumps({'complete':True,'app_version':version,'signed_app':SIGNED_APP,'selftest_fail_test_image':selftest_fail,'ble_spike_image':ble_spike,'art_bench_image':art_bench_image,'art_bench':art_bench,'dark_cpu_image':dark_cpu_image,'head3d':head3d,'sha256':hashes,'hardware_verified':False},indent=2)+'\n')
     return out
 
 # G16C rework: the default version names the build (date-time), never a task, so
@@ -240,7 +254,7 @@ def default_app_version(at=None,suffix=''):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['init','clean','archive','sdk','resolve','version-stamp']);parser.add_argument('path');parser.add_argument('destination',nargs='?');a=parser.parse_args()
-    if a.action=='version-stamp':print(default_app_version(suffix={'none':'','stfail':'-stfail','blespk':'-blespk','bench':'-bench'}[a.path]))
+    if a.action=='version-stamp':print(default_app_version(suffix={'none':'','stfail':'-stfail','blespk':'-blespk','bench':'-bench','dcpu':'-dcpu'}[a.path]))
     elif a.action=='resolve':print(checked_path(a.path))
     elif a.action=='sdk':print(json.dumps(qualify_sdk(a.path),indent=2))
     elif a.action=='init':print(initialize(a.path))

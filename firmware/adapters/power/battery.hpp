@@ -112,6 +112,26 @@ struct SleepChecks {
 // power.sleep_check_s are compared by the hour.
 bool check_drop(const SleepChecks&, int& uv_per_check, int& uv_per_hour);
 
+// G23 (battery life in dark guard): the drain of each SETTING. A run is cut into segments; a new
+// segment starts with the run and whenever one of these values changes while on battery, so one
+// BATTRUN read gives the drain per phase of every setting tried (A, B, A again: three segments).
+// The values are the ones in effect, not the TUNE text: poll_s is the update-poll period the board
+// runs on battery (0 = off), dark_mhz the CPU frequency it applies while dark (160 when the image
+// cannot change it), dim_pct the backlight percent while dimmed.
+struct Settings {
+    std::uint16_t poll_s{};
+    std::uint16_t dark_mhz{};
+    std::uint8_t dim_pct{};
+};
+bool same(const Settings&, const Settings&);
+struct Segment {
+    std::uint16_t number{};        // 1, 2, ... within the run (0 = unused slot)
+    Settings settings{};
+    std::uint16_t start_mv{};      // the cell voltage when the segment began
+    std::array<Drain, static_cast<std::size_t>(Phase::Count)> drain{};   // measured like Run::drain
+};
+constexpr std::size_t max_segments = 4;   // the latest four are kept (Run::segments_started counts them all)
+
 struct Run {
     std::uint32_t boot{};          // boot count of the run
     std::uint16_t start_mv{};
@@ -130,12 +150,17 @@ struct Run {
     // G16P (format 4): the deep sleep's timer checks.
     std::uint32_t checks{};        // over the whole run
     SleepChecks last_checks{};     // of the latest deep sleep the run woke from
+    // G23 (format 5): the drain per setting. Segment n lives in segments[(n - 1) % max_segments].
+    std::uint16_t segments_started{};
+    std::array<Segment, max_segments> segments{};
 };
-// Format 4 (G16P); decode() also reads the G16N format 3 (61 bytes), the G16D format 2 (37 bytes)
+// Format 5 (G23 segments); decode() also reads the G16P format 4 (73 bytes), the G16N format 3 (61 bytes), the G16D format 2 (37 bytes)
 // and the G16B format 1 (23 bytes) so a run recorded before an update is never lost.
 constexpr std::size_t run_bytes_v2 = 4 + 2 + 4 + 2 + 2 + 4 + 1 + 4 + 4 + 2 + 2 + 2 + 4;
 constexpr std::size_t run_bytes_v3 = run_bytes_v2 + static_cast<std::size_t>(Phase::Count) * (4 + 4);
-constexpr std::size_t run_bytes = run_bytes_v3 + 4 + 4 * 2;
+constexpr std::size_t run_bytes_v4 = run_bytes_v3 + 4 + 4 * 2;
+constexpr std::size_t segment_bytes = 2 + 2 + 2 + 1 + 2 + static_cast<std::size_t>(Phase::Count) * (4 + 4);
+constexpr std::size_t run_bytes = run_bytes_v4 + 2 + max_segments * segment_bytes;   // G23 format 5
 constexpr std::size_t run_bytes_v1 = 4 + 2 + 4 + 2 + 2 + 4 + 1 + 4;
 std::size_t encode(const Run&, std::uint8_t* out, std::size_t capacity);
 bool decode(const std::uint8_t* in, std::size_t size, Run& out);
@@ -146,7 +171,8 @@ public:
     void load();                                   // the previous run, if any
     // Called about once a second with the current state and uptime. G16N: `phase` is the
     // screen state right now (power::State Active / Dim / Dark), for the per-phase drain.
-    void tick(const State&, std::uint32_t uptime_ms, Phase phase = Phase::Active);
+    // G23: `settings` = the values in effect now (a change while on battery starts a new segment).
+    void tick(const State&, std::uint32_t uptime_ms, Phase phase = Phase::Active, const Settings& settings = {});
     // G16D: just before deep sleep (saves the run with sleep_mv, marked slept).
     void sleeping(const State&, std::uint32_t uptime_ms);
     // G16D: at boot after load(), when this boot is a key wake from deep sleep:
@@ -158,33 +184,43 @@ public:
     const Run& run() const { return run_; }
     bool active() const { return active_; }
     std::uint32_t saves() const { return saves_; }
+    // A stretch of one phase being measured (G16N), for the run and (G23) for the current segment.
+    struct Stretch {
+        bool open{};
+        Phase phase{Phase::Active};
+        std::uint32_t start_ms{}, ref_ms{}, last_ms{};
+        std::uint16_t ref_mv{};
+        Drain base{};
+    };
 private:
     void store();
-    void begin_stretch(Phase, std::uint32_t start_ms);            // G16N per-phase drain
     void account(const State&, std::uint32_t uptime_ms, Phase);
+    void begin_segment(const State&, const Settings&, std::uint32_t uptime_ms, Phase);   // G23
+    Segment* current_segment();
     BlobStorage& storage_;
     std::uint32_t boot_{};
     Run run_{};
     bool has_{}, active_{}, resume_{};
     std::uint32_t base_active_s_{};
     std::uint32_t last_saved_minute_{0xFFFFFFFFu}, saves_{}, start_ms_{};
-    // G16N: the stretch being measured (one phase, after its settle time).
-    bool seg_open_{};
-    Phase seg_phase_{Phase::Active};
-    std::uint32_t seg_start_ms_{}, seg_ref_ms_{}, seg_last_ms_{};
-    std::uint16_t seg_ref_mv_{};
-    Drain seg_base_{};
+    Stretch run_stretch_{};        // G16N: the run's per-phase drain
+    Stretch seg_stretch_{};        // G23: the current segment's
 };
 // "BATTRUN boot=.. ... end=running drain_mv_10min=active:31,dim:14,dark:- drain_s=active:900,dim:600,dark:120
-//  checks=24 last_checks=12 check_s=300 check_first_mv=3988 check_last_mv=3984 check_drop_uv=364 standby_uv_h=4364"
+//  checks=24 last_checks=12 check_s=300 check_first_mv=3988 check_last_mv=3984 check_drop_uv=364 standby_uv_h=4364
+//  segs=3 seg1=poll_s:120,dark_mhz:160,dim_pct:10,start_mv:4100,active:31/900,dim:-/0,dark:60/1200 seg2=... seg3=..."
 // G16N: mV the cell fell per 10 minutes in each screen state ("-" until drain_min_s were measured).
 // G16P: checks = timer checks over the run; the rest is the latest deep sleep: its checks, their
 // period, the cell at the first and the last one, and check_drop() ("-" until it has a number).
+// G23: segs = segments started in the run, then each kept segment (oldest first): its setting values,
+// the cell at its start, and per phase <mV per 10 min>/<measured seconds> ("-" as for drain_mv_10min).
 void run_text(const RunLog&, char* out, std::size_t n);
+constexpr std::size_t run_text_max = 1024;   // the board's BATTRUN reply buffer (battery_check proves the longest line fits)
 
 // G16N: mV per 10 minutes the cell fell in `phase` over the run; false until drain_min_s of
 // settled time were measured there.
 bool drain_rate(const Run&, Phase, int& mv_per_10min);
+bool drain_rate(const std::array<Drain, static_cast<std::size_t>(Phase::Count)>&, Phase, int& mv_per_10min);   // G23: a segment's
 // The cell voltage of a battery percent by the vendor formula (the inverse of level_from_mv).
 std::uint16_t mv_from_level(int percent);
 // "dark guard: about N h left": tenths of an hour until the cell reaches the dark floor

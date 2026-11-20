@@ -356,6 +356,12 @@ bool image_version(const std::uint8_t* image, std::size_t n, std::array<char, ma
     return true;
 }
 
+std::uint64_t poll_period_ms(float auto_s, float auto_batt_s, bool on_battery) {
+    const float s = on_battery && auto_batt_s >= 0.0f ? auto_batt_s : auto_s;   // not a number is not >= 0: follows ota.auto_s
+    if (!(s > 0.0f)) return 0;                                                   // 0, below 0 or not a number: off
+    return static_cast<std::uint64_t>(s * 1000.0f);                              // as the board converted it before G23
+}
+
 AutoPoll::Decision AutoPoll::sample(std::uint64_t now_ms, std::uint64_t period_ms, bool busy, bool alert) {
     if (!period_ms) { deferred_ = false; return Decision::Wait; }
     if (now_ms - last_ < period_ms) return Decision::Wait;

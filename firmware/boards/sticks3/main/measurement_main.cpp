@@ -72,6 +72,9 @@
 #include "art_bench.hpp"   // G16Q: used only under CONFIG_GUARDIAN_ART_BENCH (art bench build variant)
 #include "esp_sleep.h"
 #include "esp_attr.h"
+#if CONFIG_GUARDIAN_DARK_CPU
+#include "esp_pm.h"        // G23: the CPU frequency while dark (dark-cpu build variant only; needs CONFIG_PM_ENABLE)
+#endif
 #include "driver/rtc_io.h"
 #include <sys/time.h>
 #include "sdkconfig.h"
@@ -170,7 +173,7 @@ struct TextBuffers {
     char wire_line[grx::max_packet*2+7];
     char state_line[8192];      // G16F: 14 detector records in the G13 JSON
     char snapshot_line[8256];   // one USB write keeps state prefix/body together
-    char status_line[7296];     // G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96)
+    char status_line[7456];     // G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160)
     char detect[2048];          // G16E/G16F: per-detector counters (14), air meter, area observations
     char bursts[measurement::Monitor::burst_text_max];   // G16S: last_burst_network= / last_burst_area= (its own buffer: never lost with `detect`)
     char frames_reply[1024];
@@ -337,6 +340,18 @@ gp::Check check_info;                 // this boot's timer check (outcome NoReco
 bool check_ran{},check_pm1_open{};    // a timer wake ran the check; the PM1 bus could be opened for it
 // ---- G16N guard in the dark --------------------------------------------------------
 int tune_dark_s=-1,tune_dark_floor=-1;
+// ---- G23 battery life in dark guard: the means to measure and reduce the drain (defaults = before G23) ----
+int tune_ota_auto_batt=-1;            // TUNE ota.auto_batt_s: the update-poll period on battery (-1 = follow ota.auto_s)
+int tune_dark_cpu=-1;                 // TUNE power.dark_cpu_mhz: the CPU frequency while dark (dark-cpu image only)
+static_assert(CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ==gp::cpu_default_mhz,"the dark CPU policy assumes the sdkconfig CPU frequency");
+std::uint16_t cpu_applied_mhz=gp::cpu_default_mhz;   // what esp_pm_configure last accepted (the boot frequency until then)
+unsigned cpu_set_fail{};              // esp_pm_configure refusals
+unsigned cpu_switches{};              // esp_pm_configure changes accepted (two per dark stretch at a non-160 value)
+#if CONFIG_GUARDIAN_DARK_CPU
+constexpr bool dark_cpu_built=true;   // undefined (not 0) in a normal image: the option depends on CONFIG_PM_ENABLE
+#else
+constexpr bool dark_cpu_built=false;
+#endif
 int backlight_applied=-1;   // the percent last written to the backlight (-1: the board's init value)
 // S2 of the device spike: from the evidence instant of the incident that lit the screen to the backlight
 // command (dark_wake_evidence_ms) and to the first frame pushed after it (dark_wake_frame_ms). -1 = none yet.
@@ -420,6 +435,34 @@ void apply_backlight(std::uint8_t pct) {
     board_ptr->set_backlight(pct);backlight_applied=pct;
 }
 std::uint8_t dim_backlight_pct(){return tuning && tune_dim_pct>=0?static_cast<std::uint8_t>(tuning->get(tune_dim_pct)):std::uint8_t(10);}
+// G23: the update-poll period the loop runs now (USB / unknown power: ota.auto_s; battery: ota.auto_batt_s when >= 0).
+std::uint64_t poll_period_ms(bool on_battery) {
+    if(!tuning || tune_ota_auto<0)return 0;
+    return guardian::ota::poll_period_ms(tuning->get(tune_ota_auto),tune_ota_auto_batt>=0?tuning->get(tune_ota_auto_batt):guardian::ota::follow_auto_s,on_battery);
+}
+// G23: the CPU frequency this image runs while dark: the TUNE value in the dark-cpu image, 160 MHz otherwise.
+std::uint16_t dark_mhz() {
+#if CONFIG_GUARDIAN_DARK_CPU
+    if(tuning && tune_dark_cpu>=0)return gp::dark_cpu_mhz(tuning->get(tune_dark_cpu));
+#endif
+    return gp::cpu_default_mhz;
+}
+#if CONFIG_GUARDIAN_DARK_CPU
+// G23: esp_pm_configure with max = min (no frequency scaling inside a state, no light sleep). The Wi-Fi driver's
+// ESP_PM_APB_FREQ_MAX lock keeps the modem clock; esp_pm_configure refuses what the chip cannot run (counted).
+void apply_cpu(std::uint16_t mhz) {
+    if(mhz==cpu_applied_mhz)return;
+    esp_pm_config_t c{};c.max_freq_mhz=mhz;c.min_freq_mhz=mhz;c.light_sleep_enable=false;
+    if(esp_pm_configure(&c)==ESP_OK){cpu_applied_mhz=mhz;++cpu_switches;}else ++cpu_set_fail;
+}
+#endif
+guardian::battery::Phase battery_phase();
+// G23: the setting values in effect, for BATTRUN's drain segments (a change on battery starts a new segment).
+guardian::battery::Settings battery_settings() {
+    guardian::battery::Settings v;
+    v.poll_s=static_cast<std::uint16_t>(poll_period_ms(true)/1000u);v.dark_mhz=dark_mhz();v.dim_pct=dim_backlight_pct();
+    return v;
+}
 guardian::battery::Phase battery_phase() {   // BATTRUN per-state drain: which screen state this second belongs to
     switch(idle.state()) {
     case gp::State::Dim: return guardian::battery::Phase::Dim;
@@ -703,6 +746,11 @@ void companion_status() {
     char link[240];health.status_text(link,sizeof link);
     char lock_by[measurement::Survey::lock_loss_text_max];   // G23: lock_loss_by=silence:<n>,followed:<n>,held:<n>,stopped:<n>
     if(!survey.lock_loss_text(lock_by,sizeof lock_by))std::snprintf(lock_by,sizeof lock_by,"lock_loss_by=status_overflow");
+    char energy[160];   // G23: the battery-life settings in effect (the poll period now, the CPU now and while dark)
+    {   const float batt_s=tuning && tune_ota_auto_batt>=0?tuning->get(tune_ota_auto_batt):guardian::ota::follow_auto_s;
+        std::snprintf(energy,sizeof energy," ota_auto_batt_s=%d poll_s=%u cpu_mhz=%u dark_cpu_mhz=%u dark_cpu=%s cpu_set_fail=%u cpu_switches=%u",
+            batt_s<0.0f?-1:int(std::lround(batt_s)),unsigned(poll_period_ms(power_source.source()==gp::Source::Battery)/1000u),
+            unsigned(cpu_applied_mhz),unsigned(dark_mhz()),dark_cpu_built?"built":"unbuilt",cpu_set_fail,cpu_switches);}
     char power[640];gp::status_text(idle,power_source.source(),power_source.last_vin_mv(),static_cast<std::uint32_t>(clock_ptr->now()),
         wake_info,retained,wake_guard.swallowed(),power,sizeof power);
     {   // G16N: the last incident wake's latency (ms from the evidence instant; -1 = none since boot)
@@ -740,7 +788,7 @@ void companion_status() {
         " shakes=%u bursts=%u burst_ram=%s burst_ram_bytes=%u"
         " head=%s head_sets=%u/%u head_frames=%u head_refused=%s head_at=%d:%d,%d head_inflates=%u head_reuses=%u head_fail=%u:%s head_ms=%u.%u/%u.%u head_ram=%s head_ram_bytes=%u"
         " rx_received=%u rx_queue_full=%u rx_discarded=%u rx_bad=%u lock_losses=%u last_lock_loss=%s %s %s"
-        " tune_wifi=%s tune_wifi_last_end=%s tune_wifi_commands=%u tune_wifi_refused=%u %s tune_key=%s%s%s%s%s%s\n",
+        " tune_wifi=%s tune_wifi_last_end=%s tune_wifi_commands=%u tune_wifi_refused=%u %s tune_key=%s%s%s%s%s%s%s\n",
         control==Control::Console?"console":"companion",unsigned(app->onboarding()?app->onboarding_page()+1:0),screen_text(v.screen),view_mode_text(v.mode),v.has_selection?v.selected_bssid.c_str():"none",
         int(radio_state()),int(app->store()),int(v.alert),int(v.face),int(v.overlay),unsigned(app->presenter().picker().count),unsigned(app->presenter().picker().dropped),
         unsigned(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),unsigned(uxTaskGetStackHighWaterMark(nullptr)),
@@ -762,7 +810,7 @@ void companion_status() {
         unsigned(radio.received()),unsigned(radio.queue_full()),unsigned(radio.discarded()),unsigned(radio.bad()),
         unsigned(survey.lock_losses()),measurement::Survey::loss_text(survey.last_loss()),lock_by,link,
         tune_wifi,guardian::tune::wifi::end_text(tune_session.end()),unsigned(tune_session.commands()),unsigned(tune_session.refused()),
-        offers,tune_key.loaded()?"ota":tune_key_read?"none":"unread",power,detect,bursts,datapath,setup_text);
+        offers,tune_key.loaded()?"ota":tune_key_read?"none":"unread",power,energy,detect,bursts,datapath,setup_text);
 #if CONFIG_GUARDIAN_ART_BENCH
     bench_status_append(line,sizeof line);   // G16Q: " bench=<name> ..." before the line's newline
 #endif
@@ -799,7 +847,8 @@ bool console_tool(const char* input) {
     if(!std::strcmp(input,"BATTRUN")) {   // read-only; console_tool so the Wi-Fi session reaches it (review 2026-11-17)
         // G16N: + per-state drain; G16P: + the timer checks (480 B: battery_check proves the longest line fits).
         // G16P also restores the `else` that a comment had swallowed here (reply was unset without a run log).
-        char reply[480];
+        // G23: + the drain segments per setting (run_text_max; battery_check proves the longest line fits). Off the stack.
+        static char reply[guardian::battery::run_text_max];
         if(battery_log)guardian::battery::run_text(*battery_log,reply,sizeof reply);
         else std::snprintf(reply,sizeof reply,"BATTRUN none\n");
         text(reply);return true;
@@ -1615,6 +1664,11 @@ extern "C" void app_main() {
     }
     // G16D battery life (owner defaults: dim after 30 s still, deep sleep 120 s later).
     tune_ota_auto=registry.add("ota.auto_s",0.0f,3600.0f,120.0f);   // self-fetch period; 0 = gesture only
+    // G23 battery life: the self-fetch period on battery (-1 = follow ota.auto_s, the behaviour before G23; 0 = no poll on
+    // battery), and the CPU frequency while dark (160 = before G23; applied only by the dark-cpu image). Two keys:
+    // 40 literal + 18 motion.* = 58 board keys, + 68 t.* keys = 126 of tune::max_params 128 (counted 2026-11-20).
+    tune_ota_auto_batt=registry.add("ota.auto_batt_s",-1.0f,3600.0f,guardian::ota::follow_auto_s);
+    tune_dark_cpu=registry.add("power.dark_cpu_mhz",80.0f,240.0f,float(gp::cpu_default_mhz));
     tune_dim_s=registry.add("power.dim_s",5.0f,600.0f,30.0f);
     tune_sleep_s=registry.add("power.sleep_s",10.0f,3600.0f,120.0f);
     tune_dim_pct=registry.add("power.dim_pct",1.0f,60.0f,10.0f);   // backlight percent while dimmed
@@ -1799,7 +1853,7 @@ extern "C" void app_main() {
 #endif
         if(now-last_power>=1000) {   // G16B: PM1 battery once a second, run log once a minute
             guardian::battery::Raw raw;board.read_power(raw);battery_state=battery_monitor.update(raw);
-            battery_log->tick(battery_state,static_cast<std::uint32_t>(now),battery_phase());last_power=now;   // G16N: drain per screen state
+            battery_log->tick(battery_state,static_cast<std::uint32_t>(now),battery_phase(),battery_settings());last_power=now;   // G16N: drain per screen state; G23: per setting
             power_source.sample(source_reading(raw));   // G16D: debounced USB vs battery (never sleeps on USB or unknown)
         }
         if(update_requested){burst_stop();run_update();redraw=sticks3::RedrawSchedule{};continue;}
@@ -1811,7 +1865,7 @@ extern "C" void app_main() {
             // G22A: alert first. While a red ALERT is active a due poll is deferred (counted, STATUS ota_auto_deferred):
             // the incident stays on the glass and the radio keeps listening; the poll runs once the alert has ended.
             const bool busy=tune_session.active() || tune_link.running() || update_confirm.is_open() || setup_visible();
-            const auto period_ms=static_cast<std::uint64_t>(registry.get(tune_ota_auto)*1000.0f);
+            const auto period_ms=poll_period_ms(power_source.source()==gp::Source::Battery);   // G23: ota.auto_batt_s on battery
             if(auto_poll.sample(now,period_ms,busy,app && app->presenter().view().alert)==guardian::ota::AutoPoll::Decision::Run) {
                 burst_stop();update_quiet=true;run_update();update_quiet=false;
                 redraw=sticks3::RedrawSchedule{};continue;
@@ -1849,6 +1903,9 @@ extern "C" void app_main() {
             // so nothing that lit the screen for a message can leave it lit, or dark, by mistake.
             const auto glass=gp::glass(after,idle.dark_for_ms(now32),sticks3::Board::backlight_active_pct,dim_backlight_pct());
             apply_backlight(glass.backlight_pct);glass_frames=glass.frames;
+#if CONFIG_GUARDIAN_DARK_CPU
+            apply_cpu(gp::cpu_mhz(after,dark_mhz()));   // G23: the dark-cpu image only (STATUS cpu_mhz, cpu_set_fail)
+#endif
             if(after!=before) {
                 redraw=sticks3::RedrawSchedule{};dirty.invalidate();force_draw=true;   // leaving Dark: a full redraw at 60 %
                 char line[96];std::snprintf(line,sizeof line,"G16D POWER %s hold=%s\n",gp::state_text(after),gp::hold_text(idle.hold()));text(line);

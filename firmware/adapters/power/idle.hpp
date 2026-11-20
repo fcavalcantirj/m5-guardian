@@ -203,6 +203,19 @@ Glass glass(State, std::uint32_t dark_for_ms, std::uint8_t active_pct, std::uint
 // The key press that brightened Dim or lit Dark is swallowed by the WakeGuard, never a UI action.
 bool wake_press(State before, State after, bool key);
 
+// ---- G23: the CPU frequency while dark -------------------------------------------------
+// TUNE power.dark_cpu_mhz. The CPU runs at cpu_default_mhz (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) in every
+// state; while Dark it runs at the TUNE value. Only an image built with CONFIG_GUARDIAN_DARK_CPU
+// applies it (esp_pm_configure needs CONFIG_PM_ENABLE and returns ESP_ERR_NOT_SUPPORTED without it,
+// ESP-IDF v5.4 components/esp_pm/pm_impl.c); the normal image keeps 160 MHz and says so in STATUS.
+// The Wi-Fi driver's own lock (ESP_PM_APB_FREQ_MAX, components/esp_wifi/src/wifi_init.c) keeps the
+// modem clock at 80 MHz, so 80 is the floor offered here.
+constexpr std::uint16_t cpu_default_mhz = 160;
+// Any stored value -> the nearest of 80 / 160 / 240 MHz (a tie, or not a number: 160).
+std::uint16_t dark_cpu_mhz(float tune_value);
+// The frequency for a state: Dark -> dark_mhz, every other state -> cpu_default_mhz.
+std::uint16_t cpu_mhz(State, std::uint16_t dark_mhz);
+
 // ---- the wake-press guard ---------------------------------------------------------
 // The press that woke the Guardian from deep sleep, or brightened it from Dim,
 // is never a UI action: while armed for a key, that key reads "up" until it has

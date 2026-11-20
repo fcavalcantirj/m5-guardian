@@ -45,7 +45,7 @@ class BuildSupportTests(unittest.TestCase):
   return head+desc+bytes(64)+tail
  def seed(self,p,version='g16b-20261116-200000'):
   (p).mkdir(parents=True,exist_ok=True)
-  (p/'sdkconfig').write_text(''.join(m.built_line(k,v)+'\n' for k,v in m.defaults_config())+''.join(k+'=y\n' for k in m.REQUIRED_OTA_CONFIG)+('CONFIG_GUARDIAN_OTA_SELFTEST_FAIL=y\n' if version.endswith('-stfail') else '# CONFIG_GUARDIAN_OTA_SELFTEST_FAIL is not set\n')+('CONFIG_GUARDIAN_BLE_SPIKE=y\n' if version.endswith('-blespk') else '# CONFIG_GUARDIAN_BLE_SPIKE is not set\n')+('CONFIG_GUARDIAN_ART_BENCH=y\n' if version.endswith('-bench') else '# CONFIG_GUARDIAN_ART_BENCH is not set\n'))
+  (p/'sdkconfig').write_text(''.join(m.built_line(k,v)+'\n' for k,v in m.defaults_config())+''.join(k+'=y\n' for k in m.REQUIRED_OTA_CONFIG)+('CONFIG_GUARDIAN_OTA_SELFTEST_FAIL=y\n' if version.endswith('-stfail') else '# CONFIG_GUARDIAN_OTA_SELFTEST_FAIL is not set\n')+('CONFIG_GUARDIAN_BLE_SPIKE=y\n' if version.endswith('-blespk') else '# CONFIG_GUARDIAN_BLE_SPIKE is not set\n')+('CONFIG_GUARDIAN_ART_BENCH=y\n' if version.endswith('-bench') else '# CONFIG_GUARDIAN_ART_BENCH is not set\n')+('CONFIG_PM_ENABLE=y\nCONFIG_GUARDIAN_DARK_CPU=y\n' if version.endswith('-dcpu') else ''))
   for name in ['guardian_sticks3.elf','guardian_sticks3.map','toolchain.txt','sdk-worktree.txt','sdk-submodules.txt','size.txt','sdk-inputs/qualification.json','sdk-inputs/libnet80211.a','sdk-inputs/LICENSE','bootloader/bootloader.bin','partition_table/partition-table.bin','ota_data_initial.bin','ota-signing-public.pem']:
    f=p/name;f.parent.mkdir(parents=True,exist_ok=True);f.write_text(name)
   tail=self.BENCH_TAIL if version.endswith('-bench') else self.HEAD_SET   # G21: the frame set is in the image; G16Q: the bench image holds its frames instead
@@ -115,6 +115,28 @@ class BuildSupportTests(unittest.TestCase):
    self.assertEqual(hashlib.sha256((real/rec['file']).read_bytes()).hexdigest(),rec['file_sha256'],mood)
   self.assertEqual(sorted(p.name for p in real.glob('*.bin')),sorted(r['file'] for r in manifest['sets'].values()))
  # ---- G16B: signed OTA images -------------------------------------------------
+ # G23 review 2026-11-20: the archive's source copy holds every build input, including the Kconfig menu and the
+ # sdkconfig variant files (they decide which image a build makes), and nothing git ignores (caches, sdkconfig.old).
+ def test_source_copy_holds_the_kconfig_menu_and_every_sdkconfig_variant(self):
+  with tempfile.TemporaryDirectory() as d:
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);m.archive(b,o)
+   with tarfile.open(o/'source.tar.gz') as tar:names=set(tar.getnames())
+  board=m.PROJECT.relative_to(m.ROOT)
+  want={str(board/'main/Kconfig.projbuild')}|{str(board/p.name) for p in m.PROJECT.glob('sdkconfig.*') if p.name!='sdkconfig.old'}
+  self.assertTrue({str(board/n) for n in ['sdkconfig.defaults','sdkconfig.art-bench','sdkconfig.ble-spike','sdkconfig.selftest-fail','sdkconfig.dark-cpu']}<=want)
+  self.assertEqual(want-names,set())
+  self.assertEqual(sorted(n for n in names if Path(n).name=='sdkconfig.old' or {'.pytest_cache','__pycache__','build'}&set(Path(n).parts)),[])
+ def test_source_selection_takes_the_git_file_list_and_falls_back_to_the_tree(self):
+  keep={'firmware/a.cpp','firmware/boards/sticks3/main/Kconfig.projbuild','firmware/boards/sticks3/sdkconfig.defaults','firmware/boards/sticks3/sdkconfig.dark-cpu'}
+  junk=['firmware/boards/sticks3/sdkconfig.old','firmware/t/.pytest_cache/README.md','firmware/t/__pycache__/x.py','firmware/build/gen.cpp','firmware/notes.bin']
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d)
+   for f in sorted(keep)+junk+['firmware/local.cpp']:(r/f).parent.mkdir(parents=True,exist_ok=True);(r/f).write_text('x')
+   (r/'.gitignore').write_text('firmware/local.cpp\n')
+   rel=lambda ps:{str(p.relative_to(r)) for p in ps}
+   self.assertEqual(rel(m.firmware_sources(r)),keep|{'firmware/local.cpp'})   # not a git checkout: every file, filtered
+   subprocess.run(['git','init','-q',str(r)],check=True,capture_output=True)
+   self.assertEqual(rel(m.firmware_sources(r)),keep)                          # a checkout: what git does not ignore
  def test_flash_args_install_the_signed_image_at_ota_0(self):
   with tempfile.TemporaryDirectory() as d:
    b=Path(d)/'b';o=Path(d)/'o';self.seed(b);m.archive(b,o)
@@ -195,6 +217,41 @@ class BuildSupportTests(unittest.TestCase):
   script=(m.PROJECT/'tools/build.sh').read_text()
   self.assertIn('build-ble-spike)',script)
   self.assertIn('sdkconfig.ble-spike',script)
+ # ---- G23: the battery-life image (CPU frequency while dark; power management compiled in) ----
+ DCPU_VERSION='guardian-20261120-090000-dcpu'
+ def test_dark_cpu_image_is_labelled_and_never_a_normal_build(self):
+  with tempfile.TemporaryDirectory() as d:
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b,self.DCPU_VERSION);m.archive(b,o)
+   self.assertTrue(json.loads((o/'COMPLETE.json').read_text())['dark_cpu_image'])
+  with tempfile.TemporaryDirectory() as d:   # a normal build records that it is not the dark-cpu image
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);m.archive(b,o)
+   self.assertFalse(json.loads((o/'COMPLETE.json').read_text())['dark_cpu_image'])
+  with tempfile.TemporaryDirectory() as d:   # the dark-cpu config without the -dcpu label
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);(b/'sdkconfig').write_text((b/'sdkconfig').read_text()+'CONFIG_PM_ENABLE=y\nCONFIG_GUARDIAN_DARK_CPU=y\n')
+   with self.assertRaisesRegex(ValueError,'dcpu'):m.archive(b,o)
+  with tempfile.TemporaryDirectory() as d:   # -dcpu label on a normal image
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b,self.DCPU_VERSION);(b/'sdkconfig').write_text((b/'sdkconfig').read_text().replace('CONFIG_GUARDIAN_DARK_CPU=y\n',''))
+   with self.assertRaisesRegex(ValueError,'dcpu'):m.archive(b,o)
+  with tempfile.TemporaryDirectory() as d:   # labelled, but power management is not compiled in
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b,self.DCPU_VERSION);(b/'sdkconfig').write_text((b/'sdkconfig').read_text().replace('CONFIG_PM_ENABLE=y\n',''))
+   with self.assertRaisesRegex(ValueError,'PM_ENABLE'):m.archive(b,o)
+ def test_dark_cpu_version_stamp_fits_and_the_variant_is_default_off(self):
+  out=subprocess.run([sys.executable,str(m.PROJECT/'tools/build_support.py'),'version-stamp','dcpu'],text=True,capture_output=True)
+  self.assertEqual(out.returncode,0,out.stderr)
+  self.assertRegex(out.stdout.strip(),r'^guardian-[0-9]{8}-[0-9]{6}-dcpu$')
+  self.assertLessEqual(len(out.stdout.strip()),31)
+  script=(m.PROJECT/'tools/build.sh').read_text()
+  self.assertIn('build-dark-cpu)',script)
+  self.assertIn('sdkconfig.dark-cpu',script)
+  overlay=(m.PROJECT/'sdkconfig.dark-cpu').read_text()
+  self.assertIn('CONFIG_PM_ENABLE=y',overlay);self.assertIn('CONFIG_GUARDIAN_DARK_CPU=y',overlay)
+  self.assertNotIn('CONFIG_PM_DFS_INIT_AUTO=y',overlay)   # boots at the sdkconfig frequency, scaling only while dark
+  defaults=(m.PROJECT/'sdkconfig.defaults').read_text()
+  self.assertNotIn('CONFIG_PM_ENABLE=y',defaults);self.assertNotIn('CONFIG_GUARDIAN_DARK_CPU=y',defaults)   # the normal image is unchanged
+  kconfig=(m.PROJECT/'main/Kconfig.projbuild').read_text()
+  block=kconfig[kconfig.index('config GUARDIAN_DARK_CPU'):]
+  block=block[:block.index('\nconfig ',1)]
+  self.assertIn('depends on PM_ENABLE',block);self.assertIn('default n',block)
  # ---- G16Q: the art bench image -----------------------------------------------------
  BENCH_VERSION='guardian-20261118-220000-bench'
  def test_art_bench_image_is_labelled_and_never_a_normal_build(self):

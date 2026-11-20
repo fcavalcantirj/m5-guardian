@@ -61,6 +61,8 @@ do_build(){
     defaults="sdkconfig.defaults;sdkconfig.art-bench";suffix="-bench"
     python3 "$REPO_ROOT/tools/art/candidates.py" verify >/dev/null || die 'bench frames differ from firmware/art/bench/manifest.json (tools/art/candidates.py verify)'
   fi
+  # G23: battery-life measurement image (the CPU frequency while dark follows TUNE power.dark_cpu_mhz; needs CONFIG_PM_ENABLE).
+  if [ "$variant" = dark-cpu ]; then defaults="sdkconfig.defaults;sdkconfig.dark-cpu";suffix="-dcpu";fi
   require_store;require_idf;require_key
   BUILD_DIR="$("$IDF_PYTHON" "$SUPPORT" init "$BUILD_DIR")"
   STAMP="$(date +%Y%m%d-%H%M%S)-$$"
@@ -111,6 +113,8 @@ case "$CMD" in
  build-ble-spike) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-blespk}";do_build ble-spike ;;
  # G16Q art bench image: CONFIG_GUARDIAN_ART_BENCH=y (sdkconfig.art-bench), own build directory and archive.
  build-art-bench) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-bench}";do_build art-bench ;;
+ # G23 battery-life image: CONFIG_PM_ENABLE + CONFIG_GUARDIAN_DARK_CPU (sdkconfig.dark-cpu), own build directory and archive.
+ build-dark-cpu) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-dcpu}";do_build dark-cpu ;;
  keygen)
   [ ! -e "$SIGNING_KEY" ] || die "refusing to overwrite the existing signing key at $SIGNING_KEY"
   require_idf

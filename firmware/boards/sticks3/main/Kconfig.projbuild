@@ -40,6 +40,21 @@ config GUARDIAN_ART_BENCH
         make room. Built by `boards/sticks3/tools/build.sh build-art-bench` into
         its own build directory and archive (version suffix -bench). Never in a
         normal build.
+config GUARDIAN_DARK_CPU
+    bool "MEASUREMENT: the CPU frequency while dark follows TUNE power.dark_cpu_mhz (G23 battery life)"
+    depends on PM_ENABLE
+    default n
+    help
+        G23 battery-life measurement image: while the screen is dark the board calls
+        esp_pm_configure with max = min = TUNE power.dark_cpu_mhz (80, 160 or 240 MHz;
+        light sleep off), and 160 MHz again when the screen lights. The runtime change
+        needs CONFIG_PM_ENABLE (esp_pm_configure returns ESP_ERR_NOT_SUPPORTED without
+        it), which the normal image does not set: power management adds interrupt
+        latency and changes timer accuracy (ESP-IDF Kconfig help), so it stays out of
+        the Guardian until a device measurement says it is worth it. Built by
+        `boards/sticks3/tools/build.sh build-dark-cpu` into its own build directory and
+        archive (version suffix -dcpu). Compare its segments with each other (the same
+        image at 160 and at 80), not with the normal image.
 config GUARDIAN_CRED_HMAC_KEY_ID
     int "eFuse key block (0..5) holding the HMAC key of the credential vault (G16M)"
     range 0 5

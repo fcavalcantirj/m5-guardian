@@ -144,7 +144,7 @@ std::uint32_t test_crc32(const std::uint8_t* p, std::size_t n) {
     for (std::size_t i = 0; i < n; ++i) { c ^= p[i]; for (int k = 0; k < 8; ++k) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u))); }
     return ~c;
 }
-std::string run_line(const RunLog& l) { char t[480]; run_text(l, t, sizeof t); return t; }   // the board's reply buffer
+std::string run_line(const RunLog& l) { char t[run_text_max]; run_text(l, t, sizeof t); return t; }   // the board's reply buffer
 }
 
 GUARDIAN_CASE(a_deep_sleep_wake_continues_the_run_and_reports_the_standby_drop) {
@@ -347,7 +347,8 @@ GUARDIAN_CASE(drain_survives_a_deep_sleep_and_older_records_still_read) {
     Run w; w.boot = 3; w.start_mv = 4000; w.last_mv = 3800; w.minutes = 2; w.active_s = 150;
     w.drain[0] = {600, 30}; w.drain[1] = {1200, -4}; w.drain[2] = {86400, 700};
     std::uint8_t buf[run_bytes]; CHECK_EQ(encode(w, buf, sizeof buf), run_bytes);
-    CHECK_EQ(run_bytes, 73u);                                  // G16P format 4 (format 3 was 61)
+    CHECK_EQ(run_bytes_v4, 73u);                               // G16P format 4 (format 3 was 61)
+    CHECK_EQ(run_bytes, 73u + 2 + 4 * 33);                     // G23 format 5: + four drain segments
     Run r; CHECK(decode(buf, run_bytes, r));
     CHECK_EQ(r.drain[0].seconds, 600u); CHECK_EQ(r.drain[0].drop_mv, 30);
     CHECK_EQ(r.drain[1].seconds, 1200u); CHECK_EQ(r.drain[1].drop_mv, -4);
@@ -374,7 +375,7 @@ GUARDIAN_CASE(timer_checks_show_their_cost_in_battrun) {
     Monitor m; const auto batt = settle(m, on_battery(4000));
     Monitor m2; const auto after = settle(m2, on_battery(3980));
     { RunLog log(blob, 7); log.load(); log.tick(batt, 0); log.tick(batt, 30000);
-      CHECK(run_line(log).find(" checks=0 last_checks=0 check_s=0 check_first_mv=0 check_last_mv=0 check_drop_uv=- standby_uv_h=-\n") != std::string::npos);
+      CHECK(run_line(log).find(" checks=0 last_checks=0 check_s=0 check_first_mv=0 check_last_mv=0 check_drop_uv=- standby_uv_h=- segs=") != std::string::npos);
       log.sleeping(batt, 30000); }
     {   // a key wake after an hour: 12 checks, 300 s apart, the cell 4 mV lower from the first to the last
         RunLog log(blob, 8); log.load();
@@ -382,7 +383,7 @@ GUARDIAN_CASE(timer_checks_show_their_cost_in_battrun) {
         log.tick(after, 1000);
         CHECK(log.active()); CHECK_EQ(log.run().checks, 12u); CHECK_EQ(log.run().last_checks.count, 12);
         // 4000 uV over 11 intervals = 364 uV a check; over 11 x 300 s = 4364 uV an hour (standby current included)
-        CHECK(run_line(log).find(" checks=12 last_checks=12 check_s=300 check_first_mv=3988 check_last_mv=3984 check_drop_uv=364 standby_uv_h=4364\n") != std::string::npos);
+        CHECK(run_line(log).find(" checks=12 last_checks=12 check_s=300 check_first_mv=3988 check_last_mv=3984 check_drop_uv=364 standby_uv_h=4364 segs=") != std::string::npos);
         CHECK(run_line(log).find("sleeps=1 asleep_s=3600 sleep_mv=4000 wake_mv=3980 standby_drop_mv=20") != std::string::npos);   // as before
         log.sleeping(after, 60000);
     }
@@ -391,13 +392,13 @@ GUARDIAN_CASE(timer_checks_show_their_cost_in_battrun) {
         CHECK_EQ(log.run().checks, 12u); CHECK_EQ(log.run().last_checks.first_mv, 3988);   // stored (format 4)
         log.resume(900000, SleepChecks{3, 300, 3980, 3979});
         log.tick(after, 1000);
-        CHECK(run_line(log).find(" checks=15 last_checks=3 check_s=300 check_first_mv=3980 check_last_mv=3979 check_drop_uv=500 standby_uv_h=6000\n") != std::string::npos);
+        CHECK(run_line(log).find(" checks=15 last_checks=3 check_s=300 check_first_mv=3980 check_last_mv=3979 check_drop_uv=500 standby_uv_h=6000 segs=") != std::string::npos);
         log.sleeping(after, 60000);
     }
     {   // one check is no interval; a cell that rose reads negative; a missing reading gives no number
         RunLog log(blob, 10); log.load();
         log.resume(400000, SleepChecks{1, 300, 3979, 3979}); log.tick(after, 1000);
-        CHECK(run_line(log).find(" checks=16 last_checks=1 check_s=300 check_first_mv=3979 check_last_mv=3979 check_drop_uv=- standby_uv_h=-\n") != std::string::npos);
+        CHECK(run_line(log).find(" checks=16 last_checks=1 check_s=300 check_first_mv=3979 check_last_mv=3979 check_drop_uv=- standby_uv_h=- segs=") != std::string::npos);
         int uv = 7, uvh = 7;
         CHECK(!check_drop(SleepChecks{1, 300, 3979, 3979}, uv, uvh));
         CHECK(!check_drop(SleepChecks{5, 300, 0, 3979}, uv, uvh)); CHECK(!check_drop(SleepChecks{5, 300, 3979, 0}, uv, uvh));
@@ -414,16 +415,22 @@ GUARDIAN_CASE(timer_checks_show_their_cost_in_battrun) {
         CHECK(run_line(log).find("end=usb_returned") != std::string::npos);
         CHECK(run_line(log).find(" checks=20 last_checks=4 ") != std::string::npos);
     }
-    // The longest line still fits the board's reply buffer (480).
+    // The longest line still fits the board's reply buffer (run_text_max; 480 before the G23 segments).
     Run big; big.boot = big.minutes = big.active_s = big.asleep_s = big.checks = 0xFFFFFFFFu;
     big.start_mv = big.last_mv = big.sleep_mv = 0xFFFF; big.wake_mv = 1; big.sleeps = 0xFFFF; big.ended_on_usb = true;
     for (auto& d : big.drain) d = {0xFFFFFFFFu, -2000000000};
     big.last_checks = SleepChecks{0xFFFF, 60, 0xFFFF, 1};
+    big.segments_started = 0xFFFF;   // G23: four full segments, every number at its widest
+    for (unsigned k = 0xFFFCu; k <= 0xFFFFu; ++k) {   // segment k lives in slot (k - 1) % max_segments
+        auto& g = big.segments[(k - 1u) % max_segments]; g.number = static_cast<std::uint16_t>(k); g.settings = Settings{0xFFFF, 0xFFFF, 0xFF}; g.start_mv = 0xFFFF;
+        for (auto& d : g.drain) d = {0xFFFFFFFFu, -2000000000};
+    }
     std::uint8_t enc[run_bytes]; CHECK_EQ(encode(big, enc, sizeof enc), run_bytes);
     MemoryBlob wide; wide.bytes.assign(enc, enc + sizeof enc); wide.exists = true;
     RunLog wl(wide, 1); wl.load();
     const auto longest = run_line(wl);
-    CHECK(longest.size() < 479); CHECK(!longest.empty() && longest.back() == '\n');   // whole, not cut
+    CHECK(longest.size() < run_text_max - 1); CHECK(!longest.empty() && longest.back() == '\n');   // whole, not cut
+    CHECK(longest.find(" segs=65535 seg65532=") != std::string::npos);
 }
 
 GUARDIAN_CASE(a_format_4_record_round_trips_and_a_format_3_record_still_reads) {
@@ -435,7 +442,7 @@ GUARDIAN_CASE(a_format_4_record_round_trips_and_a_format_3_record_still_reads) {
     CHECK_EQ(r.checks, 70000u); CHECK_EQ(r.last_checks.count, 288); CHECK_EQ(r.last_checks.period_s, 300);
     CHECK_EQ(r.last_checks.first_mv, 3990); CHECK_EQ(r.last_checks.last_mv, 3962);
     CHECK_EQ(r.drain[2].seconds, 86400u); CHECK_EQ(r.sleeps, 2u); CHECK(r.slept);
-    buf[sizeof buf - 6] ^= 1; CHECK(!decode(buf, run_bytes, r));   // a damaged check byte (last_mv) fails the CRC
+    buf[67] ^= 1; CHECK(!decode(buf, run_bytes, r));   // a damaged check byte (last_mv) fails the CRC (format 5 keeps format 4's offsets)
     // A G16N format 3 record (61 bytes), as a stick updated over the air has stored: every field, no checks.
     CHECK_EQ(run_bytes_v3, 61u);
     std::uint8_t v3[run_bytes_v3]{};
@@ -454,4 +461,128 @@ GUARDIAN_CASE(a_format_4_record_round_trips_and_a_format_3_record_still_reads) {
     read.resume(60000, SleepChecks{2, 60, 3900, 3899});       // and the run goes on in the new format
     CHECK_EQ(read.run().checks, 2u);
     CHECK_EQ(stored.bytes.size(), run_bytes);
+}
+
+// ---- G23: battery life in dark guard, the drain of each setting --------------------------------
+namespace {
+const Settings poll120{120, 160, 10}, poll600{600, 160, 10}, cpu80{120, 80, 10};
+std::string seg_text(std::uint16_t n, const Settings& v, std::uint16_t start_mv, const char* phases) {
+    return " seg" + std::to_string(n) + "=poll_s:" + std::to_string(v.poll_s) + ",dark_mhz:" + std::to_string(v.dark_mhz)
+         + ",dim_pct:" + std::to_string(v.dim_pct) + ",start_mv:" + std::to_string(start_mv) + "," + phases;
+}
+void spend_with(RunLog& log, Clock& c, Phase phase, std::uint32_t seconds, double mv_per_min, const Settings& v) {
+    for (std::uint32_t i = 0; i < seconds; ++i) { c.ms += 1000; c.mv -= mv_per_min / 60.0; log.tick(exact(c.mv), c.ms, phase, v); }
+}
+}
+
+GUARDIAN_CASE(each_setting_gets_its_own_drain_segment_in_battrun) {
+    MemoryBlob blob;
+    RunLog log(blob, 7); log.load();
+    Clock c{0, 4100.02};
+    log.tick(exact(c.mv), c.ms, Phase::Active, poll120);          // the run starts: segment 1 holds today's values
+    CHECK_EQ(log.run().segments_started, 1u);
+    spend_with(log, c, Phase::Dark, 30 + 600, 1.0, poll120);      // A: 10 mV per 10 min dark
+    const auto b_mv = exact(c.mv).mv;
+    // B: the owner sets a longer update-poll period on battery over TUNE. A new segment starts at
+    // that second; the load step after the change settles for drain_settle_ms like a phase change.
+    spend_with(log, c, Phase::Dark, 30 + 600, 0.5, poll600);
+    CHECK_EQ(log.run().segments_started, 2u);
+    // A again (interleaved): a NEW segment, never merged into segment 1.
+    const auto a2_mv = exact(c.mv).mv;
+    spend_with(log, c, Phase::Dark, 30 + 300, 1.0, poll120);
+    CHECK_EQ(log.run().segments_started, 3u);
+    int rate = 0;
+    CHECK(drain_rate(log.run().segments[0].drain, Phase::Dark, rate)); CHECK_EQ(rate, 10);
+    CHECK(drain_rate(log.run().segments[1].drain, Phase::Dark, rate)); CHECK_EQ(rate, 5);
+    CHECK(drain_rate(log.run().segments[2].drain, Phase::Dark, rate)); CHECK_EQ(rate, 10);
+    CHECK_EQ(log.run().segments[1].drain[2].seconds, 600u);
+    CHECK(!drain_rate(log.run().segments[0].drain, Phase::Active, rate));   // nothing measured there: "-"
+    // The run's own numbers are those of a run without segments: one dark stretch, never re-settled
+    // by a setting change (630 + 630 + 330 s, minus the first 30 s of settling).
+    CHECK_EQ(log.run().drain[2].seconds, 1560u);
+    const auto line = run_line(log);
+    CHECK(line.find(" standby_uv_h=- segs=3" + seg_text(1, poll120, 4100, "active:-/0,dim:-/0,dark:10/600")
+                    + seg_text(2, poll600, b_mv, "active:-/0,dim:-/0,dark:5/600")
+                    + seg_text(3, poll120, a2_mv, "active:-/0,dim:-/0,dark:10/300") + "\n") != std::string::npos);
+    // Each segment is measured per phase, after its own settle time, like the run.
+    c.mv -= 20.0;
+    spend_with(log, c, Phase::Active, 30 + 300, 3.0, poll120);
+    CHECK(drain_rate(log.run().segments[2].drain, Phase::Active, rate)); CHECK_EQ(rate, 30);
+    CHECK_EQ(log.run().segments_started, 3u);                      // a phase change is not a new segment
+    // Kept in the record (saved once a minute): read after the stick died or was plugged in.
+    RunLog after(blob, 8); after.load();
+    CHECK_EQ(after.run().segments_started, 3u);
+    CHECK(drain_rate(after.run().segments[1].drain, Phase::Dark, rate)); CHECK_EQ(rate, 5);
+    CHECK(run_line(after).find(seg_text(2, poll600, b_mv, "active:-/0,dim:-/0,dark:5/600")) != std::string::npos);
+}
+
+GUARDIAN_CASE(segments_keep_the_latest_four_and_follow_the_run) {
+    MemoryBlob blob;
+    Clock c{0, 4000.02};
+    {
+        RunLog log(blob, 7); log.load();
+        log.tick(exact(c.mv), c.ms, Phase::Dark, poll120);
+        const Settings trials[] = {cpu80, poll600, poll120, cpu80};   // five segments in all
+        for (const auto& v : trials) spend_with(log, c, Phase::Dark, 60, 1.0, v);
+        CHECK_EQ(log.run().segments_started, 5u);
+        const auto line = run_line(log);
+        CHECK(line.find(" segs=5 seg2=poll_s:120,dark_mhz:80,") != std::string::npos);   // the oldest kept: 2
+        CHECK(line.find(" seg1=") == std::string::npos);
+        CHECK(line.find(" seg5=poll_s:120,dark_mhz:80,") != std::string::npos);
+        CHECK_EQ(log.run().segments[0].number, 5u);                    // slot (5 - 1) % 4
+        // A deep sleep (the floor) and a key wake: the same run, the same segment goes on.
+        log.sleeping(exact(c.mv), c.ms);
+    }
+    {
+        RunLog log(blob, 8); log.load();
+        log.resume(600000);
+        Clock w{0, c.mv - 5.0};
+        log.tick(exact(w.mv), w.ms, Phase::Active, cpu80);
+        spend_with(log, w, Phase::Dark, 30 + 300, 1.0, cpu80);
+        CHECK_EQ(log.run().segments_started, 5u);
+        // 30 s measured before the sleep (1 mV) and 300 s after the wake (5 mV): one segment, 6 mV in 330 s.
+        CHECK_EQ(log.run().segments[0].drain[2].seconds, 330u); CHECK_EQ(log.run().segments[0].drain[2].drop_mv, 6);
+        int rate = 0;
+        CHECK(drain_rate(log.run().segments[0].drain, Phase::Dark, rate)); CHECK_EQ(rate, 11);
+        // USB ends the run and keeps its segments; the next battery run starts again at segment 1.
+        Monitor u; const auto usb = settle(u, on_usb(4100, true));
+        log.tick(usb, w.ms + 1000, Phase::Active, cpu80);
+        CHECK(!log.active()); CHECK_EQ(log.run().segments_started, 5u);
+        log.tick(exact(3900), w.ms + 2000, Phase::Active, poll600);
+        CHECK(log.active()); CHECK_EQ(log.run().segments_started, 1u);
+        CHECK(run_line(log).find(" segs=1 seg1=poll_s:600,dark_mhz:160,dim_pct:10,start_mv:3900,active:-/0,dim:-/0,dark:-/0\n") != std::string::npos);
+        // A setting changed while on USB is simply the value at the next unplug: no segment for it.
+    }
+    CHECK(same(poll120, Settings{120, 160, 10}));
+    CHECK(!same(poll120, poll600)); CHECK(!same(poll120, cpu80)); CHECK(!same(poll120, Settings{120, 160, 11}));
+}
+
+GUARDIAN_CASE(a_format_5_record_round_trips_the_segments_and_a_format_4_record_still_reads) {
+    Run w; w.boot = 3; w.start_mv = 4000; w.last_mv = 3800; w.active_s = 150;
+    w.segments_started = 6;
+    w.segments[1] = Segment{6, Settings{900, 80, 25}, 3950, {}};
+    w.segments[1].drain[2] = {1200, 51}; w.segments[1].drain[0] = {300, -3};
+    std::uint8_t buf[run_bytes]; CHECK_EQ(encode(w, buf, sizeof buf), run_bytes);
+    Run r; CHECK(decode(buf, run_bytes, r));
+    CHECK_EQ(r.segments_started, 6u);
+    CHECK_EQ(r.segments[1].number, 6u); CHECK_EQ(r.segments[1].settings.poll_s, 900u); CHECK_EQ(r.segments[1].settings.dark_mhz, 80u);
+    CHECK_EQ(r.segments[1].settings.dim_pct, 25u); CHECK_EQ(r.segments[1].start_mv, 3950u);
+    CHECK_EQ(r.segments[1].drain[2].seconds, 1200u); CHECK_EQ(r.segments[1].drain[2].drop_mv, 51); CHECK_EQ(r.segments[1].drain[0].drop_mv, -3);
+    CHECK_EQ(r.segments[0].number, 0u);
+    buf[run_bytes - 10] ^= 1; CHECK(!decode(buf, run_bytes, r));   // a damaged segment byte fails the CRC
+    // A G16P format 4 record (73 bytes), as the stick on the G22A image stores it: no segments.
+    std::uint8_t v4[run_bytes_v4]{};
+    std::memcpy(v4, "GBRN", 4); v4[4] = 4; v4[6] = 5; v4[10] = 0x04; v4[11] = 0x10; v4[12] = 0x48; v4[13] = 0x0D;
+    v4[14] = 95; v4[18] = 0; v4[19] = 0x44; v4[20] = 0x16;
+    v4[33 + 16] = 0xD3; v4[33 + 17] = 0x11; v4[33 + 20] = 60;   // drain[2] = {4563 s, 60 mV}
+    v4[57] = 2;                                                 // checks = 2
+    const auto crc = test_crc32(v4, 69);
+    for (int i = 0; i < 4; ++i) v4[69 + i] = static_cast<std::uint8_t>(crc >> (8 * i));
+    Run old; CHECK(decode(v4, sizeof v4, old));
+    CHECK_EQ(old.boot, 5u); CHECK_EQ(old.drain[2].seconds, 4563u); CHECK_EQ(old.drain[2].drop_mv, 60); CHECK_EQ(old.checks, 2u);
+    CHECK_EQ(old.segments_started, 0u);
+    MemoryBlob stored; stored.bytes.assign(v4, v4 + sizeof v4); stored.exists = true;
+    RunLog read(stored, 9); read.load();
+    CHECK(read.has_run());
+    CHECK(run_line(read).find(" segs=0\n") != std::string::npos);   // an old run has no segments, and says so
 }

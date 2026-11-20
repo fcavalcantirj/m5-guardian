@@ -1,0 +1,12 @@
+# G23 battery-life measurement image, applied on top of sdkconfig.defaults by
+# `tools/build.sh build-dark-cpu` (own build directory, archive and version suffix
+# -dcpu). Never part of a normal build.
+#
+# The CPU frequency while dark (TUNE power.dark_cpu_mhz) is changed at run time with
+# esp_pm_configure, which needs power management compiled in (ESP-IDF v5.4
+# components/esp_pm/pm_impl.c returns ESP_ERR_NOT_SUPPORTED without CONFIG_PM_ENABLE).
+# Frequency scaling at startup stays off (CONFIG_PM_DFS_INIT_AUTO is not set): the
+# image boots and runs at CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ (160) until the screen goes dark.
+# No light sleep (the Guardian keeps listening; esp_pm_configure is called with it off).
+CONFIG_PM_ENABLE=y
+CONFIG_GUARDIAN_DARK_CPU=y

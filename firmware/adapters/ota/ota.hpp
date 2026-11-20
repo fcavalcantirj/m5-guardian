@@ -162,6 +162,13 @@ private:
     std::uint32_t checks_{}, deferrals_{};
     bool deferred_{};
 };
+// G23 battery life: the poll period the board runs. TUNE ota.auto_s is the period on USB and, by
+// default, on battery too. TUNE ota.auto_batt_s at 0 or more replaces it while the stick runs on
+// battery (0 = no poll on battery); below 0 (the default, follow_auto_s) the battery period follows
+// ota.auto_s, the behaviour before G23. Seconds become milliseconds as the board did before
+// (truncated); a value that is not a number, or 0 or less, is 0 (the poll is off).
+constexpr float follow_auto_s = -1.0f;
+std::uint64_t poll_period_ms(float auto_s, float auto_batt_s, bool on_battery);
 
 // ---- boot record (NVS key "ota") --------------------------------------------
 // Fixed record: magic "GOTA", format, state, reason, from/target slot,
