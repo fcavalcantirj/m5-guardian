@@ -1,0 +1,44 @@
+# name: beacon_csa_quiet_mbssid
+# kind: beacon
+# provenance: WPA3 beacon that also announces a channel switch, two quiet intervals and a Multiple BSSID set. Expected G16E reading: timing TSF 0x112233 interval 100 TU, csa Valid (mode 1, channel 11, count 5), quiet Valid (2 elements, longest 1500 TU), multi_bssid Valid; rsn Valid and settings complete exactly as without these elements.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 101
+# expect.fc0: 80
+# expect.bssid: 021122334455
+# expect.rsn_offset: 55
+#
+# [  0] Frame Control
+  80 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  ff ff ff ff ff ff
+# [ 10] Address 2
+  02 11 22 33 44 55
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 291
+  30 12
+# [ 24] Timestamp (TSF, little-endian)
+  33 22 11 00 00 00 00 00
+# [ 32] Beacon Interval 100 TU
+  64 00
+# [ 34] Capability Information 0x0011
+  11 00
+# [ 36] SSID element (9.4.2.2), 4 bytes
+  00 04 68 6f 6d 65
+# [ 42] Supported Rates (9.4.2.3): 1 2 5.5 11 basic, 6 9 12 18
+  01 08 82 84 8b 96 0c 12 18 24
+# [ 52] DS Parameter Set (9.4.2.4): channel 6
+  03 01 06
+# [ 55] RSNE: v1, group CCMP-128, 1 pairwise CCMP-128, 1 AKM SAE (00-0F-AC:8), caps MFPC|MFPR (PMF required)
+  30 14 01 00 00 0f ac 04 01 00 00 0f ac 04 01 00
+  00 0f ac 08 c0 00
+# [ 77] Channel Switch Announcement (9.4.2.18): mode 1 (stop transmitting), new channel 11, count 5
+  25 03 01 0b 05
+# [ 82] Quiet (9.4.2.22): count 1, period 0, duration 100 TU, offset 0
+  28 06 01 00 64 00 00 00
+# [ 90] Quiet (9.4.2.22): count 2, period 0, duration 1500 TU, offset 10 (a second quiet interval is legal)
+  28 06 02 00 dc 05 0a 00
+# [ 98] Multiple BSSID (9.4.2.45): MaxBSSID Indicator 3, no subelements
+  47 01 03

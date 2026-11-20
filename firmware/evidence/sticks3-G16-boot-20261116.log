@@ -1,0 +1,25 @@
+# G16 on-device validation — 2026-11-16
+board: LAB-STICK-1 (StickS3), port /dev/cu.usbmodem101
+worker attempt: ralph/20261116-164008-095299-task-18 (claude-sonnet-5-5), status awaiting_review
+flashed archive: builds/20261116-173235-29054-sticks3 (build.sh after `build.sh clean`; first build failed on
+  a polluted build-dir sdkconfig with CONFIG_APP_RETRIEVE_LEN_ELF_SHA=9, clean rebuild = 64)
+bin sha256:  d86329293310c8d5... (matches archive SHA256SUMS; esptool 'Hash of data verified' x3)
+bootloader:  126b03e56e39497a...  partition-table: 80c0ab49e68ec244...
+source manifest: 137 files, 0 mismatches vs repo
+embedded art: full 64,800-byte firmware/art/persona/v2/rgb565/VeryGood.rgb565 found in bin at offset 73700
+rollback image: $GUARDIAN_STORE/backups/stick-backup-pre-g16-20261116-172938.bin (c614a575627181939048702821b53eaca047d11390ccd0d94cf7167895c3d74c)
+  second read diff = 2 sectors 0xd000, 0xe000, both inside nvs (0x9000-0xF000): boot-time NVS writes only
+
+host (supervisor build, Mac disk, host-check.sh flags): plain 26/26, ASan/UBSan 26/26
+
+STATUS after flash:
+G14 STATUS control=companion onboarding=0 screen=Face mode=LIVE selected=OWNER-AP-1 radio=4 store=1 alert=0 face=3 overlay=0 picker=16 picker_dropped=193 heap_internal_min=94599 task_stack_free=4456
+
+OWNER-VERIFIED (photo 2026-11-16 17:46, DEMO 1/5): Fawkes portrait with grin and cigar, DEMO plate,
+  "Very good", WPA3-Personal, PMF Required, "settings only", hints legible. Owner accepted G16.
+NOT YET CAPTURED (moved to G16A verify, which re-lays-out this screen in portrait):
+  - G16 step 5 on-device video (grin, cigar, smoke, label at viewing distance)
+  - on-device check that removing fresh evidence replaces the rated display with no-data (host-tested only)
+  - per-frame render cost on the S3 (unmeasured; G21)
+DEFECT SEEN: rainbow strip on one panel edge (also in G14 photos). Cause per M5GFX 0.2.28 rotation formula:
+  landscape rotation 1 needs gap (40,53); sticks3_board.cpp sets (40,52). Fix scheduled in G16A.

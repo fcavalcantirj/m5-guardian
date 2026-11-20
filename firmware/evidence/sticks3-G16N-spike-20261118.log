@@ -1,0 +1,44 @@
+# G16N dark-guard spikes on the StickS3 (LAB-STICK-1), image guardian-20261118-154515, read over the self-fetch TUNE poll.
+# 16:5x installed by the stick's own poll after the owner woke it (the previous image deep-slept on battery).
+# First STATUS: power=battery batt=3756mV/57% power_state=active (the poll itself is activity) dark_total_s=30 dark_wakes=0/0/0
+#   reset=sw imu=running@0x68 heap_internal_min=111391 last_update_result=ok
+# S1 drain: BATTRUN drain_mv_10min per state, three readings 20 min apart (appended below as they land).
+# S2/S3 (wake from dark on a deauth; a second burst re-lights): owner's Bruce, pending.
+# S2/S3 17:1x-17:3x (owner's Bruce, stick on battery, ota.auto_s=900 for the test): first burst lit the dark screen
+# in about 1 s (owner's count) and showed RED, then the nearby banner (orange); the second burst, minutes later, lit the
+# screen but stayed ORANGE, face unchanged. STATUS afterwards: disconnect(frames on the selected network) events=4
+# incidents=0; area_disconnect events=43 incidents=2 last=400s; alert=0; dark_wakes=0/2/0 (key/motion/incident:
+# both wakes counted as motion, none as incident); dark_wake_evidence_ms=-1. Open: which access-point address Bruce
+# targeted on the second run (the stick watches OWNER-AP-1); and why the wakes were booked as motion.
+# Attribution read from idle.cpp:116: an incident wins over motion in the same step, so both wakes were MOTION that
+# arrived before any incident (the stick on the same table as the hands starting Bruce; gyro rest threshold 4 deg/s).
+# The "1 s" wake is therefore not yet proven as an incident wake. Redo S2 with the stick on a cushion and Bruce
+# started away from the table; the stick must stay black until the burst.
+# S1 drain (image guardian-20261118-170719, on battery, cushion, hands off; readings over the poll):
+#   17:54 batt=3545mV/30% drain_mv_10min dark:23 (dark 799 s, dim 150 s, active 16 s) dark_wakes=0/4/0
+#   18:04 batt=3503mV/25% drain_mv_10min dark:26 (dark 1031 s, dim 210 s, active 56 s) dark_wakes=0/6/0 (two more MOTION wakes, nobody touching)
+#   18:24 no answer to the poll (battery floor 20 % -> deep sleep, by design)
+# VERDICT: dark guarding drains about 5 %-points per 10 min at this charge level (INFERRED ~1.5-2 h per full charge, the
+# radio and CPU stay fully on); the rest-motion rule (4 deg/s, 0.05 g) wakes the screen on noise (traces: the quietest
+# recording trips it; 20 deg/s / 0.15 g keeps taps, shakes, drops firing) -> TUNE motion.rest_gyro=20 motion.rest_acc=0.15
+# offered over the poll; make them the firmware defaults in the G16N acceptance.
+# 18:29 TUNE landed over the poll after the owner woke the stick on USB: motion.rest_gyro=20 motion.rest_acc=0.15 saved
+#   (version 1.31); batt=3535mV/29%~usb power=usb charging=yes vbus_mv=5048 wake_cause=ext1. Dark-wake attribution is
+#   re-checked on the next battery session. Owner: a plugged-in stick should wake by itself (today only the keys wake it) -> G16P.
+# 18:55 image guardian-20261118-184937 (rest thresholds 20 deg/s / 0.15 g as firmware defaults, idle_check updated)
+#   installed by self-fetch on USB: last_update_result=ok reset=sw imu=running@0x68 batt=3638mV/42%~usb.
+
+== S2 on the device, 2026-11-19 (supervisor; owner run relayed by the Author session) ==
+image guardian-20261119-133525, on battery; owner: key wake, still until Dark, one Bruce run; owner (verbatim, via
+the Author): "worked. came back" (the dark screen lit by itself)
+STATUS 18:33:49 (builds/20261119-device-proofs/g16n-status.log): uptime_s=12137 (booted 15:11:32, so Dark, not a boot)
+  power=battery batt=3836mV/67% darks=3 dark_total_s=1837 dark_wakes=0/1/1 (key/motion/incident: 1 incident wake)
+  dark_wake_evidence_ms=53 (evidence instant -> backlight) dark_wake_frame_ms=101 (-> first frame)  [set only by an
+  incident wake]; dark_last_wake=hold: the supervisor's TUNE session read woke it again afterwards (power_hold=tune;
+  INFERRED from idle.cpp:126 Hold = neither incident, key nor motion)
+  last_burst_network=rule:deauth_broadcast,total:50,unlisted:0,tuples:8,own:4,age_s:195,open:0,top:...;ffffffffffff/OWNER-AP-1/OWNER-AP-1/11:3:own;OWNER-AP-1/AIR-1/OWNER-AP-1/11:1:own
+  area_disconnect events=223 incidents=2; disconnect events=17 incidents=0
+video: the file named "WhatsApp Video 2026-11-19 at 1.28.39 PM (1).mp4" (18:31) is byte-identical to the 13:28 G16T
+  video (sha256 2ce38bd8...); no dark-wake video is on the Mac. Acceptance rests on the stick's record.
+S3: not run as a sequence (second burst re-lights; floor -> deep sleep). The floor sleep happened on 2026-11-19 ~14:16
+  (BATTRUN sleep_mv=3467 after dark 1489 s, see sticks3-G16P-20261119.log; floor INFERRED). CARRY-OVER into G23.

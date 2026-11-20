@@ -1,0 +1,36 @@
+# name: auth_sae_commit
+# kind: auth
+# provenance: SAE Commit (algorithm 3, transaction 1) from a locally administered source. The scalar/element are placeholders. Expected G16E reading: auth_valid, algorithm 3, transaction 1, status Complete; the SAE body after the fixed fields is not decoded and is not parsed as elements.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 128
+# expect.fc0: b0
+# expect.bssid: 021122334455
+#
+# [  0] Frame Control
+  b0 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  02 11 22 33 44 55
+# [ 10] Address 2
+  da a1 19 00 00 01
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 17
+  10 01
+# [ 24] Authentication Algorithm Number 3 (SAE, 9.4.1.1)
+  03 00
+# [ 26] Authentication Transaction Sequence Number 1 (SAE Commit, 12.4.7.4)
+  01 00
+# [ 28] Status Code 0
+  00 00
+# [ 30] Finite Cyclic Group 19 (9.4.1.42)
+  13 00
+# [ 32] Scalar (32 bytes, placeholder zeros: not a valid commit, never decoded)
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+# [ 64] Element (64 bytes, placeholder zeros: not a curve point, never decoded)
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00

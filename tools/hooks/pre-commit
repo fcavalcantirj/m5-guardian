@@ -1,0 +1,5 @@
+#!/bin/sh
+# Refuse a commit while the tree holds a personal or machine-specific value.
+# Enable once per clone:  git config core.hooksPath tools/hooks
+# The check reads every file git would take (tracked and untracked-not-ignored), not only the staged ones.
+exec python3 -I "$(git rev-parse --show-toplevel)/tools/public_check.py"

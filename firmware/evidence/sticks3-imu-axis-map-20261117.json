@@ -1,0 +1,40 @@
+{
+ "right": 2,
+ "up": -1,
+ "out": 3,
+ "standing": {
+  "samples": 400,
+  "mean_g": [
+   -0.99912109375,
+   -0.0402099609375,
+   0.0017578125
+  ],
+  "gyro_dps": 0.29,
+  "acc_lsb_per_g": 4096.0,
+  "source": "IMU POSE"
+ },
+ "lying": {
+  "samples": 400,
+  "mean_g": [
+   -0.0158935546875,
+   -0.0400146484375,
+   1.0056884765625
+  ],
+  "gyro_dps": 0.28,
+  "acc_lsb_per_g": 4096.0,
+  "source": "IMU POSE"
+ },
+ "rule": "up = standing dominant axis, out = lying (screen up) dominant axis, right = up x out (right-handed BMI270 frame)",
+ "right_edge": {
+  "samples": 400,
+  "mean_g": [
+   0.0107666015625,
+   -1.00810546875,
+   -0.0292236328125
+  ],
+  "gyro_dps": 0.28,
+  "acc_lsb_per_g": 4096.0,
+  "source": "IMU POSE"
+ },
+ "cross_check": "right-edge trace agrees"
+}

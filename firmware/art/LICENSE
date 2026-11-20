@@ -1,0 +1,33 @@
+Guardian persona artwork
+Copyright (c) 2026 Felipe Cavalcanti. All rights reserved.
+
+What this covers
+  The artwork of the Guardian persona, wherever a copy sits in this
+  repository: the portraits and masters, the sheets and previews, the 3D
+  source file, the frame packs and the packed portraits generated from them
+  (image, model and packed-art files under firmware/art/, and any generated
+  copy of them elsewhere in the tree).
+
+Provenance
+  The accepted portraits are an AI-rendered illustration pack supplied by the
+  repository owner and post-processed by the scripts in this directory; the
+  earlier procedural version was generated with Blender (see
+  docs/G15-persona.md). The persona is inspired by Guy Fawkes mask
+  iconography. No claim is made here over any third-party design or mark, and
+  nothing in this file grants a right in one.
+
+What this does not cover
+  The scripts in this directory (the .py files that build, check and pack the
+  art) are source code under the repository's MIT license (../../LICENSE).
+
+What you may do
+  View the artwork, and use it unmodified to build this firmware for your own
+  personal, non-commercial use on your own device.
+
+What you may not do without written permission from the copyright holder
+  Redistribute the artwork outside an unmodified copy of this repository,
+  modify it for redistribution, use it commercially, use it in another
+  product or project, or use the persona as a name, logo or mark.
+
+The MIT license of this repository grants no right to the artwork. To build a
+firmware you can share freely, replace the artwork with your own.

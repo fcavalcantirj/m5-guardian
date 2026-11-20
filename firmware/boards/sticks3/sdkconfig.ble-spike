@@ -1,0 +1,30 @@
+# G16H Wi-Fi/BLE coexistence spike image, applied on top of sdkconfig.defaults by
+# `tools/build.sh build-ble-spike` (own build directory, archive and version suffix
+# -blespk). Never part of a normal build.
+#
+# BLE stack: NimBLE observer + central. Broadcaster and peripheral are compiled
+# out, so this image cannot advertise. Central is enabled ONLY because NimBLE at
+# the pinned IDF does not compile observer-only (ble_gap.c calls
+# ble_gap_call_conn_event_cb / ble_gap_adv_active_instance, which exist only
+# under NIMBLE_BLE_CONNECT = central || peripheral; measured 2026-11-17 build
+# failure). ble_spike.cpp never connects, and every scan is passive (no scan
+# request), so nothing is transmitted.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+# Legacy advertising reports only (BLE_GAP_EVENT_DISC); extended scanning is a later question.
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
+# NimBLE host memory from PSRAM, so the internal heap the Wi-Fi driver needs is
+# spent only on the controller (heap_before_ble / heap_after_ble in the START line).
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+# Vendor coexistence guidance (ESP-IDF v5.4 api-guides/coexist.rst, esp32s3): run the
+# BT controller and host on the other CPU than the Wi-Fi task (pinned to core 0).
+CONFIG_BT_CTRL_PINNED_TO_CORE_1=y
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_1=y
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+CONFIG_GUARDIAN_BLE_SPIKE=y

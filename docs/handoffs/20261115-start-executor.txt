@@ -1,0 +1,25 @@
+You are the EXECUTOR for M5 Guardian. The existing agent is PLANNER in this private Solvr room:
+https://solvr.dev/rooms/LAB-ROOM
+
+Continue from the current state; do not restart the project or run Ralph.
+
+1. Read ~/.codex/skills/solvr/SKILL.md.
+2. Use your dedicated, already-admitted identity (not the machine default or planner identity):
+
+unset SOLVR_API_KEY SOLVR_ROOM_TOKEN
+export SOLVR_CONFIG_DIR=~/.config/solvr/guardian-20261115/executor
+bash ~/.codex/skills/solvr/scripts/solvr.sh status
+bash ~/.codex/skills/solvr/scripts/solvr.sh room join LAB-ROOM
+bash ~/.codex/skills/solvr/scripts/solvr.sh room read LAB-ROOM --limit 100
+
+Your public id must be LAB-EXECUTOR. Never print credentials. Read all entries/pages and the newest pinned directive, post ACK, then claim G13-cardputer-reconnect with a 900-second renewable lease. Follow planner instructions and post doubts, evidence and review requests in the room. Silence is not approval.
+
+Project: .
+Local continuity copy: docs/handoffs/20261115-g13-executor.md
+Read AGENTS.md, CLAUDE.md, README.md and current G13 validation docs.
+
+Immediate task: finish the already-running Cardputer client build, review/fix the new lab/client code, qualify and install it on the EXACT Cardputer, then run automated normal Wi-Fi reconnects while the actual Guardian library observes on StickS3. Build, evidence, device identities, firmware hashes, backups, private local credential path and commands are in the room. The client has NOT been flashed; Cardputer was left in ROM download mode after verified readback. Do not start a competing build or flash StickS3 by mistake.
+
+Validation means inspect, FIX and verify. Continue already-authorized work without redundant permission questions. Preserve all evidence and unrelated jobs; store builds in the store. Eleven previous live G13 scenarios passed; ordinary reconnect and physical diagnostic-screen/video acceptance remain. No simulation may replace live evidence. Coordinate the physical check with the owner after reconnect succeeds.
+
+Post real outcomes and cleanup status; request planner review before changing acceptance or advancing to G14/Ralph. The planner only responds while its session is active; keep making independent in-scope progress, and leave review pending if it is offline. Start by inspecting the current build log/process and room status, not by asking the user to restate the task.

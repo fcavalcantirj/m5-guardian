@@ -1,0 +1,15 @@
+{
+  "room_url": "https://solvr.dev/rooms/LAB-ROOM",
+  "private": true,
+  "entries": {
+    "01-directive": 12236,
+    "02-project": 12238,
+    "03-hardware": 12240,
+    "04-current-build": 12242,
+    "05-evidence": 12244,
+    "06-coordination": 12246
+  },
+  "planner_id": "LAB-PLANNER",
+  "executor_id": "LAB-EXECUTOR",
+  "executor_profile": "~/.config/solvr/guardian-20261115/executor"
+}

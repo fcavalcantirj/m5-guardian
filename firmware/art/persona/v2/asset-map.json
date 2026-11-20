@@ -1,0 +1,211 @@
+{
+  "version": "2026-11-16-v2",
+  "source": "source/moods_contact_sheet.png",
+  "model_type": "rendered_3d_style_illustration_not_GLTF_or_blender_mesh",
+  "moods": [
+    "VeryGood",
+    "Good",
+    "Medium",
+    "Bad",
+    "Horrible"
+  ],
+  "states": [
+    {
+      "name": "VeryGood",
+      "rating": "VeryGood",
+      "alert": false,
+      "pulse": null,
+      "png_240x135": "exports/frames/VeryGood.png",
+      "rgb565": "exports/rgb565/VeryGood.rgb565",
+      "preview_rgb565": "exports/preview565/VeryGood.png",
+      "master_png": "masters_png/VeryGood.png",
+      "master_webp": "masters_webp/VeryGood.webp"
+    },
+    {
+      "name": "VeryGood_ALERT_p0",
+      "rating": "VeryGood",
+      "alert": true,
+      "pulse": 0,
+      "png_240x135": "exports/frames/VeryGood_ALERT_p0.png",
+      "rgb565": "exports/rgb565/VeryGood_ALERT_p0.rgb565",
+      "preview_rgb565": "exports/preview565/VeryGood_ALERT_p0.png",
+      "master_png": "masters_png/VeryGood_ALERT_p0.png",
+      "master_webp": "masters_webp/VeryGood_ALERT_p0.webp"
+    },
+    {
+      "name": "VeryGood_ALERT_p1",
+      "rating": "VeryGood",
+      "alert": true,
+      "pulse": 1,
+      "png_240x135": "exports/frames/VeryGood_ALERT_p1.png",
+      "rgb565": "exports/rgb565/VeryGood_ALERT_p1.rgb565",
+      "preview_rgb565": "exports/preview565/VeryGood_ALERT_p1.png",
+      "master_png": "masters_png/VeryGood_ALERT_p1.png",
+      "master_webp": "masters_webp/VeryGood_ALERT_p1.webp"
+    },
+    {
+      "name": "Good",
+      "rating": "Good",
+      "alert": false,
+      "pulse": null,
+      "png_240x135": "exports/frames/Good.png",
+      "rgb565": "exports/rgb565/Good.rgb565",
+      "preview_rgb565": "exports/preview565/Good.png",
+      "master_png": "masters_png/Good.png",
+      "master_webp": "masters_webp/Good.webp"
+    },
+    {
+      "name": "Good_ALERT_p0",
+      "rating": "Good",
+      "alert": true,
+      "pulse": 0,
+      "png_240x135": "exports/frames/Good_ALERT_p0.png",
+      "rgb565": "exports/rgb565/Good_ALERT_p0.rgb565",
+      "preview_rgb565": "exports/preview565/Good_ALERT_p0.png",
+      "master_png": "masters_png/Good_ALERT_p0.png",
+      "master_webp": "masters_webp/Good_ALERT_p0.webp"
+    },
+    {
+      "name": "Good_ALERT_p1",
+      "rating": "Good",
+      "alert": true,
+      "pulse": 1,
+      "png_240x135": "exports/frames/Good_ALERT_p1.png",
+      "rgb565": "exports/rgb565/Good_ALERT_p1.rgb565",
+      "preview_rgb565": "exports/preview565/Good_ALERT_p1.png",
+      "master_png": "masters_png/Good_ALERT_p1.png",
+      "master_webp": "masters_webp/Good_ALERT_p1.webp"
+    },
+    {
+      "name": "Medium",
+      "rating": "Medium",
+      "alert": false,
+      "pulse": null,
+      "png_240x135": "exports/frames/Medium.png",
+      "rgb565": "exports/rgb565/Medium.rgb565",
+      "preview_rgb565": "exports/preview565/Medium.png",
+      "master_png": "masters_png/Medium.png",
+      "master_webp": "masters_webp/Medium.webp"
+    },
+    {
+      "name": "Medium_ALERT_p0",
+      "rating": "Medium",
+      "alert": true,
+      "pulse": 0,
+      "png_240x135": "exports/frames/Medium_ALERT_p0.png",
+      "rgb565": "exports/rgb565/Medium_ALERT_p0.rgb565",
+      "preview_rgb565": "exports/preview565/Medium_ALERT_p0.png",
+      "master_png": "masters_png/Medium_ALERT_p0.png",
+      "master_webp": "masters_webp/Medium_ALERT_p0.webp"
+    },
+    {
+      "name": "Medium_ALERT_p1",
+      "rating": "Medium",
+      "alert": true,
+      "pulse": 1,
+      "png_240x135": "exports/frames/Medium_ALERT_p1.png",
+      "rgb565": "exports/rgb565/Medium_ALERT_p1.rgb565",
+      "preview_rgb565": "exports/preview565/Medium_ALERT_p1.png",
+      "master_png": "masters_png/Medium_ALERT_p1.png",
+      "master_webp": "masters_webp/Medium_ALERT_p1.webp"
+    },
+    {
+      "name": "Bad",
+      "rating": "Bad",
+      "alert": false,
+      "pulse": null,
+      "png_240x135": "exports/frames/Bad.png",
+      "rgb565": "exports/rgb565/Bad.rgb565",
+      "preview_rgb565": "exports/preview565/Bad.png",
+      "master_png": "masters_png/Bad.png",
+      "master_webp": "masters_webp/Bad.webp"
+    },
+    {
+      "name": "Bad_ALERT_p0",
+      "rating": "Bad",
+      "alert": true,
+      "pulse": 0,
+      "png_240x135": "exports/frames/Bad_ALERT_p0.png",
+      "rgb565": "exports/rgb565/Bad_ALERT_p0.rgb565",
+      "preview_rgb565": "exports/preview565/Bad_ALERT_p0.png",
+      "master_png": "masters_png/Bad_ALERT_p0.png",
+      "master_webp": "masters_webp/Bad_ALERT_p0.webp"
+    },
+    {
+      "name": "Bad_ALERT_p1",
+      "rating": "Bad",
+      "alert": true,
+      "pulse": 1,
+      "png_240x135": "exports/frames/Bad_ALERT_p1.png",
+      "rgb565": "exports/rgb565/Bad_ALERT_p1.rgb565",
+      "preview_rgb565": "exports/preview565/Bad_ALERT_p1.png",
+      "master_png": "masters_png/Bad_ALERT_p1.png",
+      "master_webp": "masters_webp/Bad_ALERT_p1.webp"
+    },
+    {
+      "name": "Horrible",
+      "rating": "Horrible",
+      "alert": false,
+      "pulse": null,
+      "png_240x135": "exports/frames/Horrible.png",
+      "rgb565": "exports/rgb565/Horrible.rgb565",
+      "preview_rgb565": "exports/preview565/Horrible.png",
+      "master_png": "masters_png/Horrible.png",
+      "master_webp": "masters_webp/Horrible.webp"
+    },
+    {
+      "name": "Horrible_ALERT_p0",
+      "rating": "Horrible",
+      "alert": true,
+      "pulse": 0,
+      "png_240x135": "exports/frames/Horrible_ALERT_p0.png",
+      "rgb565": "exports/rgb565/Horrible_ALERT_p0.rgb565",
+      "preview_rgb565": "exports/preview565/Horrible_ALERT_p0.png",
+      "master_png": "masters_png/Horrible_ALERT_p0.png",
+      "master_webp": "masters_webp/Horrible_ALERT_p0.webp"
+    },
+    {
+      "name": "Horrible_ALERT_p1",
+      "rating": "Horrible",
+      "alert": true,
+      "pulse": 1,
+      "png_240x135": "exports/frames/Horrible_ALERT_p1.png",
+      "rgb565": "exports/rgb565/Horrible_ALERT_p1.rgb565",
+      "preview_rgb565": "exports/preview565/Horrible_ALERT_p1.png",
+      "master_png": "masters_png/Horrible_ALERT_p1.png",
+      "master_webp": "masters_webp/Horrible_ALERT_p1.webp"
+    }
+  ],
+  "screen": [
+    240,
+    135
+  ],
+  "face_zone_x": [
+    0,
+    151
+  ],
+  "text_zone_x": [
+    152,
+    239
+  ],
+  "rgb565_byte_order": "little-endian",
+  "rgb565_bytes": 64800,
+  "pulse_phases": [
+    0,
+    1
+  ],
+  "mood_map": {
+    "VeryGood": "celebrating/cigar",
+    "Good": "confident smile",
+    "Medium": "skeptical",
+    "Bad": "worried",
+    "Horrible": "angry/clenched teeth"
+  },
+  "unsupported_expressions": [
+    "generic Happy",
+    "Sad",
+    "Neutral",
+    "Offline: policy suppresses the face"
+  ],
+  "alert": "incident overlay, not a sixth rating"
+}

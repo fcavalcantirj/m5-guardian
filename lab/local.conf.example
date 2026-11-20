@@ -1,0 +1,33 @@
+# Template for the owner-local settings of the lab tools. Copy it to ~/.config/m5-guardian/local.conf
+# (or point GUARDIAN_LOCAL_CONF at your copy) and fill in your own values. Never commit the copy.
+# An exported environment variable of the same name always wins over this file.
+# Resolvers: tools/guardian_local.py (Python) and tools/guardian-local.sh (shell).
+# A tool that needs a key you have not set refuses with the key's name; nothing falls back to a guess.
+
+# Artifact store: builds, logs, evidence, the Ralph data. It must contain an empty file named
+# .guardian-store-root.
+GUARDIAN_STORE=/path/to/guardian-store
+# Optional: the mount point the store lives on. When set, it must be a mounted smbfs share, so
+# nothing is ever written into an empty mount point.
+#GUARDIAN_STORE_MOUNT=/mnt/your-share
+
+# Optional: a substring of CLAUDE_CONFIG_DIR that the Ralph runner and the reviewer refuse to use
+# (for example a work profile that must never run this project's agents).
+#GUARDIAN_FORBIDDEN_CLAUDE_CONFIG=work-profile
+
+# Lab bench identities (only the live lab tools under lab/ and tools/threat_watch.py need them).
+# Addresses as six colon-separated bytes. A value runs to the end of its line: no trailing comments.
+# The StickS3 under test (board runs, threat_watch):
+#GUARDIAN_LAB_STICK_MAC=02:00:00:00:00:01
+# The receiver / Wi-Fi client board (its USB serial number):
+#GUARDIAN_LAB_CARDPUTER_MAC=02:00:00:00:00:02
+# The stimulus board attached to the lab Pi:
+#GUARDIAN_LAB_EMITTER_MAC=02:00:00:00:00:03
+# ssh target of the lab Pi (user@host or an ~/.ssh/config alias), its Python, and the folder that
+# holds emitter.py and ap_control.py on it:
+#GUARDIAN_LAB_PI_SSH=lab-pi
+#GUARDIAN_LAB_PI_PYTHON=/path/on/the/pi/bin/python
+#GUARDIAN_LAB_PI_TOOLS=/path/on/the/pi/lab-tools
+# Target of lab/live/deauth_truth.py (your own access point only):
+#GUARDIAN_LAB_AP=02:00:00:00:00:04
+#GUARDIAN_LAB_SSID=your-network-name

@@ -1,0 +1,4 @@
+{"candidates": [
+ {"id": "r1", "kind": "retexture", "input_task_id": "01a1ec45-0db3-7486-a844-6817d25e0005", "master": "Medium"},
+ {"id": "r2", "kind": "retexture", "input_task_id": "01a1ec45-1bdf-7017-b078-032224386647", "master": "VeryGood"}
+]}

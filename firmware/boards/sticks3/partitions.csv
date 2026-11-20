@@ -1,0 +1,19 @@
+# M5 Guardian StickS3 partition table, 8 MB flash, internal storage only (no SD).
+# G16B: two equal OTA slots (measured G16A app 907,584 B; 3 MiB each leaves
+# room for the Wi-Fi station/HTTP client and later art). nvs and phy_init keep
+# their G11-G16A offsets and sizes, so the owner's selection, TUNE values and
+# boot counter survive the one USB install of this table. App slots are 64 KiB
+# aligned (signed images are padded to 64 KiB).
+# G16M: nvs_cred is the encrypted credential vault (NVS encryption, keys derived from the owner-burnt
+# eFuse HMAC key; main/cred_vault.hpp). It sits in the gap that was unused between otadata and ota_0:
+# nothing else moves, so one USB write of the partition table (plus an erase of that gap) adds it and
+# every other partition keeps its content. An update over the air does NOT change the partition table;
+# a stick still on the old table reports cred_vault=no_partition and keeps the plain record.
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+otadata,    data, ota,      0x10000,  0x2000,
+nvs_cred,   data, nvs,      0x12000,  0x4000,
+ota_0,      app,  ota_0,    0x20000,  0x300000,
+ota_1,      app,  ota_1,    0x320000, 0x300000,
+assets,     data, littlefs, 0x620000, 0x1E0000,

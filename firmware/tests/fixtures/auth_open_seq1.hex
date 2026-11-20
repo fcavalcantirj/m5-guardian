@@ -1,0 +1,26 @@
+# name: auth_open_seq1
+# kind: auth
+# provenance: Open System authentication request (transaction 1) from the fixture station to the fixture BSSID. Expected G16E reading: kind Authentication, status Complete, auth_valid, algorithm 0, transaction 1, status code 0.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 30
+# expect.fc0: b0
+# expect.bssid: 021122334455
+#
+# [  0] Frame Control
+  b0 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  02 11 22 33 44 55
+# [ 10] Address 2
+  02 aa bb cc dd ee
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 16
+  00 01
+# [ 24] Authentication Algorithm Number 0 (Open System, 9.4.1.1)
+  00 00
+# [ 26] Authentication Transaction Sequence Number 1 (9.4.1.2)
+  01 00
+# [ 28] Status Code 0 (9.4.1.9; reserved in request frames)
+  00 00

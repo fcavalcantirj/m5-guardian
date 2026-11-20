@@ -1,0 +1,47 @@
+G16H BLE pairing-popup detector + Wi-Fi/BLE coexistence spike — supervisor log 2026-11-19
+================================================================================
+
+## Handoff (MEASURED)
+- Attempt 20261119-183457-198150-task-41, awaiting_review, exit 0, engine.log "READY FOR REVIEW".
+- Worker: host-only detector (guardian/ble.hpp, BlePopupDetector, rules pairing_popup_flood + fast_pair_rotation,
+  Area/amber), unfed on the stick (STATUS ble_popup:...,unconfigured), seven t.ble_* keys, max_params 128.
+  Worker states G16H is NOT complete: the coexistence spike never ran.
+- Watcher SUMMARY ralph-watch/G16H-20261119-183457-198150-task-41 (snapshot 19:50:28, checked 19:55:02):
+  RC_host_plain=0 RC_host_asan=0 (53/53 each) RC_tools=0 (103 passed) RC_bs=0 (41 passed) RC_build=0
+  (archive 20261119-195258-225-sticks3, guardian-20261119-195258, signed).
+- TUNE store is keyed by name (adapters/tune/tune.hpp), so the stick's saved values survive the larger registry.
+
+## Supervisor fix: the spike is reachable without the cable (in scope: the spike gates G16H)
+Defect (source, MEASURED by reading measurement_main.cpp): BLESPIKE was a USB-console verb only; a TUNE session
+aborts a running spike (spike_service "tune"); the ota.auto_s=120 self-fetch poll joins the owner network every
+120 s and would take the radio in the middle of a 60 s phase. The stick's USB is only its charger (opening it resets).
+Fix:
+- adapters/tune/session.cpp allowed() + tools/tune_session.py: BLESPIKE, BLESPIKE start [<1-3 digits> <1 digit>],
+  BLESPIKE stop/report/phases accepted over Wi-Fi.
+  RED  builds/20261119-g16h-spike-wifi/red-tune_session_check.log (7 of 7 new assertions failed),
+       red-test_tune_session.log (1 failed).
+  GREEN green-tune_session_check.log (73 assertions), green-asan-tune_session_check.log (ASan+UBSan), green-test_tune_session.log (7 passed).
+- measurement_main.cpp (spike image only): over Wi-Fi `BLESPIKE start` ARMS the run; spike_arm_service() starts it
+  after the session, once the Guardian monitors the selected AP (gives up after 180 s); self-fetch poll and
+  dim/sleep wait while armed or running; BLESPIKE phases prints every phase line; start errors land in last_end.
+- Spike image: builds/20261119-195514-8687-sticks3-blespk, guardian-20261119-195514-blespk,
+  signed 3,084,288 B sha256 17b2d01593367347714a119bc88e5a198084460e161f8f2852eeb3cb8e9a77d6; 0 compiler warnings;
+  sdkconfig GUARDIAN_BLE_SPIKE=y, NimBLE observer+central, peripheral and broadcaster not set; strings hold
+  "G16H SPIKE ARMED" and "BLESPIKE phases". Not on the stick.
+- Normal image from the same tree: builds/20261119-195724-17142-sticks3, guardian-20261119-195724, signed 2,887,680 B
+  sha256 3e1293cb8305beb1c6ee6e4164aa7c6405814c5ee1a50b87ed98196111241c5e; no BT in sdkconfig, no spike strings.
+  (firmware/README.md got the "Spike over Wi-Fi" paragraph after this build started: docs only.)
+
+## Normal image on the stick (MEASURED 2026-11-19 20:00-20:02, self-fetch, no USB)
+- ota_serve :8070 served guardian-20261119-195724 at 20:00:11 (manifest 200, image 2887680 B).
+- TUNE STATUS 20:01:51: app_version=guardian-20261119-195724 last_update_result=ok:guardian-20261119-195724
+  tune_version=1.31 tune_store=restored alert=0 imu=running@0x68 selftest=display:1,store:1,radio:1,imu:0 (boot snapshot)
+  ble_popup:frames=0,...,unconfigured (detector unfed, as designed) batt=3481mV/22% power=battery.
+- No TUNE value changed. G16H passes stays false (spike not run).
+
+ACCEPTED 2026-11-19 23:2x (supervisor, Author wifi-lab-f7 order; runner idle): G16H passes=true (pure flip, row key unchanged).
+Verdict: library ready, stick NO-GO at useful duty, C5 node. The BLE detector and rules live in the portable library,
+host-proven; on the StickS3 they are unfed by design after the measured coexistence number (run A: beacon loss tracks BLE
+duty 1:1, 3 % -> 3.3 %, 10 % -> 10-11 %, 25 % -> 26.6 %, 50 % -> 51.5 %; NimBLE costs 38,340 B heap;
+sticks3-G16H-coex-spike-20261119.log). Details/README say BLE is not watched on this device; the radar glyph shows only
+with a feed; the C5 node feeds it later. Owner ruling: Bluetooth is release 2.

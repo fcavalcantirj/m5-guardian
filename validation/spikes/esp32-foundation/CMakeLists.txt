@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+get_filename_component(GUARDIAN_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(EXTRA_COMPONENT_DIRS "${GUARDIAN_ROOT}/firmware/components")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(guardian_foundation_probe)

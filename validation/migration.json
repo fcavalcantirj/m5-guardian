@@ -1,0 +1,125 @@
+{
+  "original_files": [
+    {
+      "old": "research.md",
+      "new": "docs/research/research.md",
+      "sha256": "ca087e4c1cf297b3f1e1f4df4dfc1f3ffce2af4d6e1195bf413ccebf83ae8139"
+    },
+    {
+      "old": "guardian-wifi-audit.md",
+      "new": "docs/research/wifi-audit.md",
+      "sha256": "425d8f57268b406f199ad872fa413ed78e2a65161d2f06d8902033009b2a992c"
+    },
+    {
+      "old": "guardian-tasks.json",
+      "new": "guardian-tasks.json",
+      "sha256": "cddbf1d4ff3ad89e0fef5666235849bd81d5e47d6e72c55270f167faa01680b7"
+    },
+    {
+      "old": "guardian",
+      "new": "archive/guardian-demo",
+      "sha256": "70456454931f55c3d3a71af6b8d4e59dc23ed4fcf21ca6faefb1e45cadecf0b3"
+    },
+    {
+      "old": "validation/guardian-prototype-2026-11-13.json",
+      "new": "validation/guardian-prototype-2026-11-13.json",
+      "sha256": "45b1fca37bbb4aa291c07dce641cdaa1c2d6cf5c30e4509ccad3101fb86f2fdb"
+    },
+    {
+      "old": "validation/antihunter-upstream-refresh.patch",
+      "new": "validation/antihunter-upstream-refresh.patch",
+      "sha256": "5065dd1f9130dfe91b187dc8147089d01ddf9432b53dd262ecb21ec2face62d5"
+    },
+    {
+      "old": "guardian-firmware/CMakeLists.txt",
+      "new": "firmware/CMakeLists.txt",
+      "sha256": "91521a98538b674aeba4dd89ed6ad7b1f56bd07e1651060b0e4406cfe32f69ee"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_core/CMakeLists.txt",
+      "new": "firmware/components/guardian_core/CMakeLists.txt",
+      "sha256": "a0a7b207fdfbe55f3b77b70a0d3209c0bbc3315ed1f27d1bdc1df7c0dedda524"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_core/core.cpp",
+      "new": "firmware/components/guardian_core/core.cpp",
+      "sha256": "47a6e9377494ba96d9a9bb7f2eca6d20fce25d3803bb6d1b8c6eda53b9ffbb77"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_core/include/guardian/core.hpp",
+      "new": "firmware/components/guardian_core/include/guardian/core.hpp",
+      "sha256": "d87dc2caed9d4567f982568278764ce1193861dfb21142a0c80146acc2e66b0c"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_presenter/CMakeLists.txt",
+      "new": "firmware/components/guardian_presenter/CMakeLists.txt",
+      "sha256": "c5a8f308c84da9e4c8b614c350432d1161ddf6d90aec89ab6d30916a85310394"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_presenter/include/guardian/presenter.hpp",
+      "new": "firmware/components/guardian_presenter/include/guardian/presenter.hpp",
+      "sha256": "215959e2904610a64f2ba0a43cbebffa182a9cc40c5d627857c8d7558b81e56a"
+    },
+    {
+      "old": "guardian-firmware/components/guardian_presenter/presenter.cpp",
+      "new": "firmware/components/guardian_presenter/presenter.cpp",
+      "sha256": "6b1614c7b80f4a9b325c61bd005fba997409535b49259c01e0a3d3eca9ae0dfa"
+    },
+    {
+      "old": "guardian-prototype/index.html",
+      "new": "archive/browser-prototype/index.html",
+      "sha256": "a195524dbe7d6278ed6c6a2e7b4bbbfd706c92f7d69c87d7f302ed959bd7ebf9"
+    },
+    {
+      "old": "guardian-prototype/model.js",
+      "new": "archive/browser-prototype/model.js",
+      "sha256": "e39c86efb5a0162f428aa5eae13bef2c04dd4aef4d474245aedc6ac12ce9a785"
+    },
+    {
+      "old": "guardian-prototype/style.css",
+      "new": "archive/browser-prototype/style.css",
+      "sha256": "2002d2cd45cce53ce9ef3e4913a3c7f139ca8d32c17d86eeff355c21e5c4122e"
+    },
+    {
+      "old": "guardian-prototype/test-model.cjs",
+      "new": "archive/browser-prototype/test-model.cjs",
+      "sha256": "67167638dbbb03b54a2be81d7839d4877dc820f30a35e621baa36cebd37d1526"
+    },
+    {
+      "old": "guardian-prototype/view.js",
+      "new": "archive/browser-prototype/view.js",
+      "sha256": "c39d2ea817513db5a00be242ad40a363026a1010b16007e14b711670a34ea9e0"
+    }
+  ],
+  "destination_sha256": {
+    ".gitignore": "6edb98aaeee4becab67c374d8630847054317a198259307faeb1b1715f83c7ab",
+    "AGENTS.md": "d50767718aa8054adfbf4fa2dcc259d75ddfe66599fdf47ba557b7ef8d6e9063",
+    "CLAUDE.md": "cb807dc269206619f2c842c92d793576344ab8b2cd60c27d2353a9f7d1c438f9",
+    "README.md": "4fe57b5fcc12832f00656eb29efa747246e4bbcf1a22b0c140d1a8bf14538633",
+    "archive/browser-prototype/index.html": "a195524dbe7d6278ed6c6a2e7b4bbbfd706c92f7d69c87d7f302ed959bd7ebf9",
+    "archive/browser-prototype/model.js": "e39c86efb5a0162f428aa5eae13bef2c04dd4aef4d474245aedc6ac12ce9a785",
+    "archive/browser-prototype/style.css": "2002d2cd45cce53ce9ef3e4913a3c7f139ca8d32c17d86eeff355c21e5c4122e",
+    "archive/browser-prototype/test-model.cjs": "67167638dbbb03b54a2be81d7839d4877dc820f30a35e621baa36cebd37d1526",
+    "archive/browser-prototype/view.js": "c39d2ea817513db5a00be242ad40a363026a1010b16007e14b711670a34ea9e0",
+    "archive/guardian-demo": "65173d2e4d956c881762e00c83e8ef92b2c08fbc5fa8cfc99cda95d2be54662e",
+    "docs/architecture.md": "71be4c4fa81c5bfb2d724d6d1de781c7c22c305eccda6d9eb3f220a231ddc3dc",
+    "docs/research/research.md": "a15eec73a648a67fb91b223361c3f53da3f0af852dcd6485c37da30d3838d3dd",
+    "docs/research/wifi-audit.md": "f66530f2fb26787aec1b8228efe73641529faea01ee9dd18b6da20f36439cb8d",
+    "docs/review-status.md": "7589c811413116b462c0843976dad6978b4199ecc52b71a3d2e47b14c38a62fd",
+    "firmware/CMakeLists.txt": "91521a98538b674aeba4dd89ed6ad7b1f56bd07e1651060b0e4406cfe32f69ee",
+    "firmware/components/guardian_core/CMakeLists.txt": "a0a7b207fdfbe55f3b77b70a0d3209c0bbc3315ed1f27d1bdc1df7c0dedda524",
+    "firmware/components/guardian_core/core.cpp": "47a6e9377494ba96d9a9bb7f2eca6d20fce25d3803bb6d1b8c6eda53b9ffbb77",
+    "firmware/components/guardian_core/include/guardian/core.hpp": "d87dc2caed9d4567f982568278764ce1193861dfb21142a0c80146acc2e66b0c",
+    "firmware/components/guardian_presenter/CMakeLists.txt": "c5a8f308c84da9e4c8b614c350432d1161ddf6d90aec89ab6d30916a85310394",
+    "firmware/components/guardian_presenter/include/guardian/presenter.hpp": "215959e2904610a64f2ba0a43cbebffa182a9cc40c5d627857c8d7558b81e56a",
+    "firmware/components/guardian_presenter/presenter.cpp": "6b1614c7b80f4a9b325c61bd005fba997409535b49259c01e0a3d3eca9ae0dfa",
+    "guardian-tasks.json": "14bef3ba14116a98dc90d8b15926d3948d3454ee4c2b5996fcff188317e5eb0d",
+    "tools/review-with-claude.py": "f8d1324d93b80e5358e06086ef7f19bde2100502c4cc053282c5110ced29bfdc",
+    "validation/antihunter-upstream-refresh.patch": "5065dd1f9130dfe91b187dc8147089d01ddf9432b53dd262ecb21ec2face62d5",
+    "validation/guardian-prototype-2026-11-13.json": "47efee5c714e3ea93d179a993c3376b522ce527c1ab3ece80b1e51765f719806"
+  },
+  "source": "~/dev/wifi-lab",
+  "destination": ".",
+  "committed": false,
+  "note_20261120": "validation/antihunter-upstream-refresh.patch (AGPL-3.0 upstream delta, git diff c891485 e7646f5 of the AntiHunter fork) left the tree before the first public commit; it is archived outside the repository with the sha256 recorded above, and the docs cite the upstream commit ids instead."
+}

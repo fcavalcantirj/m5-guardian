@@ -1,0 +1,5 @@
+{"candidates": [
+ {"id": "i1", "kind": "image-to-3d", "master": "Medium", "should_texture": false},
+ {"id": "i2", "kind": "image-to-3d", "master": "VeryGood", "should_texture": false},
+ {"id": "t1", "kind": "text-to-3d-preview", "prompt": "Bust of a hooded Guy Fawkes mask, stylised cyberpunk guardian. Smooth pale mask with thin engraved circuit lines, glowing cyan eyes, black curled moustache and pointed goatee, dark hood with a padlock crest on the brow. Clean sculpted game character head, front-facing, neutral expression, no body."}
+]}

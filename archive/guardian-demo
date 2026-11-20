@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+project_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+case "${1:-demo}" in
+  demo) exec open "$project_dir/browser-prototype/index.html" ;;
+  test) exec node --test "$project_dir/browser-prototype/test-model.cjs" ;;
+  --help|-h) printf '%s\n' 'Guardian living-pet prototype' './archive/guardian-demo          Open the offline interactive demo' './archive/guardian-demo test     Test scoring, moods and evidence freshness' 'Research: docs/research/research.md (from project root)' 'No live monitoring or firmware flashing is performed.' ;;
+  *) printf '%s\n' 'Unknown command. Use ./archive/guardian-demo --help' >&2; exit 2 ;;
+esac

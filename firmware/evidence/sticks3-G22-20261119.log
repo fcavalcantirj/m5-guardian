@@ -1,0 +1,43 @@
+G22 integrated review — supervisor validation log 2026-11-19
+================================================================================
+Handoff: attempt 20261119-200513-282137-task-42, READY FOR REVIEW. Verdict of the independent review: REVISE INTEGRATED.
+
+## Independent review record (MEASURED from $GUARDIAN_STORE/reviews/20261119-201500-007595-integrated-independent/)
+- SHA256SUMS: all files OK. stream.jsonl: init model claude-fable-5-2, tools [], mcp []; every assistant message
+  claude-fable-5-2; result success, stop_reason end_turn, num_turns 1, 658,854 ms; modelUsage only claude-fable-5-2.
+- argv: claude -p --model claude-fable-5-2 --effort high --no-session-persistence --tools '' --strict-mcp-config
+  --setting-sources project --disable-slash-commands (effort evidenced by argv only; the CLI does not echo it).
+
+## Dispositions
+- All 25 reviewer ids (S1-S5, H1-H5, D1-D5, E1-E6, P1-P4) and own O1-O12 have a row in docs/review-status.md.
+- Fixed, checked in source against the pre-G22 tree (guardian-20261119-195724 source.tar.gz):
+  D1 retry_copies_max=7 bounds the retry chain in DisconnectDetector, DataPath and AreaDisconnect (copies no longer
+  take ring entries or move the header time); H5 Monitor::select calls registry_.reset() (disconnect, baseline and
+  every threat detector). Red: detector_check 2, threat_detectors_check 2, datapath_check 1 failing cases
+  (builds/20261119-g22-tdd/red-*.log); green the same plus coverage/measurement/threat.
+- "Not re-checked" rows closed by the supervisor:
+  E4 confirmed [RECORD]: attack-coverage row 4 "time-to-alert still to record"; no time-to-alert field in any evidence.
+  E5 confirmed [RECORD]: lab/live has the 11 L02 scenarios only (quiet, reconnect, stale, drop, stop, stop-inflight,
+     burst, recovery, settings, related-approved, related-unapproved); none for G16F onward.
+  S5 confirmed [SOURCE]: measurement_radio.cpp:130 passes accessible = sig_len - 4 to copy_rx, so the bound is the
+     driver's sig_len; the copy is capped at frame_capacity. Whether the driver buffer can be shorter than sig_len:
+     UNKNOWN (ESP-IDF side).
+  E3: G16R, G16P, G21 limits stand as written in their acceptance notes.
+- Open items are owner/Author decisions; the Author created G22A (signed offers, alert-first poll, version check)
+  and amended G23 (2D wording, carry-overs).
+
+## Watcher SUMMARY ralph-watch/G22-20261119-200513-282137-task-42 (snapshot 21:40:17, before G22A started 21:42:00)
+RC_host_plain=0 RC_host_asan=0 (53/53) RC_tools=0 (112 passed) RC_bs=0 (41) RC_build=0
+archive builds/20261119-214539-35867-sticks3, guardian-20261119-214539, signed 2,887,680 B
+sha256 cd6f918a9d21c1013387d84f804e93f1d8215e499535f9cb168af240e1fcf384, no BT in sdkconfig.
+
+## On the stick (MEASURED)
+- 21:50:53 self-fetch served guardian-20261119-214539. 21:52:33 TUNE STATUS: app_version=guardian-20261119-214539
+  last_update_result=ok tune_version=1.31 tune_store=restored alert=0 imu=running@0x68 fps=24.9 power=usb
+  batt=3675mV/46% charging, ota_auto_checks=1 lock_losses=2 last_lock_loss=stopped (night baseline point 0).
+- G22 passes stays false until the runner is idle; ready to flip.
+
+ACCEPTED 2026-11-19 23:2x (supervisor, Author wifi-lab-f7 order; runner idle): G22 passes=true (pure flip; row key
+09bd62ecb5210832… unchanged, equal to the input key recorded by the G22A handoff). Basis: watcher SUMMARY all RC 0
+(host 53/53, tools 112, build-support 41, signed guardian-20261119-214539), dispositions above, image on the stick since
+21:50 with last_update_result=ok and rx_queue_full=0 on the 21:52 read.

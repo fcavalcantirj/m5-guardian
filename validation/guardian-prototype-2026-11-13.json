@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-13",
+  "prototype": "archive/browser-prototype/index.html",
+  "model_tests": {
+    "passed": 12,
+    "command": "./archive/guardian-demo test"
+  },
+  "javascript_syntax": "passed",
+  "local_assets_and_research_links": "passed",
+  "visual_browser_check": "not completed: browser connector missing runtime module; headless Chrome aborted; current Chrome state blocked by automatic approval review due to unrelated private tabs",
+  "hardware": "not flashed or tested",
+  "antihunter": {
+    "original_checkout": "~/dev/AntiHunter",
+    "original_commit": "c6ef921",
+    "prepared_checkout": "/private/tmp/guardian-antihunter-rebase-20261113",
+    "prepared_branch": "guardian/upstream-refresh",
+    "prepared_commit": "e7646f5",
+    "upstream": "c891485",
+    "lint": "passed full and headless",
+    "firmware_build": "blocked before compilation by dependency download DNS failure",
+    "python_contract_tests": "blocked before tests by sandbox denial binding localhost",
+    "applied_to_original": false,
+    "pushed": false
+  },
+  "migration_note": "Paths updated during project extraction; original validation date and results are historical, not rerun hardware tests."
+}

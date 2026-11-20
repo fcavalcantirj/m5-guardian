@@ -1,0 +1,40 @@
+# G16A on-device validation — 2026-11-16
+board: LAB-STICK-1 (StickS3), port /dev/cu.usbmodem101
+worker attempt: ralph/20261116-183036-552633-task-19 (claude-opus-5-5, effort high), status awaiting_review
+flashed archive: builds/20261116-192558-345-sticks3 (supervisor `build.sh clean` + `build.sh build`)
+  app bin sha256 ca2605d9e6c3b5c867cb894778a784014ec1ab3a7b47822be0627eed9e7cf66a (SHA256SUMS all OK)
+  elf sha256 c97808a58754a66395e2e5342010f4de8000d1e64b61bc5d950a1be27c44ccd6 = GRX1 INFO elf= on the device
+  sdkconfig identical to the G16 archive; partition table identical (80c0ab49...); bootloader differs only by
+  build metadata, so only the app was written (0x10000) and the proven G16 bootloader kept. esptool verify_flash OK.
+  app 0xdd940 bytes (907,584), 71% of the 3 MB factory slot free
+source manifest: 151 files, 0 mismatches vs repo
+embedded art: portrait/VeryGood_portrait.rgb565 (43,200 B) found once in the bin; old landscape frame absent
+portrait asset: rebuilt in a throwaway copy from the store masters_png/VeryGood.png -> d861bb56... (= manifest), byte-identical
+Bosch BMI270 config blob (8,192 B): identical to M5Unified's BMI270_config.inl copy; present once in the bin
+rollback image: $GUARDIAN_STORE/backups/stick-backup-pre-g16a-20261116-192849.bin
+  (0f62d6283d3e24bfbbbd54055337b2ba40f4d8104bb521218459a2b0d3085b46; app region == accepted G16 archive)
+
+host (supervisor build, Mac disk, host-check.sh flags): plain 29/29, ASan/UBSan 29/29
+host preview re-rendered from current code: explanation page wraps whole words and ends with "more"
+  (the worker's evidence sheet predated its own fix)
+
+serial (each port open resets the board over USB-JTAG):
+  boot: "imu: BMI270 running addr=0x68"
+  STATUS ... radio=4 face=3 heap_internal_min=86099 task_stack_free=4272 imu=running@0x68 imu_samples=1095
+         imu_drops=0 orient=portrait-usb-down tune_version=1.0 tune_store=defaults edge=0
+  IMU 3: 599 samples / 3 s (200 Hz), ring_drops=0 output_drops=0; lying at rest: acc (30, 1067, -3941) LSB
+         = ~0.99 g, sd ~5 LSB; gyro mean (-4.1, -0.3, 3.6) LSB, sd ~1.4 LSB (< 0.1 deg/s)
+  TUNE persona.smoke=0.3 -> "TUNE OK ... version=1.1 saved"; tilt_deg=9 -> out of range; bogus=1 -> unknown key
+  after reboot (new boot id): persona.smoke=0.3, version=1.1, store=restored  -> NVS persistence proven
+  restored default: persona.smoke=0.62 (version 1.2)
+  EDGE 180 -> "G16A ACK edge 180s"
+
+OWNER-VERIFIED (photo + 46 s video, 2026-11-16 19:37): stick standing USB down, upright portrait, big
+  Fawkes face, DEMO plate, "Very good", WPA3-Personal, PMF Required, hints legible; details pages, picker,
+  real LIVE rating (Medium, 0 s ago) on the owner's network. No rainbow strip on any panel edge.
+  Owner: "face is starting to get nice".
+OWNER FEEDBACK -> G16C: network name squeezed beside the 2x LIVE tag; text screens look blue on the glass
+  (color::dark rgb565(16,16,24)); wants every screen in the Fawkes + dense techy HUD style, reacting to the IMU.
+CARRIED TO G16C verify: on-device no-data replacement (host-tested); per-frame render cost (G16C/G21).
+KNOWN: heap_internal_min 86 KB (G16: 94.6 KB), mostly the IMU task stack; advice "more" page is not reachable
+  (presenter pagination counts items) -> fixed in G16C.

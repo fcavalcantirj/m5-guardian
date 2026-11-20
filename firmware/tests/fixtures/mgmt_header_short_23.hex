@@ -1,0 +1,19 @@
+# name: mgmt_header_short_23
+# kind: beacon
+# provenance: Counterexample for G04: 23 bytes, one short of a management MAC header. Expected G04 reading: ParseError ShortMacHeader, header_valid false.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 23
+# expect.fc0: 80
+#
+# [  0] Frame Control
+  80 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  ff ff ff ff ff ff
+# [ 10] Address 2
+  02 11 22 33 44 55
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 1 (cut after 1 of 2 bytes)
+  10

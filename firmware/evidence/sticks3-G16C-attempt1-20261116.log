@@ -1,0 +1,25 @@
+# G16C first attempt — supervisor measurements on the StickS3, 2026-11-16 (task NOT accepted; rework running)
+board: LAB-STICK-1, worker attempt ralph/…-task-21 (claude-opus-5-5), reviewed archive
+  builds/20261116-214116-69711-sticks3 (signed, 1,904,640 B = 60.5 % of an OTA slot, 16 portraits each once,
+  166 sources match, signature block 0 valid). Host: plain 33/33, ASan 33/33, tools 18/18, build-support 22/22.
+install: OTA by owner triple tap 21:4x; server "/image: sent 1904640 bytes"; boot "slot=ota_0 ...
+  result=ok:g16b-20261116-214116", STATUS art=16, motion=no_imu -> unmapped (no IMU axis map yet)
+
+owner video 2026-11-16 21:46 (cable plugged, port unread): real network rated Medium with the v2 face, full-width
+  OWNER-NETWORK header, HUD rows; the rating dropped every few seconds to "Listening coverage degraded" /
+  "Searching 2.4 GHz" for 10-15 s. Owner: "improvements… looking sooo nice… love look&feel".
+
+FRAMES/STATUS (serial open, 75 s): fps 12.2, frame_ms 78.4/80.3, render_ms 64.7, push_ms 13.7 (rated and nodata
+  alike); heap_internal_min 75,747 B stable; one dropout at 48 s after boot (radio=3, overlay=3).
+A/B (serial open and read, one boot): frame_ms 40 for 180 s -> 0 not-rated samples of 60; frame_ms 200 for 180 s
+  (fps 5.0) -> 0 of 60. Render load alone does not cause the dropouts.
+owner, unplugged 3 min: no "Listening coverage degraded" seen.
+=> dropouts only observed with USB plugged and the port unread. Suspect (not proven): console/ESP_LOG output
+   (wifi:ic_enable_sniffer every 300 ms) stalling on USB-Serial-JTAG. Rework requires counters + non-blocking console.
+FAIL vs ledger: >= 20 fps required (12.2 measured).
+
+open bug (not G16C-specific): owner ran the Evil Cardputer "Deauther" against OWNER-NETWORK (ch 11,
+  OWNER-AP-1, WPA2-Personal, PMF off) for ~20 s at ~23:2x: the stick showed no red ALERT. Code path
+  re-read (scope = addr3 == selected BSSID, 20 frames / 10 s, 60 s visibility); not yet explained.
+  Ground-truth capture prepared: lab/live/deauth_truth.py (console select + listen 11, decodes every deauth by
+  addr1/addr2/addr3). Next: stick on USB, owner reruns the deauther; then A/B with the Pi ESP emitter (G13 known-good).

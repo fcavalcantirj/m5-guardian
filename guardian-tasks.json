@@ -1,0 +1,849 @@
+[
+  {
+    "id": "G01",
+    "category": "portability",
+    "description": "Define the portable defense-library contracts and boundaries",
+    "depends_on": [],
+    "steps": [
+      "Execution ownership: the Ralph worker implements only this task and hands off files and remaining work. The supervising assistant executes validation and owns passes. Do not run test suites, flash devices, change this ledger, or start another task. Acceptance criteria below are for the supervising reviewer; if validation exposes a defect, revise this task before proceeding.",
+      "Separate packet acquisition, parser/detector adapters, evidence/business logic, presentation and board drivers. Core headers use standard C++ types only; no Arduino, ESP-IDF, M5Stack, graphics, filesystem or network dependencies. Inject monotonic time and typed observations.",
+      "Define board/radio capabilities for supported bands/channels, display geometry, input controls, BLE, memory and storage. Never hardcode StickS3 pins, 2.4 GHz-only channels, PSRAM or a display into the defense core. A headless adapter runs the same logic; optional features report unsupported explicitly.",
+      "Use native ESP-IDF initially. Zephyr now has a StickS3 board target; evaluate it on actual raw-radio integration and resource costs, not a false claim that board support is missing. Keep OS-specific queue/driver behavior behind adapters.",
+      "Deliver typed contracts for raw receive metadata, bounded frame input, parser results, normalized AP settings, incidents, monotonic time/epoch, freshness/coverage and board/radio capabilities. Reuse existing core/presenter types where sound. Keep UI drawing, device pins and OS queues outside the defense library. Document ownership, byte identity, capacity limits and error/unknown semantics.",
+      "Deliver a dependency diagram and API examples for headless replay and a later ESP-IDF adapter. This task is contracts and boundaries, not hardware bring-up, a parser rewrite or full detector implementation.",
+      "Reviewer acceptance: inspect the public headers and dependency graph for SDK/display isolation, explicit unsupported capabilities and implementable ownership/lifetime rules. Confirm existing code migration is described. Hardware and cross-target builds are later gates."
+    ],
+    "passes": true,
+    "existing_work": "Existing core and presenter are drafts to inspect and retain where correct; the StickS3 project is a later adapter, not the starting point."
+  },
+  {
+    "id": "G02",
+    "category": "architecture",
+    "description": "Choose reusable parsers and detector components with provenance",
+    "depends_on": [
+      "G01"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Pin third-party revisions and licenses in the store. Compare libwifi frame parsing, the SDK supplicant parser, AntiHunter detector extraction, and native M5GFX/M5Unified display/button/power support. Reuse working code behind adapters; do not import entire offensive tools or rewrite every parser.",
+      "Read docs/research/wifi-audit.md and pin original AntiHunter c6ef921 and prepared rebase e7646f5 when reviewing these findings. Record actual revisions if they change. The original disables AH_SENTINEL; the separate prepared branch enables it for physical full/headless builds, but runtime startup remains gated. Neither establishes what is flashed.",
+      "Preserve the no-Arduino requirement. AntiHunter uses Arduino and AGPLv3; do not treat it or its N16R8 image as a native StickS3 dependency. Record the source and license of any reused code/assets and satisfy their applicable terms. Decide whether each feature is independently implemented, ported with provenance, or supplied by a later external evidence adapter.",
+      "Do not reuse hasOpenAuth as a complete security classifier, sanitized display SSIDs as identity, or a duplicate-SSID incident as confirmed attacker evidence. Review protected management-body handling and callback execution context before porting detection code. Do not equate attacker_kick with an RF attack merely because of its name.",
+      "If a later AntiHunter adapter is used, require detector runtime state, firmware/features, capture time and coverage; stale JSON snapshots and heap/uptime alone cannot establish active monitoring. Keep the standalone v1 independent of that adapter.",
+      "Read the existing research before downloading anything. Pin revisions, licenses, native compatibility and adapter boundaries in a decision table. Separate source-audit findings from experimentally verified behavior. Include libwifi versus SDK parser tradeoffs and AntiHunter ideas/portability; avoid importing offensive functionality.",
+      "Reviewer acceptance: verify the selected source revisions, licensing obligations, parser/detector boundaries and reasons for reuse versus independent implementation. No claimed device validation or completed experiment without evidence."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G03",
+    "category": "foundation",
+    "description": "Make the portable host build and reviewer validation harness complete",
+    "depends_on": [
+      "G01",
+      "G02"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Repair the missing firmware/tests/contracts.cpp target and provide a coherent host build for core, presenter and canvas without ESP-IDF or M5Stack. Add fixtures and test-source scaffolding needed by later tasks; do not add tests for the Ralph runner.",
+      "Document reviewer-run build and sanitizer commands with outputs in the store, fixture provenance and known limits. Do not silently use the Mac as an artifact store. If the SMB filesystem prevents a toolchain or build step, report the constraint for an explicit decision rather than inventing a fallback.",
+      "Reviewer acceptance: build and link the host targets and establish meaningful contract checks. No syntax-only result, nonexistent test target, vacuous passing harness or simulated radio claim counts. Behavior-specific evidence is added in the following tasks.",
+      "Establish a baseline for pre-existing core/helpers without calling it TDD. New behavior and defect repairs in G04-G08 follow recorded red -> minimal green -> refactor. Tests must exercise contracts and counterexamples, not mirror implementation. The assistant independently checks evidence before each acceptance."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G04",
+    "category": "parser",
+    "description": "Implement bounded portable Wi-Fi security-frame parsing",
+    "depends_on": [
+      "G02",
+      "G03"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Use the pinned ESP-IDF receive metadata correctly, including payload length/FCS conventions and RX error status. Validate frame type/subtype, header and fixed-body length, every IE length, OUI/type, list count and optional field before reading. Handle missing optional fields according to documented format defaults; reject truncation, conflicting duplicate elements and inconsistent PMF flags. Bound counts, memory and arithmetic.",
+      "Distinguish the Privacy capability, WPA vendor element, RSN AKMs/ciphers, OWE and OWE transition metadata. Never call a malformed frame open, nor infer WEP solely from a parse failure. Keep hidden/empty/non-UTF-8 SSIDs distinct without injecting display control characters.",
+      "Implement the parser chosen in G02 behind G01 contracts. Keep ESP-IDF payload/FCS adaptation out of portable parsing. Accept an explicitly bounded normalized frame span and emit typed parse status plus raw SSID/BSSID identity and advertised fields. Do not classify a truncated or ambiguous frame as open.",
+      "Start parser tests with truncated fixed fields/IEs, zero/large little-endian suite counts, more than three suites, unknown suites, OWE, optional RSN fields, PMF inconsistency and allocator failure. Test libwifi bounds/count concerns against the pinned source before adopting or patching it. Reviewer runs host memory/undefined-behavior sanitizers and compare normal fixtures against an independent decoder.",
+      "Reviewer acceptance: execute malformed/valid fixture checks with memory and undefined-behavior sanitizers and compare valid fields with independent decoding. Record limitations and actual outcomes in the store; no live board required for this gate."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G05",
+    "category": "core",
+    "description": "Implement evidence freshness and the five advertised-settings ratings",
+    "depends_on": [
+      "G04"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Implement a documented v1 rating of advertised Wi-Fi configuration, not a probability of being hacked: Very good = WPA3-Personal SAE-only with supported CCMP/GCMP and PMF required; Good = WPA2-Personal only with CCMP and PMF required; Medium = WPA2-Personal with CCMP and PMF optional or disabled, or valid WPA2/WPA3 transition with supported strong ciphers; Bad = original WPA or any advertised TKIP option; Horrible = unencrypted open access or WEP. Apply the weakest advertised supported mode, so a legacy fallback cannot earn a high rating.",
+      "Treat the mood mapping as our documented product policy, not a standard certification. Transition mode is a valid compatibility choice. Show the exact PMF limitation and advice rather than calling every WPA2 network broken. Unknown options prevent a complete grade; retain any separately confirmed legacy-risk finding. Check both group and pairwise ciphers, every AKM, and PMF consistency. Do not infer actual client negotiation or authenticated AP identity from spoofable advertisements.",
+      "Treat OWE, Enterprise modes, inconsistent settings and unparsed security fields as unsupported/unknown until their policies are deliberately specified. Do not call all privacy-bit-clear networks unencrypted: check OWE. Unknown is an observation overlay, not a sixth rated mood. Show 'Checking' at startup and 'No fresh data' after 30 seconds without a usable sample; never leave a stale happy rating looking current.",
+      "Use docs/research/wifi-audit.md as the source-audit baseline. Each reading must retain source, SSID bytes, BSSID, monotonic observation time, channel and parsing status. Independent RSSI/receive activity must not refresh expired security evidence; after reboot cached settings are historical until observed again.",
+      "Test core isolation using wrong BSSID, same SSID on another AP, binary/hidden SSIDs, delayed/future timestamps, reboot/timebase changes, expired evidence, malformed newer samples, queue drops and demo/imported/live origin separation. Future timestamps must not poison all later live observations.",
+      "Keep selection identity and rating in portable code. Raw RSSI/activity does not renew security evidence; malformed newer samples, clock epochs and unknown options must not create a fresh positive grade. Preserve demo/imported/live separation.",
+      "Reviewer acceptance: execute fixtures for all five moods, unknown/OWE/Enterprise cases, cipher combinations, PMF consistency, duplicate SSIDs, delayed/future samples, reboot and stale timeout. No networking, display, password knowledge or device boot is required to pass this library task."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G06",
+    "category": "defense",
+    "description": "Implement portable disconnect and baseline-change detectors",
+    "depends_on": [
+      "G05"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Add a separate incident overlay to the five advertised-configuration moods. Scope events to the selected BSSID and an owner-approved list of related APs. An incident or lost coverage must remain visible even when configuration is Very good; never leave the cigar celebration as the only current status.",
+      "Count deauthentication/disassociation observations within documented time windows and actual listening coverage. Handle retry deduplication without assuming sequence numbers uniquely identify an event. For protected frames distinguish observable headers from encrypted bodies; never read an encrypted reason code or claim MIC verification without the required keys.",
+      "Treat thresholds as tunable heuristics, document cooldowns, and display the observed count/window and uncertainty. Normal reconnects, roaming, AP reboot, repeated frames and short listening gaps must be part of calibration. A burst means observed disconnect traffic, not proof clients were disconnected or an attacker identified.",
+      "Use explicit baseline approval; do not silently learn trust from nearby packets. Same SSID with another BSSID, changed channel, RSSI changes or deauth followed by EAPOL can warrant investigation but cannot alone confirm an evil twin, a named attack tool, or a passive sniffer. Approved mesh/extender APs must be handled normally.",
+      "Implement bounded detector state, configurable time windows and explicit approved-AP baselines behind G01 contracts. Prepare fixture/replay cases for benign roaming, reconnects, retries, sequence wrap, protected/malformed frames, bursts and coverage gaps.",
+      "Reviewer acceptance: execute these cases and inspect count/window/uncertainty outputs and bounded resource use. Record replay-only confidence. Physical false-positive calibration remains a separate requirement of G13; do not claim hardware effectiveness here."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G07",
+    "category": "guidance",
+    "description": "Implement evidence-based advice without overstating Wi-Fi health",
+    "depends_on": [
+      "G05",
+      "G06"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Explain WPA3 preference, transition-mode compatibility, legacy WPA/TKIP/WEP risk and PMF limitations in simple language using the primary references in docs/research/wifi-audit.md. Give one relevant next step from the current evidence. Hidden SSIDs and MAC filtering receive no security credit.",
+      "Show RSSI as received signal at this device, with sampling interval and age. Do not infer speed, congestion, Internet access, non-Wi-Fi interference or whole-home coverage from signal strength or nearby AP counts. Connection health stays unmeasured in passive-only v1.",
+      "Keep later associated gateway/DNS/HTTPS probes separate from passive monitoring: define their credentials, destinations, timeouts, channel-sharing gaps and user-visible opt-in before implementation. A failed endpoint is not automatically a Wi-Fi failure or an attack. Do not add a new app or service to deliver this v1.",
+      "Offer concise owner checks for long unique passwords, unique router-admin credentials, supported firmware/updates, unneeded WPS/remote administration/UPnP and guest/IoT separation. Mark them unverified unless independently checked. Do not request/store the home password to award a mood. A guest SSID alone cannot prove isolation; WPS IE presence/absence cannot prove exploitability or disabled status.",
+      "Implement portable advice outputs and unsupported/unverified states. RSSI is separate from security mood; future active connectivity probes remain deferred. No new website, account or companion service.",
+      "Reviewer acceptance: evaluate every generated claim against fixture evidence. Good RSSI cannot improve a security grade; lost Internet, absent sensor data or unsuccessful cracking cannot imply an RF attack or password strength."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G08",
+    "category": "presenter",
+    "description": "Implement portable presentation and interaction state before board painting",
+    "depends_on": [
+      "G05",
+      "G06",
+      "G07"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Use core snapshots and typed input actions to produce a board-independent view model for face, details and network picker. No M5 pins, drawing calls or framebuffer ownership in presentation policy.",
+      "Specify approved selection by SSID bytes and BSSID, duplicate-name disambiguation, persistence adapter contract, DEMO/live separation and incident priority. Preserve five moods, a distinct unknown/stale overlay, muted stale art and no celebration during an incident.",
+      "Prepare fixture-source coverage for action transitions, selection, stale state, malformed labels and demo/live isolation. Leave physical button reads and storage writes for board integration.",
+      "Reviewer acceptance: execute the presenter checks with headless inputs and inspect view-model reasons/age/coverage. Firmware screenshots or artistic placeholders cannot substitute for correct policy."
+    ],
+    "passes": true
+  },
+  {
+    "id": "L01",
+    "category": "live-lab",
+    "description": "Qualify host live capture and automated offensive control before writing the harness",
+    "depends_on": [
+      "G02"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Read local inventory and existing Bruce/AntiHunter/host tools before adding dependencies or buying hardware. Identify a real host capture backend and a separate offensive emitter. Prefer an existing Linux/Pi monitor-capable radio if suitable; an existing ESP raw-frame serial bridge is an alternative only if it truly supplies required bytes and metadata. A single radio switching roles must not masquerade as simultaneous continuous observation.",
+      "Inspect the actual installed offensive firmware and official source/CLI protocol. Confirm Bruce can be controlled programmatically for the intended scenarios; do not invent USB commands or assume every build supports them. If not, document a supported lab-only backend without flashing anything as a side effect.",
+      "Specify the lab SSID/BSSID/channel, receiver identity, emitter identity, supported bands, permitted bounded scenarios, duration/rate limits and stop/cleanup paths. No broad nearby-network targeting, password recovery or credential collection is needed for detector validation.",
+      "Reviewer acceptance: hardware/backend identities, capabilities and exact documented command/read interfaces are recorded. Record missing hardware as blocked; no replay fallback or inferred monitor-mode support. Do not advance to integration while the live gate is unresolved."
+    ],
+    "passes": true
+  },
+  {
+    "id": "L02",
+    "category": "live-validation",
+    "description": "Automate live RF scenarios against the real library running on the host",
+    "depends_on": [
+      "L01",
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Build a CLI/script harness that starts the actual portable C++ parser, detector, evidence core and presenter on the host with a live FrameSource. Link the same components intended for ESP32; no Python/mock detector substitute. A receiver adapter only acquires/normalizes frames. Never label PCAP replay or generated fixtures live.",
+      "Implement pluggable offensive control using the qualified L01 backend (Bruce when verified), separate receiver and explicitly configured lab AP. Scripts must automate bounded stimuli, receiver capture, library execution, event correlation, machine-readable assertions and cleanup. An explicit live scenario launch is required; setup, Ralph and dry-run do not transmit.",
+      "Cover a quiet baseline and benign reconnects, a scoped disconnect-frame burst, recovery/cooldown, approved versus unexpected AP-baseline changes where supported, dropped/stale reception, and controlled AP security-setting changes where the lab backend supports them. Declare unsupported scenarios; do not mark them passed. Preserve uncertainty: observed deauth frames do not prove client disconnection or attacker identity.",
+      "Feed frames into the host library while RF events happen and display timestamped live incidents, evidence age, counts, BSSID/channel and coverage. Assert expected/absent incidents, a documented detection-latency budget after the threshold, no fresh grade after stale timeout, and benign false-positive bounds. Capture emitter acknowledgments separately from actual receiver observations so a failed emitter or deaf receiver cannot produce a vacuous pass.",
+      "Automate hard timeouts, signal handling, emitter stop and original lab-state restoration. Save raw captures, source/firmware identities, library revision/hashes, scenario parameters, counters, live console log and pass/fail/inconclusive results in the store. No unbounded interference loop. Missing time synchronization, coverage or sufficient observation must be inconclusive/fail, not success.",
+      "Reviewer acceptance: execute the live CLI harness against the configured owned lab, inspect evidence, fix failures and rerun affected scenarios. All required scenarios need genuine RF observations with the real host library; hardware/backend blockers stay visible. This gate MUST pass before G10/G11 new ESP32 integration. No display art or fixture demonstration can satisfy it."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G09",
+    "category": "review",
+    "description": "Review the portable foundation before proceeding to hardware",
+    "depends_on": [
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "L02"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Supervising assistant reviews G01-G08 source, evidence and remaining gaps first. The worker prepares an evidence index and dispositions; it does not validate its own work or mark passes.",
+      "Use normal claude, never claude-work-profile or its account/configuration. Request claude-fable-5-1 at high effort, no silent fallback. Supply only project-relevant context, disable reviewer tools and request a read-only critical review. Save the actual response and model metadata in the store.",
+      "Keep the independent review focused on library contracts, parser bounds, evidence freshness, detector false positives, licenses and board isolation. A review saying looks good is not test evidence. Authentication/model failures remain pending; no silent alternate account or model.",
+      "Reviewer acceptance: required host evidence exists, substantive own-review and independent-review findings are resolved or explicitly deferred with reasons, and portable library acceptance does not depend on a flashed board. Preserve a clear list of later hardware unknowns.",
+      "Do not accept the foundation until L02 automated live RF validation has passed with the actual host library and real receiver. Host fixtures alone are insufficient. Board integration stays blocked if the live hardware/backend is unavailable."
+    ],
+    "passes": true,
+    "review_record": "docs/G09-validation.md; owner explicitly selected Codex after Fable usage limit and Opus refusal; independent APPROVE FOUNDATION $GUARDIAN_STORE/reviews/20261114-214942-G09-codex-final"
+  },
+  {
+    "id": "G10",
+    "category": "hardware",
+    "description": "Repair and integrate the existing StickS3 adapter; preserve the earlier spike",
+    "depends_on": [
+      "G09"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Hard gate: L02 host automated live RF acceptance and G09 review must precede new board integration. The earlier board spike is preserved, not acceptance or permission to bypass this order.",
+      "Read docs/task-1-review-20261113.md and retain the existing native ESP-IDF project, portable canvas, board identity and flash backup. Do not repeat completed exports or erase the previous work. Reconcile the board adapter with the now-reviewed portable APIs.",
+      "Fix mutable framebuffer reuse by waiting for the ESP-IDF color-transfer completion before writing that buffer, or use explicitly owned multiple buffers. A fixed delay is not ownership synchronization. Handle submission failure.",
+      "Propagate PM1 setup failures; distinguish panel setup from successful transfers and visible display proof. Check NVS open/get/set/commit outcomes before claiming persistence. Verify actual ID semantics rather than identifying the board from any successful I2C reply.",
+      "Make required artifact-copy failures visible. Preserve a self-contained archive with valid flash paths, sdkconfig, source revision or manifest, toolchain identity and checksums. Guard build/clean paths and document storage needs. The existing Mac scratch directory is an unresolved policy exception; do not silently continue expanding it.",
+      "Reviewer acceptance: inspect the fixes, build the linked native project and check archived artifacts. Hardware boot, flash authorization and observed screen behavior are G11, not this task."
+    ],
+    "passes": true,
+    "existing_work": "Preserve firmware/boards/sticks3 and guardian_canvas from original ledger task 1. Existing image: $GUARDIAN_STORE/builds/20261113-215738-sticks3/ (315168 bytes, checksum reviewed). 8 MB backup: $GUARDIAN_STORE/device-backups/LAB-BRUCE-STICK-20261113/. Identity/backup/build exist; no Guardian boot or display evidence. Original run: 20261113-213123-248300-task-1.",
+    "review_record": "docs/G10-validation.md",
+    "accepted_scope": "Native adapter/source/build, independent Codex approved; no live board radio"
+  },
+  {
+    "id": "G11",
+    "category": "hardware",
+    "description": "Accept StickS3 bring-up on the real device after the library is ready",
+    "depends_on": [
+      "G10"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Scope: build a simple on-device Wi-Fi security companion with one original 3D persona and exactly five rated moods: Very good, Good, Medium, Bad, Horrible. This ledger specifies future implementation; all passes flags begin false. The existing browser prototype is not the product or evidence of firmware completion.",
+      "Project root is .. Keep maintained source, ledger and documentation here. Store downloaded third-party checkouts, toolchains, builds, test logs and large art exports under $GUARDIAN_STORE; fail clearly if the store is unavailable rather than silently filling the Mac disk.",
+      "Identify the connected M5Stack StickS3 by USB identity and board information. The device last observed was /dev/cu.usbmodemXXXX, serial LAB-BRUCE-STICK; rediscover it rather than assuming the port or device stayed the same. Export its Bruce captures and record the installed firmware and a restoration route before replacing firmware. Do not touch the LILYGO, Cardputer, Pi jobs or another StickS3.",
+      "Use native ESP-IDF as the initial firmware choice, without Arduino. Before committing to the driver approach, inspect official StickS3 documentation and existing local board code for display, buttons, power management and PSRAM. Zephyr is an alternative only if the required passive Wi-Fi, screen and power features are demonstrated on this exact board; record the choice and pinned versions.",
+      "Keep firmware, build settings, original art sources and verification evidence together under firmware/. Fit the board's verified flash and RAM limits, use internal storage for assets/settings, and make the first version USB-powered and independent of a Pi, phone, website or SD card.",
+      "Verify: build firmware from documented commands, boot the identified StickS3, and record the detected board, flash, PSRAM, working screen/buttons and no-SD operation. Save real device logs and a photograph under firmware/evidence/. A host build alone does not pass this task.",
+      "Continue from the preserved G10 adapter and original backup rather than recreating them. Re-identify the unit before any owner-authorized flash. Preserve all other lab devices and jobs.",
+      "Reviewer acceptance includes actual screen orientation/color order, physical buttons, checked storage behavior, PM1/power state, PSRAM and no-SD operation. Never infer screen function solely from display=ok in a setup log."
+    ],
+    "passes": true,
+    "existing_work": "Preserve firmware/boards/sticks3 and guardian_canvas from original ledger task 1. Existing image: $GUARDIAN_STORE/builds/20261113-215738-sticks3/ (315168 bytes, checksum reviewed). 8 MB backup: $GUARDIAN_STORE/device-backups/LAB-BRUCE-STICK-20261113/. Identity/backup/build exist; no Guardian boot or display evidence. Original run: 20261113-213123-248300-task-1.",
+    "review_record": "docs/G11-device-validation.md",
+    "accepted_scope": "Physical bringup-0.3 on LAB-STICK-1: screen/colors/buttons/PSRAM/NVS; live integration remains G13"
+  },
+  {
+    "id": "G12",
+    "category": "portability",
+    "description": "Qualify the reviewed library across host and ESP32 target profiles",
+    "depends_on": [
+      "G09",
+      "G10"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Verify: compile and link the core and presenter independently on the host and representative Xtensa/RISC-V targets; exercise headless, no-PSRAM and a synthetic dual-band capability profile. Run the same core behavior tests without any M5Stack SDK. Physical validation on other boards remains separately recorded, not implied by compilation.",
+      "Use the established native toolchain and adapters. Include headless, no-PSRAM and synthetic dual-band profiles without assuming the StickS3 has 5 GHz. Do not fetch full extra toolchains onto the nearly full Mac without resolving storage constraints.",
+      "Reviewer acceptance: record actual compile/link and behavior outcomes by target; distinguish synthetic capability fixtures, cross-compilation and physical board coverage. No portable-core SDK dependencies may be introduced to make a board build pass."
+    ],
+    "passes": true,
+    "review_record": "docs/G12-validation.md",
+    "accepted_scope": "Host normal/ASan+UBSan behavior and Xtensa/RISC-V separate core/presenter links; native execution not claimed."
+  },
+  {
+    "id": "G13",
+    "category": "measurement",
+    "description": "Repeat the accepted host live scenarios through the real ESP32 adapter",
+    "depends_on": [
+      "G11",
+      "G12"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Reuse the L02 offensive scenario controller, evidence format and assertions. Replace only the host acquisition/output adapters with the board path; the parser, detector and policy library remains the same. This is board-integration validation after host live acceptance, not the first live library validation.",
+      "Make a minimal on-device diagnostic display first: selected BSSID, raw-SSID identity with escaped readable label, channel, RSSI, accepted/invalid/dropped frame counters, security fields and observation age. Every live value must originate from a real receive callback; fixtures must visibly say DEMO and use a separate input path.",
+      "Configure passive discovery explicitly, respecting the configured regulatory domain. Lock monitoring to the selected AP channel after discovery; show coverage gaps during rediscovery and channel changes. Keep BLE, AP mode and associated health probes off in this first measurement path. Never imply one radio observes every channel continuously.",
+      "Use the pinned ESP-IDF receive metadata correctly, including payload length/FCS conventions and RX error status. Validate frame type/subtype, header and fixed-body length, every IE length, OUI/type, list count and optional field before reading. Handle missing optional fields according to documented format defaults; reject truncation, conflicting duplicate elements and inconsistent PMF flags. Bound counts, memory and arithmetic.",
+      "Distinguish the Privacy capability, WPA vendor element, RSN AKMs/ciphers, OWE and OWE transition metadata. Never call a malformed frame open, nor infer WEP solely from a parse failure. Keep hidden/empty/non-UTF-8 SSIDs distinct without injecting display control characters.",
+      "Copy only bounded required metadata/frame bytes into a queue in the Wi-Fi driver task; defer parsing, display, file operations and scoring. Use APIs appropriate to that task context, record queue drops, and fail to unknown/degraded coverage when evidence is insufficient. Use wrap-safe monotonic aging.",
+      "Verify: compile and boot the exact StickS3, observe a controlled AP, compare fields with router settings and independent packet decoding, change its security mode/channel and verify the displayed observation changes. Turn the AP off and show No fresh data within 30 seconds. Save logs and video. Host fixtures or browser demonstrations cannot pass this gate.",
+      "Use the accepted portable parser, evidence core and detectors instead of a parallel board-only implementation. Normalize ESP-IDF RX metadata at the adapter boundary.",
+      "Reviewer acceptance additionally records normal-traffic false positives for G06 and any controlled physical event observations. Replay success is not evidence of real RF detection effectiveness; absent physical validation remains explicitly unverified."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G14",
+    "category": "functional",
+    "description": "Connect the network picker, buttons and persistence to real observations",
+    "depends_on": [
+      "G13",
+      "G08"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Provide a small on-device network picker using the StickS3 buttons. Bind the selected network to SSID bytes and BSSID, display a disambiguator for duplicate names, and remember the choice across reboot. Do not automatically trust another AP just because it uses the same SSID.",
+      "Passively read the selected AP's advertised authentication, cipher and PMF information on supported 2.4 GHz channels. Validate packet lengths before parsing and record the sample time and channel. Do not require the Wi-Fi password, collect personal profiles, run cracking, transmit deauthentication frames or change router settings.",
+      "In the detail view label the rating 'Advertised Wi-Fi settings', show the observed mode/cipher/PMF and evidence age, and state that password strength, router patch status, actual client negotiations and 5 GHz coverage are not measured. Weak signal, Internet downtime and a failed dictionary test must not change this security rating.",
+      "Keep v1 to the face screen, a short explanation screen, and the network picker. Use one button for face/details and a documented deliberate button action to change the selected network. Do not add quests, accounts, a dashboard or a mobile application to this version.",
+      "Offer a clearly labeled DEMO mode that cycles all five rated expressions for classroom and visual testing. DEMO inputs never overwrite the live selected network or appear as real security observations.",
+      "Show a muted no-data overlay with the last observation age when monitoring is unavailable. Do not map an offline sensor to Medium, Bad or Horrible; the five moods describe the assessed settings, not whether the device is connected.",
+      "Verify: operate every screen with physical buttons, reboot and confirm network selection persists, switch between demo and live modes, and disconnect the test AP to demonstrate the no-data behavior.",
+      "Wire the G08 presenter to the real adapter without duplicating policy in rendering code. Use diagnostic visuals until the art tasks are accepted. Physical validation belongs to the supervising assistant.",
+      "Owner requirement (2026-11-14): a current supported incident affecting the selected/approved monitored network makes the Guy Fawkes face red as an ALERT overlay, independent of its normal security grade. Show an evidence-based reason (e.g. Disconnect burst detected), suppress celebration/cigar, and preserve visible stale/degraded coverage. Do not imply malicious intent or detection of every attack. Unrelated BSSIDs must not trigger it. Once incident evidence expires, return to the current evidence-driven mood or no-data state, never declare all-clear solely from silence. TDD verifies trigger, scoping, expiry and stale coexistence; physical acceptance uses a controlled live scenario."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G15",
+    "category": "visual",
+    "description": "Create an original, iconic Guy Fawkes-inspired 3D Guardian persona designed for the StickS3 screen",
+    "depends_on": [
+      "G14"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Use the Bruce OS 3D shark as a reference for instant recognition, expressive movement and a strong silhouette. Inspect the actual reference before art review; do not substitute the existing browser demo or reuse the shark mesh, textures or animations.",
+      "Design our own adult masked guardian: sculpted cheekbones, bold arched brows, a distinctive curled moustache/goatee, expressive eye openings and an expressive mouth. Add an original silhouette, mask markings and material palette so it reads as our character rather than a stock mask. The name remains provisional.",
+      "Create an editable 3D source model with camera, lighting, materials and controls for all five expressions. Prioritize attractive sculpted volume, readable eyes and mouth, and clear depth on the small screen. Do not satisfy the 3D requirement with emoji, flat icons or CSS shapes.",
+      "Prefer pre-rendered animation frames from that real 3D source for v1; a real-time 3D renderer is optional, not a prerequisite. Prepare a five-pose contact sheet at the actual display size with consistent framing. Make the persona dominate the screen while leaving space for its mood and a short network label.",
+      "Verify: review the editable 3D source and five-pose contact sheet, then inspect them on the StickS3. Confirm recognizable expressions without relying on color alone, no clipped face or cigar, and a distinct identity from Bruce's shark. Record the art provenance and asset license.",
+      "Create a red alert material/lighting treatment of this same original face for supported live incidents. It overlays any of the five rated moods; it is not a sixth security rating. Use a clear ALERT/reason label and restrained pulse or alarmed expression so it differs from the static Horrible red mood and remains readable without colour alone."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16",
+    "category": "visual",
+    "description": "Very good shows the Guardian's best possible expression: an enormous confident smile and cigar",
+    "depends_on": [
+      "G15"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Activate a deterministic Very good fixture with an obvious DEMO indicator, then verify the same mapping from supported live observations when a matching test AP is available.",
+      "Show the original 3D Guardian with its widest unmistakable grin, delighted eye shape, raised cheekbones and relaxed confident posture. Add a clearly visible cigar held at the corner of the mouth, a restrained ember glow and a small looping curl of smoke. The cigar is the signature flourish of this top mood.",
+      "Use warm gold/emerald accents, a gentle head tilt and subtle breathing. Keep the animation polished and calm enough to live on a desk; smoke must not cover the eyes or status text.",
+      "Show 'Very good' and an explanation tied to the observed WPA3-only/PMF settings. Never display 'unhackable', '100% safe' or a claim that the password is strong.",
+      "Verify: capture an on-device video at normal viewing distance showing the grin, cigar, smoke and legible label, and confirm that removing fresh evidence replaces the rated display with the no-data indication."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16A",
+    "category": "visual",
+    "description": "Upright portrait platform for the standing StickS3 (USB down): clean panel edges, portrait layouts, native BMI270 IMU and live-tunable parameters",
+    "depends_on": [
+      "G16"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Orientation is fixed upright portrait with the USB connector down (owner decision: the stick stands on the table; no auto-rotation). The mapping is proven on the glass by the 2026-11-16 spike and owner video: in today's landscape buffer, x maps to the screen top and y=0 to the screen right. Implement it as the panel's native 135x240 portrait rotation (same 64,800-byte framebuffer).",
+      "Panel edges: the current landscape window leaves one unwritten controller row (rainbow strip on the glass in G14, G16 and the spike video). Take the gap for the chosen rotation from the vendor M5GFX 0.2.28 formula (Panel_LCD::setRotation; StickS3 panel 135x240, offset_x 52, offset_y 40, ST7789 memory 240x320): r0 (52,40), r1 (40,53), r2 (53,40), r3 (40,52). Add a serial EDGE command that draws a 1-pixel coloured border so the reviewer can confirm all four edges on the glass.",
+      "Portrait layout zones: face zone at the top (full 135 px width, about 160 px tall) and an information zone below. Move every existing screen (face, details pages, network picker, DEMO, ALERT, no-data, onboarding) to portrait within 22 glyphs at 1x and 11 at 2x, keeping all honesty rules. Until the 3D Guardian exists, the Very good face uses a portrait crop of the accepted v2 master: extend firmware/art/persona/v2/build_assets.py to export it reproducibly from masters_png/VeryGood.png ($GUARDIAN_STORE/art-exports/G15/20261116-v2/) as little-endian RGB565 with its sha256 in the manifest, embed it with a size check, and re-measure the cigar tip and smoke zone so ember and smoke stay attached and clear of the eyes and text.",
+      "IMU: native ESP-IDF BMI270 driver (no Arduino) on the existing internal I2C bus (SDA 47 / SCL 48, shared with the PM1); keep the bus handle in the board adapter instead of a local. Probe chip-id 0x24 at 0x68 first (measured address on this unit), then 0x69. Load the configuration blob from Bosch's official BMI270_SensorAPI; pin its revision, keep the downloaded source and licence on $GUARDIAN_STORE/third-party/, and record the licence. Accelerometer and gyroscope at 200 Hz into a timestamped ring buffer read by the companion loop. If the IMU is absent or fails, art stays static and STATUS reports it; IMU work never blocks the observation loop or the radio callback. Add a serial IMU command that streams raw samples for tuning sessions.",
+      "Live tuning: serial 'TUNE key=value' and 'TUNE?' for named, bounded float parameters, applied immediately and persisted in NVS as a versioned, CRC-checked blob (same style as the companion store); unknown keys and out-of-range values are rejected with a reason. Later art and physics tasks register their parameters here.",
+      "Add imu=, orient= and tune_version= to the serial STATUS line.",
+      "Verify: host TDD for the orientation mapping, portrait layout bounds of every screen, asset size and selection, and the TUNE parser and persistence. On the StickS3 the reviewer and owner check the EDGE border on all four edges, record a video of the upright Very good face with cigar, ember, smoke and legible label, confirm that removing fresh evidence replaces the rated display with the no-data indication (closing G16's open items), see sane IMU streams at rest and while handled, and confirm a TUNE value survives a reboot."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16B",
+    "category": "platform",
+    "description": "Signed over-the-air updates from the owner's Mac with automatic rollback, plus honest battery state, so the Guardian runs and updates unplugged",
+    "depends_on": [
+      "G16A"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Partition table for OTA on the 8 MB flash: nvs, otadata, phy_init, ota_0, ota_1 (equal slots sized from the measured app plus margin, at least 2.5 MB each) and the remaining space as the assets partition. Installing it is the last USB flash; the reviewer performs it after a verified backup. ROM USB download mode remains the emergency recovery path; no eFuses are burned.",
+      "Signed images: ESP-IDF app signature verification without hardware secure boot (CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT, ECDSA). The private signing key lives only on the owner's Mac outside the repository and outside the store; its path is documented, never committed or printed. Unsigned or wrongly signed images are refused before the slot switch.",
+      "Rollback: enable app rollback. A freshly updated image marks itself valid only after a boot self-test (display, companion store, radio initialisation; IMU optional). If the self-test fails or the image crashes before it, the bootloader returns to the previous slot, and STATUS reports the rollback.",
+      "UPDATE mode is owner-initiated only: a deliberate button gesture (for example hold both buttons about 3 s) plus an on-screen confirmation. It pauses passive monitoring, joins the owner-configured Wi-Fi network, fetches the image from the owner-configured Mac server URL, verifies size, sha256 and signature, switches slot and reboots, showing progress and clear failure reasons. On any failure it leaves the current image running and resumes monitoring. The Wi-Fi credentials and server URL are provisioned over USB serial into NVS and are never printed or shown. Outside UPDATE mode the Guardian never joins a network.",
+      "Mac side: a script under tools/ that serves a chosen archived build (from $GUARDIAN_STORE/builds/, produced by boards/sticks3/tools/build.sh) together with its sha256 and signature for the duration of one update, and a signing step that build.sh records in the archive.",
+      "Battery: read battery level and charging state from the PM1 (cite the register source used) and show a small battery indicator; add batt= and charging= to STATUS. Measure real runtime on battery from full with passive monitoring and the animated face running, and report it; low battery shows a clear warning and never fakes a rating.",
+      "Add ota_slot=, app_version= and last_update_result= to the serial STATUS line.",
+      "Verify: host TDD for the OTA state machine with a fake transport (good image, bad signature, wrong sha256, truncated download, network failure, self-test failure leading to rollback). On the StickS3 the reviewer installs the partition table by USB (backup first), then an OTA update from the Mac succeeds, a deliberately bad-signature image is refused, and an image that fails its self-test rolls back automatically."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16C",
+    "category": "companion",
+    "description": "Every screen is the Guardian: the v2 face for every rating on top, a dense techy HUD of the real evidence below, a clean full-width header, and face and HUD that react to the IMU",
+    "depends_on": [
+      "G16B"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "SUPERVISOR REWORK (2026-11-16, attempt ralph/…-task-21 reviewed; keep everything that works, fix only these). Measured on the StickS3 with the reviewed archive builds/20261116-214116-69711-sticks3 over OTA (FRAMES/STATUS): (1) Speed FAILS: 12.2 fps, render_ms 64.7 + push_ms 13.7 per frame on the observation loop (rated and nodata screens alike); required >= 20 fps. Bring render + push to <= 40 ms per frame on the device without moving work into the Wi-Fi receive path: for example fixed-point maths in the portrait warp, the current portrait copied once into fast RAM (PSRAM or internal, report which and the heap cost), skipping the warp when the pose is unchanged, caching static HUD layers, and drawing only regions that changed. Add a host micro-benchmark of the render path so regressions are visible, and keep FRAMES/STATUS timing. (2) Rating dropouts: on the glass the rated face is replaced every few seconds by 'Listening coverage degraded' / 'Searching 2.4 GHz' for 10-15 s (owner video 2026-11-16 21:46, USB cable plugged into the Mac with no program reading the port). With the serial port open and read, 6 minutes at frame_ms 40 and 200 showed zero dropouts, so render load alone is not the cause. Suspect (not proven): console output (ESP_LOG at INFO, including wifi:ic_enable_sniffer/ic_disable_sniffer every 300 ms) and text() writes stalling on the USB-Serial-JTAG when no host reads, so the selected AP's beacons go unseen for 5 s and Survey::next drops the lock. Required: add counters to STATUS that make the cause measurable (radio queue drops, USB/console output drops or stalled-write time, survey lock losses with the last reason, coverage-degraded transitions); prevent console logging from ever blocking the radio or observation loop (for example Wi-Fi driver logs at WARN or above and non-blocking console writes); host-test any changed lock/coverage logic. The reviewer then verifies 10 minutes of continuous rating with no dropout in each of three states: unplugged on battery, plugged in with the port closed, and plugged in with the port read. (3) The network list cuts names to 10 characters without a marker: apply the header rule (visible shortening marker, never silent). (4) build.sh stamps the app version 'g16b-<date>'; make the stamp task-neutral (for example 'guardian-<date>-<time>') so STATUS and OTA show which build runs. (5) Live TUNE currently needs the USB cable, so the standing stick cannot be tuned: keep USB TUNE, and also accept TUNE/STATUS over the owner's Wi-Fi only inside an owner-confirmed session (same gesture and confirmation as UPDATE, same provisioned network, Mac-side tool under tools/, bounded session that ends on timeout or key press, passive monitoring resumes after; never listening otherwise). Do not change the IMU axis-map design: the reviewer records the standing/lying traces with the owner.",
+      "Owner direction (2026-11-16, on the glass after G16A): the Very good portrait screen is the model; every other screen must reach that standard. Defects seen on the device: the network name is squeezed into the top-right corner beside the 2x LIVE tag, and text screens show a visible blue background (canvas color::dark = rgb565(16,16,24) is lifted by the panel) while the art screens are true black.",
+      "Header, every screen: the mode tag (LIVE / DEMO n/5 / ALERT) and the network name never share a squeezed row. The network name gets its own full-width 1x row (up to 22 glyphs; longer names are shortened with a visible marker, never cut silently), the BSSID tail its own row or slot. Host tests cover long, short, empty and non-ASCII-safe names on every screen type.",
+      "Background: all screens use pure black, matching the art. Keep text contrast rules; no color carries meaning alone.",
+      "Faces: every rating (Very good, Good, Medium, Bad, Horrible) shows its v2 face as an upright 135x160 portrait cropped from its accepted master ($GUARDIAN_STORE/art-exports/G15/20261116-v2/masters_png/<Mood>.png) by build_assets.py portrait, reproducible by sha256 and recorded in manifest.json, exactly like G16A's Very good crop. ALERT uses the two ALERT pulse masters of the current rating. Not rated and no-data keep an honest neutral state (no rated face is ever shown without a fresh rating); design it in the same visual language (for example the face dimmed or in silhouette with a clear 'no fresh data' marker). Store the frames either embedded (size-checked at build time) or in the assets partition; report the flash used against the OTA slot size from G16B.",
+      "Techy HUD below the face (owner: 'lots of symbols and text stuff on the bottom', 'high techy meets art'): an animated, dense information zone built only from real evidence and real device state: security mode and cipher/PMF badges, rating, evidence age ticker, RSSI bars with dBm, channel, BSSID tail, listening/sweep indicator, incident marker, battery (G16B). Decorative motion (scanlines, ticks, sweep) is allowed only where it never implies a measurement that does not exist; nothing says or suggests 'safe', 'hacked', speed or Internet health. The honesty rules of G13/G14 (observations only, DEMO plate, ALERT reason, no-data replaces the rated display) stay intact and stay host-tested.",
+      "IMU reaction: the face and HUD respond to the stick being handled, from the G16A ring buffer: the face tilts/shifts with gentle inertia (damped spring, lag and settle) within the range that still looks right on the 2D art, and HUD elements react (for example a horizon/level line, parallax of HUD layers, a brief flicker on a tap). At rest on the table it is calm (idle breathing only). All motion constants are TUNE parameters (live, persisted). The IMU axis mapping for the standing, USB-down stick is derived from a recorded serial IMU trace, not assumed. IMU absent or faulted: static, still correct screens.",
+      "Performance: measure and report on the StickS3, with passive monitoring running, the frame time of each animated screen (render plus panel push) and the IMU-to-glass latency; the animated face screens must hold at least 20 fps with no G13 drop-accounting regression and no observation loss. Report internal heap minimum and task stack headroom in STATUS as today.",
+      "The details pages keep their content; restyle them in the same HUD language, and fix the advice pagination so a page never ends in an unreachable 'more' (pagination by wrapped rows, host-tested).",
+      "Verify: host TDD for header layout, every mood/state screen (golden checks of zones and text), pagination, HUD honesty (no element drawn without its evidence) and the IMU motion model (fake samples: rest, tilt, shake, tap, set down); host preview renders of every screen in the evidence. The reviewer installs it over OTA (G16B), checks every rating via DEMO and the real network on the glass, records the owner's video of the stick standing and being handled, and tunes with the owner via TUNE. Carried over from G16/G16A: on the device, the loss of fresh evidence (for example the stick inside a switched-off microwave oven as a 2.4 GHz shield, watched through the door) replaces the rated display with the no-data state within the freshness deadline."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16D",
+    "category": "platform",
+    "description": "Battery life: on battery the Guardian dims when left still, then deep-sleeps, and a button press wakes it",
+    "depends_on": [
+      "G16C"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-16, stick runs unplugged): 'to preserve battery, after a while with no IMU movement… DEEP SLEEP… clicking revives the screen'. Owner decisions: dim first, then deep sleep; wake by button press only (owner: 'deep sleep – click to wake better', a path he has tested before). Shake-to-wake is out of scope (BMI270 interrupt wiring to an RTC GPIO is unverified).",
+      "Facts to build on (read, cite in code): ESP-IDF v5.4 docs/en/api-reference/system/sleep_modes.rst (Deep-sleep powers off CPUs, most RAM, APB peripherals and Wi-Fi, call esp_wifi_stop first; wake restarts the app; on the S3 ext1 wakes on ANY_LOW of RTC GPIOs). The owner's own StickS3 firmware ~/dev/m5/sticks3-ai-usage (firmware/src/hal/sticks3/power.cpp, docs/DEVICES.md; ptt.ino lineage, each write a measured leak fix): ext1 wake on the buttons GPIO11/GPIO12 active low; teardown = display sleep, LCD rail off (PM1 GPIO2), PA off (PM1 GPIO3), ES8311 codec low power (I2C 0x18: 0x0D<-0xFC, 0x0E<-0x6A, 0x00<-0x00), BMI270 suspend (0x68: 0x7D<-0x00, 0x7C<-0x03); never arm the PM1 IRQ wake (GPIO1->GPIO13: conflicts with SDA and hangs PM1 I2C after wake); never deep-sleep on USB power (VBUS > 4000 mV, debounced); 250 mAh cell, deep sleep with button wake measured at weeks of standby.",
+      "Power states, SDK-free and host-tested (for example adapters/power/idle.{hpp,cpp}): Active (normal screens and motion). Dim after power.dim_s (TUNE, default 30 s) without motion (G16A IMU), key press or ALERT: backlight to a low TUNE level, reduced frame rate, a minimal symbol view (rating glyph and mood colour, honest no-data/ALERT states kept); passive monitoring continues; motion, a key or a new ALERT returns to Active. Deep sleep after power.sleep_s (TUNE, default 120 s) more without activity, only on battery: show 'sleeping - press to wake' about 1 s, stop the radio, run the teardown above, arm ext1 ANY_LOW on GPIO11|GPIO12, enter deep sleep; no timer wake, no IMU wake. Never sleep on USB power, during UPDATE or a TUNE session, while an ALERT is shown, or during onboarding.",
+      "Wake: a press of either key boots the Guardian; that press is swallowed (never a UI action). After wake the screen honestly shows that nothing was observed while asleep (searching / no fresh data until a new observation), exactly like a cold boot. STATUS adds power_state=, wake_cause=, sleep_count= (RTC-retained) and the time spent asleep.",
+      "Verify: host TDD for the idle state machine (motion, key, ALERT, USB, UPDATE/TUNE session and onboarding cases; timeouts from TUNE), the wake-press guard and the teardown order against a fake PM1/I2C bus. On the StickS3 unplugged (reviewer, installed over OTA): dims after 30 s still; deep-sleeps after a further 120 s; FRONT and SIDE each wake it (wake_cause=ext1); plugged in it never sleeps; ten sleep/wake cycles without a PM1 I2C hang; BATTRUN reports the active runtime and the overnight standby drop with this policy. Carried over from G16B: the measured battery runtime and the on-battery readings (power=battery, charging=no). Carried over from G16C (accepted 2026-11-17 on speed and stability; owner chose to validate the rest with this task): IMU axis calibration from three recorded still poses (tools/imu_axis_map.py) and live motion tuning; one live TUNE session over Wi-Fi with the stick standing; 10-minute no-dropout runs unplugged and plugged-with-port-closed (plugged-and-read already measured clean); every rating via DEMO on the glass; the owner's video of the stick standing and being handled; the microwave no-data check.",
+      "Accepted 2026-11-17 (supervisor): device-proven on guardian-20261117-172431 and later: dim after 30 s shows the real portrait, deep sleep with ext1 wake on FRONT and SIDE (press swallowed), USB never sleeps, ES8311 powered down at boot and sleep (sleep_codec=powered_down, faults 0), STATUS power/wake fields, host TDD for the idle machine and teardown order. CARRY-OVER into G23: BATTRUN on battery, 10 sleep/wake cycles, 10-minute runs, DEMO and video checks."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16E",
+    "category": "core",
+    "description": "Detection platform: the parser decodes every management frame the passive detectors need, nearby threats get their own scope, and the Guardian shows them as a live threat radar",
+    "depends_on": [
+      "G16D"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-16, after attacking with the Evil Cardputer while the Guardian stayed 'normal'): 'it's defensive — look at AntiHunter, check all defensive algorithms, lots of probe watchers… not only art: playful to touch, beautiful to use, gorgeous on IMU, even better on tech'. Source of ideas: AntiHunter (~/dev/AntiHunter, commit c6ef921) is AGPL-3.0-only: copy NO code; re-implement independently from the behaviour described here, keep its constants only as uncalibrated hypotheses (policy of docs/research/reuse-decisions.md). Never transmit, never name an attack tool, never claim compromise: observations with count/window/uncertainty ('seen nearby', 'on your network').",
+      "Parser (guardian_core, host TDD with new make_fixtures.py fixtures for each): add FrameKind ProbeRequest (subtype 4: SSID raw bytes incl. wildcard, sequence, source, locally-administered bit), Reassociation request/response, Authentication body (algorithm incl. SAE=3, transaction seq, status), (Re)Association request power-management bit, and beacon/probe-response extras: TSF timestamp, beacon interval, CSA element 37 (switch count, new channel), Quiet element 40 (duration), Multi-BSSID element 71 presence, vendor element 222 (pwnagotchi payload bounded), OWE transition element (already parsed). Malformed/truncated bodies stay explicit statuses, never guessed. Hidden SSIDs sent as non-empty NUL bytes are a distinct SsidKind (not an SSID mismatch).",
+      "Core: add IncidentScope {Network, Area}. Network incidents keep today's rule (about the selected network). Area incidents are about the air around the stick, never change the security rating, and have their own visibility/cooldown. Replace the named detector calls in Monitor::receive with a bounded detector registry (fixed array, no allocation). STATUS and the G13 JSON report per detector: frames seen, events in window, last incident, cooldown remaining. Every detector threshold/window is a TUNE parameter with the AntiHunter value as its documented starting hypothesis.",
+      "Experience: presenter shows red for your network (today's ALERT) and amber for nearby threats (banner with the observation in words, e.g. 'Probe flood nearby: 312 probes / 5 s from 214 random addresses'). The HUD gains a live threat radar: one glyph per detector family that pulses on each counted event, plus real rates (probes/min, beacons/min, distinct transmitters). The face reacts per class through the G16C motion path (amber: a wary glance; red: a stare and the ALERT pose). Decoration never implies a measurement; details pages list each active observation with count/window.",
+      "Verify: host plain+ASan; parser fixtures for every new field incl. malformed; registry bounded; area incidents never change the rating (test); presenter golden checks for red vs amber; previews of the threat radar. Device (OTA): STATUS per-detector counters present, FRAMES fps/drops unchanged."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16F",
+    "category": "core",
+    "description": "Passive management-frame threat detectors: probe floods, beacon floods, karma/MANA responders, auth/SAE/assoc floods, channel-switch abuse, SSID confusion, pwnagotchi, OWE abuse and stronger deauth detection",
+    "depends_on": [
+      "G16E"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-16, after attacking with the Evil Cardputer while the Guardian stayed 'normal'): 'it's defensive — look at AntiHunter, check all defensive algorithms, lots of probe watchers… not only art: playful to touch, beautiful to use, gorgeous on IMU, even better on tech'. Source of ideas: AntiHunter (~/dev/AntiHunter, commit c6ef921) is AGPL-3.0-only: copy NO code; re-implement independently from the behaviour described here, keep its constants only as uncalibrated hypotheses (policy of docs/research/reuse-decisions.md). Never transmit, never name an attack tool, never claim compromise: observations with count/window/uncertainty ('seen nearby', 'on your network').",
+      "Implement each as an independent FrameDetector (bounded tables, O(1) per frame, cooldown, area scope unless it concerns the selected network), with AntiHunter's behaviour as the starting hypothesis (all values TUNE): (1) Probe flood: randomized-source flood (>=80 probe requests and >=60 distinct sources in 5 s), single-source flood (>=60 per 5 s in 2 consecutive windows), per-SSID flood (>=40 distinct sources asking for one SSID in 5 s); 60 s quiet before re-alert; ignore random-looking SSIDs only as a documented rule. (2) Beacon flood: >=40 distinct BSSIDs at >= -65 dBm within 10 s (RSSI gate prevents far-away false positives); while active, suppress per-beacon noise. (3) Karma/MANA responder (passive half only, no bait): one transmitter answering for >=N distinct SSIDs via probe responses/beacons within 60 s, excluding Multi-BSSID APs; stronger when the answered SSIDs match recently observed probe requests. (4) Auth flood: per BSSID >=16 distinct sources and >=60 open-system auth frames in 5 s. (5) SAE commit flood (Dragonblood-style DoS): per BSSID SAE commits minus confirms >=10 in 5 s. (6) Assoc-sleep: per BSSID >=8 (re)assoc requests with the power-management bit or >=4 distinct sources in 5 s. (7) CSA/Quiet abuse: CSA switch count >=50 or a CSA from the selected BSSID that its own beacons never announced; Quiet duration >=1000 TU; 30 s per BSSID. (8) SSID confusion (CVE-2023-52424): probe response SSID differs from that BSSID's beacon SSID (hidden NUL-SSID handled, not a mismatch). (9) Pwnagotchi nearby: beacon from DE:AD:BE:EF:DE:AD or with vendor element 222; one alert per 30 s per BSSID. (10) OWE transition abuse: an open beacon reusing an OWE AP's SSID that is not its declared partner. (11) Deauth upgrade: in addition to today's selected-BSSID burst, area detection per source (>=20 in 10 s) and per source+destination pair (>=12 in 1 s) and broadcast bursts; never read the reason of a Protected frame; retries deduplicated as today. (12) Beacon forgery facts (no tool names): SSID rotation (>=12 SSIDs from one transmitter in 5 s, Multi-BSSID excluded); an open network with a lure-style SSID from a transmitter that also rotates SSIDs.",
+      "Each detector: attack fixtures that fire exactly once per cooldown and benign fixtures that never fire (phones probing normally, a mesh system with many BSSIDs, an AP reboot, a Multi-BSSID AP, hidden SSIDs, normal roaming deauths), allocation ban, saturation flagged, observation text with count/window/uncertainty.",
+      "Live proof (owner runs every live attack; reviewer prepares scenarios in lab/live and the throwaway commands): the Evil Cardputer as attacker for probe flood, beacon spam, karma/evil portal, deauth, and any auth/SAE flood it offers; the Guardian must raise the right amber/red incident within 1.5 s of the closing frame. Benign soak >= 12 h of normal home traffic with phones roaming: target 0 false incidents; the measured home rates (probes/min, beacons/min, distinct transmitters) are recorded and used to set the TUNE defaults.",
+      "Accepted 2026-11-17 (supervisor): live-proven 2026-11-17 on the StickS3: probe flood = amber (t.probe_flood=16/sources=12/window=10000 saved), beacon spam = amber, Bruce deauth on the selected network = RED, Brucegotchi deauth nearby = amber (scope split), 52 t.* TUNE keys, threat_detectors_check 32 cases, lab engine runs the 14 detectors. CARRY-OVER into G23: karma (needs the SD list), auth/SAE flood live proofs, 12 h benign soak reading."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16G",
+    "category": "core",
+    "description": "Passive data-path detectors: handshake-harvesting signs (PMKID harvest, fake M1, deauth followed by a fresh handshake) and frame-loss jamming, after a measured device load spike",
+    "depends_on": [
+      "G16F"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-16, after attacking with the Evil Cardputer while the Guardian stayed 'normal'): 'it's defensive — look at AntiHunter, check all defensive algorithms, lots of probe watchers… not only art: playful to touch, beautiful to use, gorgeous on IMU, even better on tech'. Source of ideas: AntiHunter (~/dev/AntiHunter, commit c6ef921) is AGPL-3.0-only: copy NO code; re-implement independently from the behaviour described here, keep its constants only as uncalibrated hypotheses (policy of docs/research/reuse-decisions.md). Never transmit, never name an attack tool, never claim compromise: observations with count/window/uncertainty ('seen nearby', 'on your network').",
+      "Spike first, reported before building: enable promiscuous DATA (and FCS-fail for jamming) with a receive-callback prefilter that keeps only LLC/SNAP AA AA 03 00 00 00 88 8E (EAPOL) frames and per-channel FCS-fail counters, dropping everything else before the queue; measure on the StickS3 in a busy home: callback cost, queue drops, G13 drop accounting, FRAMES fps, heap. If the load breaks the G16C budgets, stop and report numbers.",
+      "Then (independent code, hypotheses as TUNE): EAPOL-Key decoding (key info, replay counter, nonce, PMKID KDE 00-0F-AC-04) bounded; PMKID harvest = M1 messages to one station without its M2, across >=3 BSSIDs in 10 s, 1.5 s settle; fake M1 = all-zero ANonce; on the selected network: a deauth/disassoc burst followed within 8 s by a fresh 4-way handshake for the same station, worded 'clients were pushed off and reconnected (a handshake was exchanged)' — never 'cracked' and never claiming who captured it; jamming = per channel per second packet-delivery ratio < 0.3 with >=15 FCS errors at > -70 dBm average and a valid frame there within 30 s (frame-loss jamming only; say honestly that carrier/noise jammers are not detectable this way).",
+      "Verify: host fixtures for EAPOL M1-M4, PMKID KDE, zero ANonce, normal reconnects (must not fire), malformed keys; device load numbers before/after; live: owner-run deauth+reconnect and (if the Evil Cardputer supports it) PMKID-style probing against his own AP; benign soak 0 false incidents.",
+      "Accepted 2026-11-17 (supervisor): datapath_check 20 cases/1250 asserts, data path behind TUNE detect.datapath, EAPOL prefilter, PMKID/fake-M1/deauth-then-handshake detectors host-proven; signal-here fixed to AP-transmitted frames. CARRY-OVER into G23: device load numbers with datapath off/on and the owner's live deauth+reconnect proof."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G17",
+    "category": "visual",
+    "description": "Good shows a clearly smiling, reassuring Guardian",
+    "depends_on": [
+      "G16"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Activate the Good fixture and show the same character with a smaller friendly smile, relaxed brows and a composed posture. Remove the celebratory cigar and smoke so the top two moods are visibly different.",
+      "Use green accents and a soft idle motion. Show 'Good' and explain the observed WPA2-CCMP/required-PMF configuration without claiming the entire network is secure.",
+      "Verify: compare Good and Very good on the StickS3 side by side in recorded frames; the smile remains obvious, the expressions differ in more than color, and the label matches the fixture.",
+      "Accepted 2026-11-17 (supervisor): v4 art pack ($GUARDIAN_STORE/art-exports/G15/20261117-v4, portraits regenerated by build_assets.py, sha-pinned in persona_check) shipped in guardian-20261117-203615: Good = smaller friendly smile, relaxed brows, no cigar or smoke, cyan eyes (owner chose cyan over green accents on 2026-11-17, rating row B); the rating text and explanation come from the G07 advice library on the HUD."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G18",
+    "category": "visual",
+    "description": "Medium shows a neutral Guardian with no smile",
+    "depends_on": [
+      "G17"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Activate the Medium fixture and show a neutral mouth, thoughtful eyes and slightly lowered brows. Do not leave the mask's geometry locked into a permanent smile. No cigar or smoke appears.",
+      "Use amber accents and restrained motion. Show 'Medium' and a specific explanation, such as WPA2 remaining available in transition mode or PMF being optional, according to the actual input.",
+      "Verify: inspect an on-device still and animation; a viewer can distinguish the neutral expression from both smiling states and can read why this network received Medium.",
+      "Accepted 2026-11-17 (supervisor): v4 pack: Medium = neutral mouth, lowered brows, no cigar or smoke, cyan eyes; explanation from the G07 advice library; shipped and seen on the device 2026-11-17."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G19",
+    "category": "visual",
+    "description": "Bad shows a concerned Guardian and a clear warning about legacy Wi-Fi settings",
+    "depends_on": [
+      "G18"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Activate the Bad fixture and show a frown, inward angled brows and a tense but readable expression. Use orange accents and a small concerned head movement, with no cigar or smoke.",
+      "Show 'Bad' and name the observed legacy WPA or TKIP setting. Give one short suggestion to review the router's security mode; do not imply that an attacker is currently present.",
+      "Verify: the on-device pose is visibly more concerned than Medium, the warning comes from the supplied security evidence, and low RSSI alone cannot trigger this state.",
+      "Accepted 2026-11-17 (supervisor): v4 pack: Bad = frown, inward brows, concerned; no cigar or smoke; cyan eyes; legacy WPA/TKIP wording from the G07 advice library; low RSSI never rates (core invariant tests)."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G20",
+    "category": "visual",
+    "description": "Horrible shows the most alarmed Guardian for open or WEP configuration",
+    "depends_on": [
+      "G19"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Activate separate unencrypted-open and WEP fixtures. Show the Guardian's most alarmed expression, widened eyes, strongly furrowed brows and a pronounced grimace. No smile, cigar or smoke appears.",
+      "Use deep red accents with a slow pulse rather than rapid flashing. Show 'Horrible' and distinguish 'No Wi-Fi encryption' from 'WEP is obsolete' in the short explanation.",
+      "Verify: record both explanations on the StickS3, show that Horrible differs from Bad through expression as well as color, and confirm that sensor loss or OWE cannot be mislabeled as an unencrypted-open network.",
+      "Accepted 2026-11-17 (supervisor): v4 pack: Horrible = widened eyes, furrowed brows, grimace, BLOOD-RED eyes (owner 2026-11-17), distinct from Bad by expression; open vs WEP wording from the G07 advice library; the ALERT pulse (450 ms) is the slow pulse; sensor loss shows NoData, never Horrible."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16I",
+    "category": "core",
+    "description": "Fawkes always stands upright by gravity (USB down is his feet; continuous counter-rotation, no snapping) and a real shake bursts the face into about a thousand particles that drift like a snow globe and slowly reform",
+    "depends_on": [
+      "G16A",
+      "G16C"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-17): 'fawkes should always stand facing up, independent of the direction. his correct position is USB facing down, so he always stands up. if we shake it: THOUSAND PARTICLES LIKE SNOW GLOBE, slowly reforming face'. Decisions: continuous counter-rotation by the gravity angle (a level, not 4-way snapping); the burst fires on a real SHAKE only (never taps, walking, drops or the FRONT x3 update gesture); particles keep the face colours; the HUD rating and text stay; an ALERT cancels the burst at once (the red stare paints). Scope: the existing 2D v4 portraits; the 3D head is G21.",
+      "Facts, all MEASURED on the StickS3 and host on 2026-11-17 (spike logs: firmware/evidence/sticks3-imu-shake-*-20261117.txt, the approved design and spike results in firmware/evidence/G16I-plan-upright-burst-20261117.md): the motion model (adapters/companion/motion) already exports the absolute roll; a warp per frame costs 19.0 ms render + 11.9 ms push at 24.9 fps (total_max 37.7 ms) and today's code already warps EVERY frame at rest (breath + sway change the cache key: 961 warps for 903 frames), so upright adds no rest cost; a 3x3-block particle frame costs about 1/6 of a warp on the host (15.0 us vs 85.5 us, 1,388 particles). Shake rule proven on nine recorded traces: per-axis gravity low-pass tau 1 s, dominant-axis sign alternations above 1.2 g at least 60 ms apart; fire at 8 alternations within 1500 ms, refractory 1000 ms. Separation: hard shake 16, gentle shake 11 (fire); FRONT x3 6, hands-off drops 5, tap/still/walk/set-down 0 (never fire).",
+      "Upright: a mode of motion::Model (TUNE motion.upright 0/1 default 1, motion.upright_fit 0..1 default 1): tilt target = -roll unwrapped to the nearest turn (no spin across +-180), no tank wall, HOLD the last angle when lying flat (in-plane gravity under 0.3), 0.5 deg rest deadband so the picture is still at rest, fit scale from the hood box 130x157 so upright_fit=1 never clips the hood; Output gains up_x/up_y (screen gravity) and lin_x/lin_y (the shove) for the burst. Shake: adapters/companion/shake.{hpp,cpp}, portable, fed from drain_imu, TUNE shake.g 0.5..4 (1.2), shake.peaks 2..16 (8), shake.window_ms 200..3000 (1500); STATUS shakes=. Burst: adapters/companion/burst.{hpp,cpp}, one particle per lit 3x3 block of the current portrait (capacity 1600, 10 B each, board copy in PSRAM via psram::make), phases explode 0.5 s / drift 1.0 s under the motion gravity with wall bounces / reform 2.0 s landing every block exactly on its home so the last frame equals the identity portrait (TUNE burst.s total, default 3.5); painted through a persona::PixelSource, no warp during the burst; DrawInput gains burst; burst_allowed = face shown and persona and art Rated and not alert; cancel on ALERT, art change, Dim/Sleep, console, EDGE, UPDATE, and refuse begin while update_confirm is open or a TUNE session is active; FrameKind::Burst in FRAMES; STATUS bursts=. TUNE registry ends at 94 of 96.",
+      "TDD, host only, failing test named first: motion_check (upright through a quarter turn, crossing -180 without spinning, hold when flat, fit keeps the hood inside at every angle, exactly still under +-0.2 deg noise at rest, exposes gravity and shove), shake_check (single tap, FRONT x3, 2 Hz walking, drop, steady spin and a weak shake never fire; a real shake fires once; refractory; configure; defaults inside TUNE ranges; the nine recorded traces classify as labelled from tests/fixtures/imu/), burst_check (one particle per lit block and refuse oversized art, inside the band in every phase, explode away from the pivot, gravity follows the up vector, reform lands exactly, final frame equals the identity portrait, kick re-scatters, frame-rate independent, cancel), companion_check (never paints outside the band, ALERT cancels and paints the red stare, text and HUD untouched, reforms to exact pixels, no burst without a rated face, changed portrait cancels, caution border stays), frame_stats_check (burst kind), render_bench rated-burst kept permanently, persona_check (hood 130x157, WarpCache exposes art and source).",
+      "Verify: firmware/tools/host-check.sh plain and asan green; companion_preview sheet with a mid-burst frame; signed archive via boards/sticks3/tools/build.sh; shipped-artifact check (SHA256SUMS, signature, 16 portraits in the bin). On the device (owner, OTA): roll slowly through 360 deg and lay it flat: face stays upright, no spin, holds when flat, FRAMES kind=rated at or above 20 fps; still 30 s shows no jitter; one tap, FRONT x3 (answer SIDE), walking, three shakes: STATUS shakes= counts only the shakes, the burst reforms in about 3.5 s with the HUD text steady, FRAMES kind=burst render + push at or below 40 ms; an ALERT during a burst paints the red stare at once; heap_internal_min and task_stack_free unchanged from guardian-20261117-203615 plus 16,000 B PSRAM. README section and firmware/evidence/sticks3-G16I-*.log.",
+      "Accepted 2026-11-18 (supervisor): host 47/47 plain+ASan, nine recorded traces as fixtures, signed images booted on the stick (guardian-20261118-030709 .. 131550), IMU running after hardware and software resets (the software-restart regression found on first boot was fixed the same morning: restart stops the IMU and soft-resets it, init retries once). Owner ruling 2026-11-18: upright mode OFF by default (motion.upright=0; the approved behaviour is the floating face; the hold-when-flat rule moved the picture when the stick was laid down). CARRY-OVER into G23: owner's shake-burst and upright checks on the glass with motion.upright=1."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16J",
+    "category": "core",
+    "description": "Attack coverage: every attack the owner's kit (Bruce, Evil-M5 Cardputer, Marauder/GhostESP, Pi emitter) can send on 2.4 GHz is proven live on the StickS3 with a measured time-to-alert, the evil-twin watch is on by default, the data path is on when the measured load allows, thresholds are measured on this radio, and every blind spot is printed on the glass",
+    "depends_on": [
+      "G16E",
+      "G16F",
+      "G16G",
+      "G16I"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-17): 'for every single attack that I try, our guardian must guard and alert ... we need THE best defense possible'. The honest state and the full kit x attack matrix are in docs/attack-coverage.md (read first; keep it current). Four measured limits: one channel at a time while locked; 2.4 GHz only (5 GHz is physics, printed on the glass); the evil-twin watch (UnexpectedAp) is off with no control; the data path (handshake, frame_loss) is off. Passive only: never transmit, never name a tool or a person on the glass. AntiHunter upstream/main (2026-11-17, AGPL) is a source of BEHAVIOUR hypotheses only: no code copied; the adopt/reject table is in docs/attack-coverage.md.",
+      "Spikes first, recorded in firmware/evidence/ before any threshold is written: (a) data-path load on the stick (fps, rx_queue_full, heap, 10 min with detect.datapath 0 then 1); (b) own-channel loss under a bounded area sweep (100 ms dwell every 2 s) with the Pi emitter's deauth burst at threshold, versus locked; (c) the benign ceiling per detector from the 12 h soak ($GUARDIAN_STORE/evidence-raw/soak-benign-20261117-232211.jsonl, parse with tools/threat_watch.py); (d) the karma shape of Evil Spear and Marauder Karma (one SSID per SoftAP, MAC per target) captured on the Mac (tcpdump -I) or the Pi.",
+      "Then, host TDD, in this order: evil twin on by default when a network is picked (presenter stores settings and channel; set watch_impostors there) with an 'approve this AP' picker action feeding the existing approved set, RED text 'another device is using your network's name'; data path default on if spike (a) keeps fps >= 20 and rx_queue_full flat, else off with 'handshake watch: off (load)' in Details; the deauth pair rule (>=12 in 1 s) on the selected network too; the karma probe-then-answer rule in responder (a phone asks for X, then within 10 s a never-seen unapproved BSSID answers or beacons X -> amber); confidence shapes that halve the count threshold and add 'looks like a known attack tool' (deauth reason 2 + seq 0xFFF0, reason 7 + duration 0x013A, rising sequence, deauth/disassoc alternation, CSA count 0xFF, probe seq 0x0001, TSF static, beacon interval 1000, transmitter 12:34:56:78:9A:BC, hcxdumptool replay 0xF000..0xFFFE, zero/forged PMKID, EAPOL within 30 s of a deauth, open beacon from an Espressif OUI with a lure word); frame_loss replaced by the noise-floor rule (>= 8 dB above a 60 s average for 3 s, per channel) with the error ratio as evidence text; disassoc (reason 8) fixtures; hostile-SSID fuzz fixtures (format strings, overlong, control bytes, RTL marks: never a crash, never a mis-rating, text clipped); the optional area sweep behind detect.sweep_ms (default from spike (b), 0 if the RED path loses frames). Every new pattern: an attack fixture firing once per cooldown and a benign twin never firing; new TUNE keys with ranges; raise max_params as needed.",
+      "Honesty on the glass and in the docs: Details line '2.4 GHz, channel N only, no 5 GHz, passive' and 'handshake watch: off' when the data path is off; firmware/README.md 'What it cannot see' next to the detectors list with the measured thresholds table; docs/attack-coverage.md rows updated with the measured threshold, time-to-alert and evidence file; tools/live_matrix.py drives tools/threat_watch.py per row (owner starts each attack on the selected channel for 60 s, then its benign twin 60 s) and writes firmware/evidence/sticks3-G16J-<tool>-<attack>-<date>.log; lab/live gets a Pi-emitter scenario per row it can replay (disassoc, targeted pair, auth flood, PMKID orphan, fake M1, CSA 0xFF, Quiet, hostile SSIDs).",
+      "Verify: host-check plain and asan green; lab/live scenarios green with a fresh engine build; signed archive with the shipped-artifact check. On the device (owner runs every attack, reviewer prepares): the matrix has no 'unproven' row the kit can send (Bruce deauth/targeted/beacon spam/evil portal clone/karma/pwngrid; Evil-M5 beacon spam/probe flood/karma spear/CSA/SAE if WPA3/pwngrid; Marauder AP clone/assoc sleep/Bad Msg/CSA/Quiet/SAE), each with time-to-alert <= 1.5 s after the closing frame, benign twin 0 incidents, the 12 h soak 0 false incidents at the new defaults, fps >= 20 with the data path on, heap and stack recorded, the Details honesty line photographed. Blind rows (5 GHz, silent sniffers, LAN after joining, BLE) state why.",
+      "Accepted 2026-11-18 (supervisor): host 48/48 plain+ASan, lab 94, image booted on the stick; evil-twin watch on by default, measured probe defaults, noise-floor rule, limits page, tool shapes; benign ceiling from the overnight soak (0 false incidents in 9.8 h outside the owner's own Brucegotchi window 00:51-01:08). CARRY-OVER into G23: data-path load spike, sweep-loss spike, the live matrix rows with the owner's kit, the 12 h soak at the new defaults."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G21",
+    "category": "performance",
+    "description": "The 3D Guardian head: pre-rendered angle frames of the owner-accepted Meshy head with the ORIGINAL master projected on it, packed in internal flash under 1.9 MB, chosen by the IMU yaw/pitch at or above 20 fps while the StickS3 observes Wi-Fi",
+    "depends_on": [
+      "G16",
+      "G16A",
+      "G16B",
+      "G17",
+      "G18",
+      "G19",
+      "G20",
+      "G16C",
+      "G16D",
+      "G16E",
+      "G16F",
+      "G16G",
+      "G16I",
+      "G16J"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-17): the face is the repo art, in 3D, and 'we can polish on the end'. What exists (MEASURED, 2026-11-17, $GUARDIAN_STORE/art-exports/G21-3d/): Meshy heads i1 (Medium master) and i2 (VeryGood master) as GLB with sha256 (tasks 01a1ec45-0db3-7486-a844-6817d25e0005 and 01a1ec45-1bdf-7017-b078-032224386647; Meshy tasks expire 3 days after finish, the GLBs are in the store), 80 credits spent in total, spend log spend.jsonl; tools/face3d/project_views.py (Blender 5.2, projects the 512x512 master onto the head at the identity pose, bakes it, renders a yaw x pitch grid at 135x160 scale 4; grazing and hidden surfaces fade to the hood's dark colour); tools/face3d/measure_frames.py (downscale, RGB565 LE, zlib deflate per frame, budget check, sheet). Numbers: Medium on i1 averages 15.6 KB deflated per frame; a 15 yaw x 7 pitch grid of one mood is 1.64 MB (86 % of 1.9 MB); five moods fit at 7 x 3 each (about 1.7 MB). The face art itself is still the owner's to accept ('not quite there yet'); this task builds the PIPELINE and the firmware path with the current render set, so a better render set is one rerun of the pipeline, no firmware change. No Meshy call and no credit spend in this task: Meshy is the owner's, the GLBs are inputs.",
+      "Pipeline (rerunnable, tested like build_assets.py): tools/face3d/pack_frames.py takes a views directory per mood, downscales to 135x160 LANCZOS on black, converts to little-endian RGB565, deflates each frame (zlib level 9, raw deflate for the ROM inflater), writes firmware/art/persona/v3/frames/<mood>.bin + manifest.json (grid yaw/pitch lists, offsets, sizes, sha256 per frame and total) and refuses a pack above the measured budget. Document the exact Blender and pack commands in firmware/README.md so the owner's polish pass is one rerun.",
+      "Firmware: a FrameSet in flash (embedded like the v2 portraits), one frame inflated at a time into a PSRAM band buffer with the ESP32-S3 ROM inflater (or a bounded miniz), chosen by the quantised IMU yaw/pitch from the motion model (held angles, hysteresis so the frame never flickers at a grid boundary), cross-fade or snap decided by measurement; the G16I upright rotation and the burst still apply on top of the chosen frame (the chosen frame is just the art the warp and the burst read). Rated moods without a 3D set fall back to the 2D portrait. Memory: measure before choosing: bounded buffers, no allocation in the frame path, PSRAM band like WarpCache.",
+      "Verify: host tests for pack_frames (pins, budget refusal, byte-exact frame round trip through the inflater used on the device), frame choice (hysteresis, held angles, fallback), and render_bench rated-3d kept permanently; host-check plain and asan green; signed archive with the shipped-artifact check (every frame set pinned by sha256 inside the bin, app size against the OTA slot); on the device (owner, OTA): the head turns with the stick at or above 20 fps (FRAMES kind=rated), no flicker at a grid boundary, heap_internal_min and task_stack_free recorded, a 30-minute USB-powered soak across the five moods with live monitoring, detail-screen visits and AP disappearance, no watchdog or reset, no memory growth. Evidence in firmware/evidence/sticks3-G21-*.log.",
+      "Accepted 2026-11-18 (supervisor): pipeline (project_views.py framed like the 2D crop, pack_frames.py, own inflater byte-exact on 54 frames), image booted, one inflate 14.8 ms measured on the stick; the real flash budget (about 1.0 MB beside the app) recorded. Owner ruling 2026-11-18: the 3D frames are NOT the approved design; head.on=0 by default, the v4 portrait shows; frames stay available behind TUNE head.on=1 and the five-mood question (partition table or assets partition) is deferred until the owner wants the head."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16M",
+    "category": "core",
+    "description": "Product setup: join the home Wi-Fi from the phone, no cable, no Mac: a gesture-entered SoftAP setup page asks only for the picked network's password, credentials stored with NVS encryption, OTA and TUNE use the stored credential, the USB provisioning tool stays as the lab path",
+    "depends_on": [
+      "G16B",
+      "G16J"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-18): 'I never set wifi password via stick, this is NOT a product if firmware needs hard coding'. Facts: nothing is compiled in; the SSID/password were provisioned once over USB with tools/ota_provision.py (getpass, never echoed) into NVS, unencrypted (open G16B item). A product sets up from the phone with no cable and no Mac.",
+      "Design (decided): setup mode on the stick itself, phone only, no app. ESP-IDF v5.4 ships components/wifi_provisioning (SoftAP scheme with a captive page; BLE scheme as the fallback). The owner enters setup with a key gesture (hold SIDE 3 s on the picker, or FRONT x3 when nothing is provisioned); the stick raises a short-lived 'Guardian-xxxx' access point with a one-page form; the picked network's name is already known from the picker, so the page asks for the password only; on save the stick drops the access point, stores the credential (NVS encryption on, which also closes the G16B 'unencrypted password' item), returns to passive listening and says so on the glass. It transmits only during setup, by the owner's hand. The existing OTA/TUNE transport reads the same stored credential; tools/ota_provision.py stays as the lab path.",
+      "Host TDD: the setup state machine (enter by gesture, page served, password saved, timeout 5 min, cancel by key, never while an ALERT is shown) against a fake provisioning port; the glass texts; STATUS fields (setup=idle/open/saved, setup_count). Board: wifi_provisioning manager (SoftAP) wired to the companion loop like the TUNE session (radio handed over and resumed), NVS encryption enabled in sdkconfig with the partition/key handling documented (one USB flash by the owner if the partition table changes), the gesture, the page.",
+      "Verify: host-check plain and asan green; signed archive; on the device (owner): from a wiped credential, phone joins 'Guardian-xxxx', enters the password, the stick joins the home network for an OTA/TUNE poll within 2 minutes, STATUS ota_provisioned=yes; the password never appears in any log or STATUS line; NVS read back with the encryption key shows the credential only through the API.",
+      "Accepted 2026-11-19 (supervisor): host 52/52 plain+ASan in every later check; on guardian-20261119-133525 the owner set up the home Wi-Fi from the phone (SIDE hold on the list, Guardian-xxxx access point, one page): STATUS 15:29:47 setup_last=saved setup_saved=1 setup_count=2 setup_refused=0 wifi_provisioned=yes ota_provisioned=yes, the poll landing afterwards over the home Wi-Fi; no field carries the password. CARRY-OVER into G23: the G16M credential vault: nvs_cred partition table write (one USB sitting), eFuse HMAC key burn, erase of the old plaintext nvs, encrypted read-back (all Felipe's decisions); until then the stick reports cred_store=plain cred_vault=no_partition. Evidence firmware/evidence/sticks3-G16M-20261119.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16N",
+    "category": "core",
+    "description": "Guard in the dark: on battery the screen goes fully off after dimming while the radio, detectors and IMU keep running, and every new incident (red or amber) lights the screen with the alert; deep sleep remains the floor at a battery percentage the owner sets",
+    "depends_on": [
+      "G16D",
+      "G16J"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-18): 'device now has screen pitch black to save battery, BUT it should be monitoring, any deauth packets should bring screen UP, alert. Otherwise the screen has to be on to guard.' Approved design and code facts: firmware/evidence/G16N-plan-dark-guard-20261118.md (read first). Today Active -> Dim -> deep sleep after power.sleep_s stops guarding; a first ALERT brightens Dim but a second incident while the banner is up does not (idle.cpp:102 single bool).",
+      "Library (host TDD, failing test first): a fourth idle state Dark in adapters/power/idle.{hpp,cpp}: Dim -> Dark after power.dark_s (TUNE 0..3600, default 60; 0 = off) on battery only; Dark = backlight 0, no frames drawn, everything else running; Dark -> Sleep only at batt_pct <= power.dark_floor_pct (TUNE 5..90, default 20); exits: key (swallowed), motion, a NEW incident. Snapshot/view gain incident_seq (the Monitor increments it on every new Network or Area incident); gp::Inputs gains incident_seq and batt_pct; Idle::step treats a changed seq as activity. Never use display_sleep() for Dark (it revokes the canvas until reboot): set_backlight(0) only, 60 % and a forced full redraw on exit. idle_check cases: dark_after_dim_on_battery, dark_keeps_running_inputs, a_second_incident_relights_from_dark, dark_sleeps_at_the_floor, usb_never_darkens, key_and_motion_leave_dark; core/presenter tests for incident_seq.",
+      "Board (measurement_main.cpp): apply Dark (backlight 0, skip draws, forced redraw on exit), TUNE power.dark_s and power.dark_floor_pct, STATUS power_state=dark dark_s= dark_wakes=key/motion/incident, BATTRUN per-state drain (mV per 10 min in active/dim/dark) and a Details line 'dark guard: about N h left' from the measured drain; one dim line for 2 s on entering Dark: 'guarding in the dark, press to look'. firmware/README.md section.",
+      "Verify: host-check plain and asan green; signed archive. Device (owner's kit; the image lands by auto-OTA, STATUS and BATTRUN over the self-fetch TUNE poll): S1 drain on battery 20 min each at full-on / Dim / Dark / Sleep -> mA per state and hours of guarding on 250 mAh; S2 a Bruce deauth against the home network while Dark lights the red stare within 1.5 s plus the detector window; S3 a second burst after the first banner ends re-lights; the floor sends it to deep sleep. Numbers in firmware/evidence/sticks3-G16N-spike-<date>.log. If Dark costs more than 150 mA, the default becomes power.dark_s=0 and the numbers go on the glass.",
+      "Accepted 2026-11-19 (supervisor): host 52/52 plain+ASan in every later check; S1 2026-11-18; S2 on guardian-20261119-133525 on battery: the owner let the stick go Dark and ran Bruce, the screen lit by itself ('worked. came back'); STATUS 18:33:49 uptime_s=12137 (no boot) darks=3 dark_wakes=0/1/1 (one incident wake) dark_wake_evidence_ms=53 dark_wake_frame_ms=101, last_burst_network own:4. CARRY-OVER into G23: G16N S3 as one sequence: a second Bruce burst after the first banner re-lights the dark stick, and the battery floor (dark_floor_pct=20) sends it to deep sleep; the floor sleep was seen 2026-11-19 ~14:16 (BATTRUN sleep_mv=3467 after 1489 s dark; floor inferred, no STATUS field names the reason). Evidence firmware/evidence/sticks3-G16N-spike-20261118.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16O",
+    "category": "core",
+    "description": "Shake particles obey gravity: after a shake the particles fall toward the real down of the stick, keep falling and sliding while the owner keeps tilting or shaking, and reform into the face only once the stick is held still or nearly level",
+    "depends_on": [
+      "G16I"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-18 14:5x): 'when shake, particles should assume physics, fall... if one keeps tilting to sides, particles should fall (gravity)... it only comes back with no or very few tilting... if one shakes and keeps shaking, particles keep falling on gravity'. Today (G16I burst.cpp): explode 0.5 s, drift 1.0 s under the motion gravity, reform 2.0 s on a fixed timer whatever the hands do.",
+      "Design: the reform phase is gated by stillness, not by a timer: while |tilt change| or the shove exceeds TUNE burst.still_dps / burst.still_g (defaults from the G16I traces: gentle handling stays 'moving'), particles keep integrating under gravity along the motion model's up vector (up_x/up_y), with wall bounces and floor settling at the band edge (pile-up: particles rest on the band floor and on each other's rows, a 3x3-block height map, no O(n^2)); a new shake re-scatters (kick). Reform starts after burst.calm_s (default 0.6 s) of stillness and lands every block exactly on its home as today; a maximum burst.max_s (default 20 s) always reforms so a left-tilted stick does not stay a pile forever. ALERT cancels as today.",
+      "Host TDD: burst_check cases: gravity_follows_the_stick_down_while_tilted, particles_settle_on_the_floor_and_pile_up, continuous_tilting_postpones_the_reform, calm_starts_the_reform_and_lands_exactly, max_time_always_reforms, a_new_shake_rescatters_a_pile; companion_check draw rules unchanged; render_bench rated-burst cost within the G16I budget (particle frame below a warped frame).",
+      "Verify: host-check plain and asan green; signed archive; on the device (owner): shake and keep tilting: the pile follows gravity for as long as he tilts; hold still: it reforms in about 2.6 s; FRAMES kind=burst render + push at or below 40 ms; evidence firmware/evidence/sticks3-G16O-*.log.",
+      "Accepted 2026-11-19 (supervisor): host 52/52 plain+ASan in every later check; on guardian-20261119-133525 the owner shook and tilted twice: FRAMES kind=burst render 14.4 + push 11.3 ms, worst 33.7 ms (<= 40), shakes=1 bursts=1; owner on the glass: 'yes ... the feeling is nice, 9 out of 10'. CARRY-OVER into G23: the G16O pile reforms while the stick is still being tilted (owner 2026-11-19: 'even tilting, they came back sooner than they should', 9/10); stillness gate keys burst.still_dps=12, burst.still_g=0.10, burst.calm_s=0.6, burst.max_s=20 (firmware defaults): tune from recorded tilt traces so a slow tilt does not count as still. Evidence firmware/evidence/sticks3-G16O-20261119.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16P",
+    "category": "core",
+    "description": "A plugged-in Guardian wakes by itself: deep sleep adds a timer wake every few minutes that checks for USB power and returns to sleep within a second when there is none; on USB it stays up (the keys remain the other wake source; the power-chip interrupt line stays unused)",
+    "depends_on": [
+      "G16D",
+      "G16N"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner (2026-11-18 18:3x, after plugging a deep-asleep stick into a charger): 'have to click button to wake screen. crazy.' Facts: wake sources today are ext1 on the two keys only (measurement_main.cpp arm_ext1); G16D ruled out the PM1 IRQ line as a wake source (owner ORDER #29, never the small side button's line); the PM1 reports VBUS (idle.hpp Source, vbus_mv) once awake.",
+      "Design: before deep sleep also arm a timer wake of power.sleep_check_s (TUNE 60..3600, default 300). On a timer wake: read the PM1 power source once (no display, no radio, no IMU); USB present -> normal boot (hold Usb, screen on, poll runs); absent -> record the check (RTC retained counter) and re-enter deep sleep within 1 s without touching the display rails. STATUS: sleep_checks=, wake_cause=timer|ext1. BATTRUN: the timer checks' cost (sleep_mv across checks) so the trade-off is on the glass.",
+      "Host TDD (idle_check): timer wake with usb -> Active with Hold::Usb; timer wake without usb -> back to sleep within the budget, counter incremented, display untouched; key wake unchanged; the check period inside its TUNE range. Board: esp_sleep_enable_timer_wakeup beside ext1, the quick re-sleep path, the retained counter, the TUNE key (registry has room since G16O: 116 of 120).",
+      "Verify: host-check plain and asan green; signed archive; device (owner): let it sleep on battery, plug the charger, no key: it must light within power.sleep_check_s; unplugged, STATUS after a key wake shows the checks counted and the standby drop per check in BATTRUN; evidence firmware/evidence/sticks3-G16P-*.log.",
+      "Accepted 2026-11-19 (supervisor): watcher SUMMARY host 51/51 plain+ASan at handoff, now 52/52 in every later check; on guardian-20261119-133525 the stick went Active -> Dim -> Dark -> deep sleep on battery (asleep 3310 s, 10 timer checks, 0 faults); the owner plugged the charger and pressed nothing: first poll 15:13:35 wake_cause=timer wake_check=usb power_hold=usb, check_awake_ms 974/986 (budget 1000, thin margin); BATTRUN checks=10 standby_uv_h=-13333 (no measurable drop). Residual: no unplugged key wake after the sleep. Evidence firmware/evidence/sticks3-G16P-20261119.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16R",
+    "category": "core",
+    "description": "BUG: your network is its name, not one address. A deauth or disassoc burst against any access point that advertises the picked network's exact name is RED; the same-name set is learned at runtime from the picked network (nothing hard-coded: no names, no addresses, no vendor lists in code)",
+    "depends_on": [
+      "G16J"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner (2026-11-18 21:2x, Bruce deauth against his own router gave amber twice): 'if device reacts to amber, it gets deauth. don't overcomplicate.' MEASURED: the Network disconnect detector counted 4-7 frames while the nearby detector counted 43-58 from the same burst, because SCOPE_OF (threats.cpp) and the G06 disconnect detector accept only the selected BSSID (OWNER-AP-1) or the approved list; the owner's router answers to OWNER-NETWORK from more than one 2.4 GHz address, and Bruce targets by name.",
+      "Rule: Network scope = the selected BSSID, the approved list, AND every BSSID the stick has seen beaconing or probe-answering the picked network's exact name during this session (a bounded same-name set, 8 entries, oldest evicted, cleared on re-pick). The G16J clone alert ('another device is using your network's name') keeps its own rule: an unapproved same-name BSSID beaconing is still the twin warning; a deauth burst against it is still RED. Area (nearby) stays for other names. NOTHING HARD-CODED: the picked name comes from the picker/NVS selection, the same-name set from live beacons and probe responses; the owner's network name and addresses appear in this row only as measured evidence, never in code or tests as constants (tests use synthetic names).",
+      "Host TDD first: core/threat tests: deauth burst against a second same-name BSSID is a Network incident (RED), against a foreign name stays Area; the set is bounded and cleared on re-pick; the twin warning and the red can coexist; existing G06/G16F fixtures unchanged. Presenter: the red text names the network, not the address.",
+      "Verify: host-check plain and asan green; signed archive; device (owner's Bruce against his router, any target address under his name): RED within the detector window, evidence firmware/evidence/sticks3-G16R-*.log with the STATUS disconnect counters; a Bruce burst against a neighbour's name stays amber.",
+      "Accepted 2026-11-19 (supervisor) together with G16S/G16T: the owner's Bruce run against his own name turns RED on the glass (video 13:28) and STATUS shows the picked network's frames (own:4, 13:47) on guardian-20261119-133525; host 52/52 plain+ASan. The same-name set stayed 0 on this site (no second address advertises the name); the RED came through G16T's rule. Neighbour-only amber evidenced by a burst with no own frame (13:28), not a deliberate neighbour-name run. Evidence firmware/evidence/sticks3-G16R-20261119.log and sticks3-G16T-20261119.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16S",
+    "category": "core",
+    "description": "Burst forensics in STATUS and on the glass: for the last disconnect burst in each scope the Guardian keeps the top addresses it heard (receiver, sender, BSSID, channel, count) so the owner and the supervisor can read over the TUNE poll who was hit and from which address, with no USB capture",
+    "depends_on": [
+      "G16R"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner (2026-11-19 00:4x): after G16R landed (guardian-20261119-001104), a Bruce deauth still gave amber: area_disconnect events=16 incidents=1, same_name=0. The frames' addresses are unknown and no USB cable is at hand for lab/live/deauth_truth.py. MEASURED facts only; the fix for red is decided from the addresses this row exposes. Nothing hard-coded (no names, no addresses in code or tests).",
+      "Core (host TDD): the disconnect and area_disconnect detectors keep, per scope, a bounded table (8 entries) of the (addr1, addr2, addr3, channel) tuples seen in the current window with counts, cleared when the window closes after an incident is recorded into a 'last burst' copy. STATUS prints last_burst_network= and last_burst_area= as up to 4 tuples 'a1/a2/bssid/ch:n' (most frequent first) plus the burst's total and the incident time. The presenter's Details screen shows the top tuple of the last burst in the incident line (short form: last 2 bytes of each address) so the owner reads it on the glass too.",
+      "Verify: host-check plain and asan green; a replay fixture with a mixed burst (frames against two different BSSIDs) yields the expected tuples and counts; signed archive. Device (owner's hands, over the TUNE poll): one Bruce run, STATUS shows the tuples; the supervisor records them in firmware/evidence/sticks3-G16S-<date>.log and writes the G16R fix direction from them.",
+      "Accepted 2026-11-19 (supervisor): watcher SUMMARY host 52/52 plain+ASan, tools 103, build-support 41, signed archive guardian-20261119-021247 installed by self-fetch; STATUS reply (8192 B) arrives whole over the TUNE poll; owner's Bruce run 12:12 recorded the tuples (7 access points, broadcast, channel 11) in firmware/evidence/sticks3-G16S-20261119.log; G16R fix direction written from them (row G16T)."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16T",
+    "category": "core",
+    "description": "BUG: a nearby disconnect burst that also touches the owner's network is a Network incident (RED), not Area (amber)",
+    "depends_on": [
+      "G16R",
+      "G16S"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "MEASURED 2026-11-19 12:12 on guardian-20261119-021247 (STATUS over the TUNE poll, Bruce run by the owner): area_disconnect events=40 incidents=1 (amber); disconnect (Network) events=3 incidents=0; the G16S area record holds 7 tuples on channel 11; the 4 printed ones are not the selected address (9 frames each, 36); the 3 unprinted tuples share 4 frames and may include the selected address (disconnect events=3 is a counter since boot, not proof they fell in that window); same_name=0. So the burst is spread over the access points on the channel and the owner's network receives at most a few frames per window, below the Network detector's own threshold, while the Area detector reaches its threshold. The owner sees amber for an event that hits his network.",
+      "Rule (nothing hard-coded, names and addresses come from the pick at runtime): when the Area disconnect detector raises its incident, and within the same window at least one disconnect frame was addressed to the owner's network (selected address, approved list or the G16R same-name set), the incident is Network scope, RED, with a presenter line that names the owner's network and says the burst also hit the neighbourhood. A burst with zero frames at the owner's network stays Area, amber, unchanged. The Network detector's own threshold stays as it is for targeted bursts. The G16S burst record keeps the full tuples in both cases. STATUS evidence: a tuple whose bssid, a1 or a2 is the selected address, an approved address or in the same-name set is always printed in the burst record even outside the top 4, and the record carries a field with the count of frames at the owner's network inside that burst, so the device shows why it turned RED.",
+      "Host TDD: a replay of 40 frames spread over 7 addresses with 3 at the picked network => Network RED with the new line; the same replay with 0 at the picked network => Area amber (existing case unchanged); the picked network's frames counted through the same-name set as well; existing G06/G16F/G16R/G16S fixtures untouched; coverage row. Verify: host-check plain and asan green; signed archive; device (owner, over the TUNE poll): the same Bruce run gives RED and the record prints the owner's tuple with its count; a run that avoids his network stays amber; firmware/evidence/sticks3-G16T-<date>.log.",
+      "Accepted 2026-11-19 (supervisor): watcher SUMMARY host 52/52 plain+ASan, tools 103, build-support 41; owner's video 13:28 shows RED 'Nearby burst also on <network>' on the glass; supervisor fix (TDD red 9/18 -> green): the picked network's burst record persists after a later nearby-only burst (BurstTrace::last_own); image guardian-20261119-133525 by self-fetch; owner's Bruce run 13:46 read at 13:47: last_burst_network own:4 with the selected address's tuples printed :own below the top 4, 94 s after the burst. Amber for a burst with no own frame measured on the 13:28 second burst (own 0, Area only), not a deliberate neighbour-target run. Evidence firmware/evidence/sticks3-G16T-20261119.log, raw video/frame $GUARDIAN_STORE/evidence-raw/20261119-G16T/."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16Q",
+    "category": "core",
+    "description": "The approved art on the glass as close to the 512 px master as the panel allows: an art-bench build variant shows candidate renderings (linear-light resize, tuned unsharp, dither, full-height crop, panel gamma table, backlight, still versus breathing) on the real StickS3 so the owner picks, then the winning knobs become the Guardian's portrait pipeline and panel defaults",
+    "depends_on": [
+      "G16A",
+      "G16C"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner (2026-11-18): the approved set is the v4 pack (green eyes Very good, red eyes Horrible, cyan in between, red-eye ALERT); 'THIS IS THE DESIRED RESOLUTION, our stick MUST look like it, which it isn't'; a separate firmware to advance the art is allowed, then bring it to the Guardian. Approved design and the code facts (every knob between the master and the glass is untuned today: sRGB LANCZOS, no dither, no gamma registers sent, 60 % backlight, per-frame bilinear warp from breathing): firmware/evidence/G16Q-plan-artbench-20261118.md (read first). Physics stays stated: 135x160 pixels never equal 512.",
+      "Part 1, the bench: tools/art/candidates.py (host-tested, byte-exact, pinned) renders 135x240 RGB565 candidate frames of Very good, Horrible and Medium from the v4 masters: A today's pipeline, B linear-light LANCZOS, C B + unsharp 0.6/120/1, D C + Floyd-Steinberg dither to 565, E D with the full 240 rows (master scaled to 240 high, hood sides cropped), F D + ST7789 gamma table (M5GFX values, sent at init in the bench only), G F at 100 % backlight, H still portrait versus the breathing warp, plus a 5-step grey ramp for the camera. A build variant CONFIG_GUARDIAN_ART_BENCH (sdkconfig.art-bench, build-art-bench in boards/sticks3/tools/build.sh, ble-spike pattern) of the same app boots into the bench: one candidate at a time, FRONT next, SIDE cycles backlight 60/80/100 %, a 2 s label, STATUS bench=<name>; the self-fetch poll and signing stay as in the Guardian so the next image lands by itself; no radio capture.",
+      "Part 2, after the owner's pick (recorded with camera sheets and one-line verdicts in firmware/evidence/sticks3-G16Q-artbench-<date>.log): the winning knobs become build_assets.py defaults (linear-light resize, unsharp, dither, crop or full height), the board init (gamma table) and backlight default, persona.breath default if the still portrait wins, with new manifest and persona_check pins, host-check plain and asan, signed Guardian image. If the full-height crop wins, the HUD-on-a-toggle layout is a follow-up row, not this one.",
+      "Verify: candidates byte-exact in tests; the bench variant builds, signs and archives with the normal tools; on the device the bench lands by self-fetch and the owner cycles every candidate; the final Guardian image lands by self-fetch and the glass is compared to the same camera sheet; evidence log with the pick.",
+      "Accepted 2026-11-19 (supervisor): Part 1 bench (owner pick D, 'its the difuser. perfect'), Part 2 by the supervisor with TDD (D in build_assets.py, hood_w 133, burst range re-measured), 16/16 D portraits byte-exact in guardian-20261119-133525; owner on the Guardian glass (verbatim): 'Functionality is perfect. I think the eyes could improve, but leave for the very last.' CARRY-OVER into G23: the G16Q ALERT eyes on the glass (owner: 'the eyes could improve, but leave for the very last'; red + white highlight read washed on camera): measure on the panel with the desk camera before any change; no new art. Evidence firmware/evidence/sticks3-G16Q-artbench-20261118.log."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G16H",
+    "category": "core",
+    "description": "Deferred candidate (moved after G21 on 2026-11-17 so the ledger can proceed; needs the owner-run Wi-Fi/BLE coexistence spike first): BLE threat observations (popup/pairing spam, rotating Fast Pair identities) — only if the spike shows acceptable Wi-Fi capture loss",
+    "depends_on": [
+      "G16G"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Owner direction (2026-11-16, after attacking with the Evil Cardputer while the Guardian stayed 'normal'): 'it's defensive — look at AntiHunter, check all defensive algorithms, lots of probe watchers… not only art: playful to touch, beautiful to use, gorgeous on IMU, even better on tech'. Source of ideas: AntiHunter (~/dev/AntiHunter, commit c6ef921) is AGPL-3.0-only: copy NO code; re-implement independently from the behaviour described here, keep its constants only as uncalibrated hypotheses (policy of docs/research/reuse-decisions.md). Never transmit, never name an attack tool, never claim compromise: observations with count/window/uncertainty ('seen nearby', 'on your network').",
+      "Spike first: passive BLE scanning in parallel with Wi-Fi promiscuous capture on the ESP32-S3 (time-sharing radio): measure Wi-Fi frame loss, G13 drops, heap and power with BLE scan duty cycles; report and stop if the defense loses Wi-Fi coverage.",
+      "If acceptable: independent detectors for advertising floods that trigger phone popups (Apple Continuity / Samsung / Microsoft Swift Pair / Google Fast Pair message bursts from rotating addresses: >=3 message types and >=3 addresses in 1 s; one address rotating >=3 Fast Pair model IDs in 5 s), worded as 'pairing-popup spam nearby'; known false positives (real earbuds) documented and calibrated in a benign soak; area scope, amber.",
+      "Out of scope: tracking people or devices (no identity linking, no tracker hunting)."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G22",
+    "category": "review",
+    "description": "Complete own review and independent Claude review of the integrated product",
+    "depends_on": [
+      "G21"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Review the current source and ledger yourself first. Record concrete defects, missing tests, contradictions and physical unknowns in docs/review-status.md; preserve all five requested art states and the portable architecture.",
+      "Use normal claude, never claude-work-profile or its account/configuration. Request claude-fable-5-2 at high effort, no silent fallback. Supply only project-relevant context, disable reviewer tools and request a read-only critical review. Save the actual response and model metadata in the store. (Model pinned to claude-fable-5-2 on 2026-11-19 by the supervisor: Fable 5.1 refused the Guardian worker prompt on 2026-11-16; 5.2 is the current family and ran every row since.)",
+      "Evaluate every substantive finding against source or a reproducing test; incorporate justified changes and document reasons for rejected suggestions. Another model saying the plan is good is not hardware or test evidence.",
+      "Verify: the saved review actually completed with the requested model/effort, the findings have dispositions, ledger structure remains valid, and no implementation task passes merely because it was reviewed. Authentication errors mean the independent review remains pending.",
+      "This is final integrated review, distinct from G09 foundation review. Review real hardware/art/performance evidence and any changes since the library was accepted. Leave failed or unperformed checks visible."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G22A",
+    "category": "core",
+    "description": "Self-fetch lane hardening (from the G22 independent review, critical + high): TUNE offers are signed with the OTA signing key and verified by the stick before any session opens; the update poll never paints over an active ALERT; an image is installed only when its version is newer than the running one",
+    "depends_on": [
+      "G22"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "G22 review (2026-11-19) measured facts: every ota.auto_s (120 s) the stick leaves monitoring, joins Wi-Fi and fetches tune/offer over plain HTTP; any host answering at the provisioned URL can open a TUNE session (pause monitoring up to 30 min, change saved detector limits) with no gesture and no proof of origin; the same poll has no alert term, so it paints the update screen over a red ALERT; images are installed with signature check only, no version comparison. The OTA image signature (RSA-3072, SBv2) already gives the stick a trust root: the public key it verifies images with.",
+      "Rule: a TUNE offer is a signed envelope: the command list, the stick's own fresh nonce (from the poll's SYNC request), an expiry (seconds), and an RSA-3072 PKCS#1 v1.5 SHA-256 signature made with the OTA signing key on the Mac (tools/tune_session.py signs with the key file path already used by build.sh; the key is never printed, copied or embedded anywhere else). The stick verifies with its embedded OTA public key before opening a session; an unsigned, stale, replayed (nonce mismatch) or badly signed offer is refused, counted in STATUS (tune_offers_refused with the reason) and leaves monitoring untouched. The console verbs reachable over Wi-Fi stay the existing allowlist. The poll: while an ALERT is active the poll is deferred (the incident stays on the glass; STATUS counts deferrals), and an update is installed only when the offered version string is newer than app_version (same date-time format), refused and counted otherwise. Nothing hard-coded: no keys in source beyond the already embedded public key.",
+      "Host TDD: envelope verify (good, bad signature, wrong nonce, expired, unsigned) on the portable tune session code with a test key pair generated in the test (never the real key); alert-first deferral; version comparison. tools: tests for the signer with a throwaway key. Board: the verify path uses the same mbedtls/public key as the image check. Verify: host-check plain and asan green; a signed archive; device: the Mac's unsigned offer is refused (count up) and a signed one lands by self-fetch; an ALERT run with the poll due keeps the alert on the glass; an older image served is refused with its count; evidence firmware/evidence/sticks3-G22A-<date>.log. README: the self-fetch lane section updated to 'signed offers only'."
+    ],
+    "passes": true
+  },
+  {
+    "id": "G23",
+    "category": "validation",
+    "description": "Deliver a tested StickS3 Guardian with five expressive 2D portrait moods (the accepted v4 art; the 3D head stays optional and off) and honest evidence of what works",
+    "depends_on": [
+      "G22",
+      "G22A"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "Document the reproducible build, asset export, selected USB device, firmware flashing and Bruce restoration commands in firmware/README.md. Keep the captured files exported from Bruce separate and intact.",
+      "Save one native-resolution still for each mood, one video showing all five 2D portrait expressions (accepted v4 pack; 3D head optional, off by default) and transitions, and a real-device live observation plus no-data demonstration. Record firmware/toolchain versions and which router modes were actually tested; label fixture-only results as such.",
+      "Confirm the original Guy Fawkes-inspired persona, extreme grin with cigar for Very good, friendly smile for Good, no smile for Medium, concerned Bad and alarmed Horrible are all present. No browser-only demonstration can satisfy device acceptance.",
+      "Review the ledger against the implementation and its evidence. Mark an entry passes=true only after its own verification succeeds; leave hardware or visual checks false when they were not performed. Preserve all existing Wi-Fi lab jobs and tools.",
+      "Include a requirement-to-evidence table covering every task: source audit and licensing, native build, raw-frame parser, real AP setting change, stale data, passive coverage, anomaly false positives, advice, all five original 3D expressions, buttons and physical performance. Record untested router modes and detector limits explicitly. No browser/model test can close a physical gate.",
+      "Verify: a person can power the StickS3 without an SD card or companion computer, select their supported home AP, see the appropriately labeled 3D mood, read its reason, and recognize missing observations. Archive the evidence and any remaining limitations without claiming universal Wi-Fi protection.",
+      "Record a controlled live monitored-network incident causing the Guy Fawkes face to turn red with the observed reason, then record expiry/no-data behavior. Include an unrelated-network negative case. Label unsupported threat types and preserve evidence uncertainty; no claim of detecting all offensive activity.",
+      "CARRY-OVER from G16O (2026-11-19): the G16O pile reforms while the stick is still being tilted (owner 2026-11-19: 'even tilting, they came back sooner than they should', 9/10); stillness gate keys burst.still_dps=12, burst.still_g=0.10, burst.calm_s=0.6, burst.max_s=20 (firmware defaults): tune from recorded tilt traces so a slow tilt does not count as still.",
+      "CARRY-OVER from G16M (2026-11-19): the G16M credential vault: nvs_cred partition table write (one USB sitting), eFuse HMAC key burn, erase of the old plaintext nvs, encrypted read-back (all Felipe's decisions); until then the stick reports cred_store=plain cred_vault=no_partition.",
+      "CARRY-OVER from G16N (2026-11-19): G16N S3 as one sequence: a second Bruce burst after the first banner re-lights the dark stick, and the battery floor (dark_floor_pct=20) sends it to deep sleep; the floor sleep was seen 2026-11-19 ~14:16 (BATTRUN sleep_mv=3467 after 1489 s dark; floor inferred, no STATUS field names the reason).",
+      "CARRY-OVER from G16Q (2026-11-19): the G16Q ALERT eyes on the glass (owner: 'the eyes could improve, but leave for the very last'; red + white highlight read washed on camera): measure on the panel with the desk camera before any change; no new art.",
+      "Carry-overs added 2026-11-19 from the G22 review (each needs its own device evidence line before G23 passes): G16D (battery/sleep device items), G16F, G16G (data-path live runs per tool mode), G16I (upright/burst device items), G16J (device Verify items, no sticks3-G16J log), G21 (no sticks3-G21-*.log; the head is off by default, so record the 3D path as optional with the measured bench numbers), the dim view showing NO DATA during an ALERT when left on Details, the setup access-point one-time password strength (8 symbols, 38.9 bits: raise to 10 symbols or justify), libnet80211.a modification provenance in the notices, READMEs re-read against the ledger. The G22A hardening row must pass before G23.",
+      "PUBLIC TREE (Author 2026-11-20): the delivery image is built from a tree that passes `python3 -I tools/public_check.py` with 0 findings (with the owner's private map when it exists, `--require-map` on the owner's Mac), and the worker keeps it green: no network names, radio addresses, machine paths, hostnames or lab values in code, tests or docs. Lab values come from arguments, the environment or ~/.config/m5-guardian/local.conf (template lab/local.conf.example; resolvers tools/guardian_local.py and tools/guardian-local.sh); tests use synthetic locally administered addresses only.",
+      "README for a public reader (Author 2026-11-20): rewrite the root README.md: what the Guardian is, what it detects and what it cannot see, the hardware, how to build and install, a measured status table taken from the ledger, the lab rules; the present 'Current state' log moves to a history document under docs/. Keep the 'License' and 'Before you commit' sections at the end unchanged. The publication status of the persona art is the owner's decision (2026-11-20: published with the repository, all rights reserved, recorded in docs/G15-persona.md); do not restate or change it. The lab's test-stimulus firmware is kept outside the public repository (owner, 2026-11-20).",
+      "CARRY-OVER from G22A (2026-11-20): the alert-first device proof. In the same owner run as the live-incident recording (step 7): a red ALERT stays on the glass while a self-fetch poll is due, STATUS ota_auto_deferred goes up by 1, and the poll runs after the alert ends. Host proof already passes (firmware/tests/ota_check.cpp auto_poll_is_deferred_while_an_alert_is_active); evidence firmware/evidence/sticks3-G22A-20261119.log.",
+      "CARRY-OVER for the worker (Author 2026-11-20): channel-lock losses exceed update polls (MEASURED: 84 losses against 51 polls in 104 min on the G22 image; 10 against 4 in 481 s on G22A). Add a per-reason count to Survey and print it in STATUS as `lock_loss_by=silence:<n>,followed:<n>,held:<n>,stopped:<n>` (host TDD, red first, no behaviour change); the supervisor reads it on the device and the Author rules on a fix."
+    ],
+    "passes": false
+  },
+  {
+    "id": "G16U",
+    "category": "core",
+    "description": "RELEASE 2 (owner, 2026-11-19: 'we have to totally spec bluetooth before; defer for release 2; focus on wifi, graphics, battery lasting, finishing what we have'): radio guard toggle, Wi-Fi (default) or Bluetooth, one at a time. Needs a full Bluetooth spec first (what is watched, which radio, the C5 node or the stick, proofs). Not built in release 1.",
+    "depends_on": [
+      "G16H",
+      "G22A",
+      "G23"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "MEASURED (firmware/evidence/sticks3-G16H-coex-spike-20261119.log): the radio is shared in proportion to scan duty (beacon loss 3.3/10.3/26.6/51.5 % at 3/10/25/50 %), so the modes are either/or, never both; NimBLE observer role costs 38 kB internal heap (63.7 kB free after init, min 45 kB); the normal image with the BT stack is 3,084,288 B signed and fits the OTA slot; at 50 % duty about 21 adverts/s were heard, 100 % duty is unmeasured. The detector and rules exist in the portable library (G16H); the passive scan code exists in the spike image (observer only, nothing transmitted, started on demand, never at boot).",
+      "Build: (a) board adapter: NimBLE adverts into the BleAdvert queue, Monitor::ble_advert and ble_coverage, scan at the duty the mode needs (100 % in Bluetooth mode; measure adverts/s); (b) a settings screen on the stick reachable from the existing navigation (the worker chooses the gesture within today's key grammar and documents it) with one item: Radio guard: Wi-Fi / Bluetooth, persisted in NVS, mirrored as TUNE key guard.radio (default wifi) and STATUS field guard=wifi|bluetooth; the phone setup page's Advanced section shows the same toggle; (c) honesty on the glass: Bluetooth mode shows the BLE detector state and 'Wi-Fi not watched' in Details and the HUD; Wi-Fi mode keeps today's text plus 'Bluetooth not watched'; the rating in Bluetooth mode is the BLE view only (no Wi-Fi rating shown as fresh); (d) an open incident does not switch modes: the stick stays in the chosen mode and the glass names it; (e) switching modes stops one radio before starting the other, clears nothing of the saved settings, and is refused while an update or setup session runs; (f) the BT stack is compiled into the normal image. Nothing hard-coded.",
+      "Host TDD: mode state machine (default wifi, persistence, refusal during update/setup, incident does not switch), presenter text per mode, the BLE feed path through Monitor with synthetic adverts, settings screen rendering in companion_check; tools: tune key registry. Verify: host-check plain and asan green; signed archive; device (owner's hands, over the TUNE poll): toggle to Bluetooth on the stick, STATUS guard=bluetooth with adverts/s measured, a benign soak with the owner's earbuds (0 false amber), one live run per popup-spam tool mode with the owner's transmitter (amber, named), toggle back, Wi-Fi guard unchanged (one Bruce run RED); evidence firmware/evidence/sticks3-G16U-<date>.log; docs: attack-coverage BLE row, README settings section."
+    ],
+    "passes": false
+  }
+]

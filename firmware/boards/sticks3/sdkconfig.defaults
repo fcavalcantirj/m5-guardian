@@ -1,0 +1,56 @@
+# M5 Guardian / StickS3 build settings (pinned with ESP-IDF v5.4, see README).
+CONFIG_IDF_TARGET="esp32s3"
+
+# Flash: ESP32-S3-PICO-1 embedded 8 MB GD flash, eFuse says quad lines
+# (esptool flash_id 2026-11-13: "Flash type set in eFuse: quad").
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# PSRAM: embedded 8 MB, OCTAL mode. Quad mode booted with psram=0 on this
+# very board (home-automations first light, 2026-08-05); octal reported 8 MB.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+CONFIG_SPIRAM_MEMTEST=y
+
+# Console on the native USB Serial/JTAG peripheral (/dev/cu.usbmodem*).
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# G14: the companion presenter/advice path runs in the main task beside the
+# G13 receive loop (G13 measured 1,976 B minimum headroom at 8 KiB).
+# Review 2026-11-17: 12 KiB left 1,696 B with the G16E-G16G detectors (measured on the
+# device); 16 KiB, paid for by moving ~110 KB of buffers to PSRAM (boards/sticks3/main/psram.hpp).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+CONFIG_FREERTOS_HZ=1000
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Exact firmware identity for live receiver qualification.
+CONFIG_APP_RETRIEVE_LEN_ELF_SHA=64
+
+# G14 passive companion listening country (owner lab scope BR; see Kconfig.projbuild).
+CONFIG_GUARDIAN_COUNTRY="BR"
+
+# G16B signed OTA with automatic rollback, no hardware secure boot, no eFuses.
+# ESP32-S3 offers only the RSA-3072 (Secure Boot V2) app signature scheme in
+# IDF v5.4 (soc_caps.h: SOC_SECURE_BOOT_V2_RSA only; the ECDSA schemes depend on
+# SOC_SECURE_BOOT_V1 / SOC_SECURE_BOOT_V2_ECC, which the S3 lacks). The trusted
+# key is taken from the RUNNING app's signature block, so the USB-installed
+# image must itself be signed with the owner key (build.sh signs every build).
+CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT=y
+# Images are signed by build.sh with a key outside the repository and the store.
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=n
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# G16M phone setup: the phones' captive-portal probes carry long request headers
+# (ESP-IDF examples/protocols/http_server/captive_portal uses the same value).
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+# G16M credential vault: eFuse key block of the HMAC key (see main/Kconfig.projbuild; read only).
+CONFIG_GUARDIAN_CRED_HMAC_KEY_ID=0

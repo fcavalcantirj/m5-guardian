@@ -1,0 +1,27 @@
+G16P a plugged-in Guardian wakes by itself — device evidence (supervisor log), 2026-11-19
+image guardian-20261119-133525 (contains G16P; installed by self-fetch 13:39), no TUNE value changed for this proof
+
+== Natural sleep on battery ==
+13:47 STATUS: power=battery batt=3572mV/34% dim_s=30 dark_s=60 dark_floor_pct=20 sleep_check_s=300
+the stick stopped polling after ~13:48 (supervisor offer 15:02-15:05 not fetched)
+BATTRUN (read 15:15:33): boot=178 start=3593mV last=3467mV minutes=36 active_s=2212 sleeps=1 asleep_s=3310
+  sleep_mv=3467 end=usb_returned drain_s=active:145,dim:138,dark:1489 drain_mv_10min=dark:36
+  => Active -> Dim -> Dark for ~25 min, then deep sleep at 3467 mV (the dark floor, INFERRED from sleep_mv and the
+     G16N rule; the reason is not a STATUS field) at about 14:16
+  checks=10 last_checks=10 check_s=300 check_first_mv=3496 check_last_mv=3506 check_drop_uv=-1111 standby_uv_h=-13333
+  (the cell recovered slightly during standby: no measurable drop per check)
+
+== Charger plugged, no key (owner, ~15:1x, relayed by the Author session) ==
+first poll 15:13:35, STATUS (builds/20261119-device-proofs/status-wake.log):
+  uptime_s=123 (booted ~15:11:32) reset=deepsleep wake_cause=timer wake_key=- wake_check=usb power_hold=usb
+  power_source=usb vbus_mv=5050 charging=yes batt=3577mV/34%~usb power_state=active
+  asleep_s=3310 sleep_count=1 sleep_faults=0x0 sleep_checks=10 wake_checks=10 check_faults=0 check_awake_ms=974/986
+  app_version=guardian-20261119-133525 last_update_result=ok:guardian-20261119-133525
+  => the timer check found USB and booted the stick: lit without a key, inside sleep_check_s=300
+  check_awake_ms 974/986 is under the 1000 ms budget (margin 14 ms: the open risk in firmware/README.md G16P stays thin)
+TUNE? power (same session): dim_s=30 sleep_s=120 dim_pct=10 sleep_check_s=300 dark_s=60 dark_floor_pct=20 (unchanged)
+
+== Acceptance (supervisor, 2026-11-19) ==
+accepted: charger wake without a key (wake_cause=timer, wake_check=usb), checks counted (10, 0 faults), standby per
+check from BATTRUN. Residual: the stick was not key-woken unplugged after the sleep (the checks and BATTRUN numbers were
+read after the USB wake instead); ext1 key wake is the G16D path, proven earlier.

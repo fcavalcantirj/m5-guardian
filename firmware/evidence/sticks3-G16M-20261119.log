@@ -1,0 +1,19 @@
+G16M product setup from the phone — device evidence (supervisor log), 2026-11-19
+image guardian-20261119-133525 (contains G16M), stick on USB, booted 15:11:32 (charger wake, G16P)
+
+== Owner run (relayed by the Author session) ==
+two SIDE holds on the home network row of the device list: the first reached SETUP but the page was not completed;
+the second (owner's photo 15:28) went through the page with the same home password and was saved
+
+== STATUS 15:29:47 (supervisor; builds/20261119-device-proofs/g16m-status-1.log), uptime_s=1095 ==
+setup=idle setup_count=2 setup_saved=1 setup_refused=0 setup_last=saved setup_pages=2 setup_form_refused=0
+setup_ap_error=none wifi_provisioned=yes ota_provisioned=yes cred_store=plain cred_vault=no_partition cred_migrated=0
+cred_plain_cleared=0 alert=0 screen=Face overlay=0 power=usb control=companion
+(setup counters are RAM, since the 15:11 boot: 2 access points opened, 2 pages served, 1 saved)
+the poll after the save landed over the home Wi-Fi (this STATUS, 15:29:47)
+password: no STATUS field can carry it (setup_* are counters/enums by design); the supervisor never handled the value
+
+== Acceptance (supervisor, 2026-11-19, on the Author's direction) ==
+accepted: the phone setup saves over the stick's own access point and the stick listens and polls again afterwards.
+CARRY-OVER into G23 (Felipe's decisions): the vault — nvs_cred partition write (USB), eFuse HMAC key burn, erase of the
+old plaintext nvs, encrypted read-back; until then cred_store=plain cred_vault=no_partition.

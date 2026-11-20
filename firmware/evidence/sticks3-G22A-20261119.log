@@ -1,0 +1,82 @@
+G22A — signed TUNE offers, alert-first poll, newer-only update — supervisor validation 2026-11-19
+====================================================================================================
+
+Handoff
+- Attempt 20261119-214200-037078-task-43, engine claude, receipt status ledger_changed (exit 2), 22:58.
+  Expected: the G16U row insert changed guardian-tasks.json mid-run. Validated by hand; no --retry.
+- The runner exited after this attempt (no python3 ralph_runner.py pid at 22:59); G23 did not start.
+- The watcher only snapshots awaiting_review handoffs, so the supervisor ran the watcher's own check_one
+  (copied verbatim from tools/ralph_watch.sh) on a frozen snapshot at 23:00:48.
+  Note: check_one reads globals tid/att in its `local` line (works in the watcher only because its read loop
+  sets them); the by-hand script sets them before the call.
+
+Watcher-equivalent SUMMARY (builds/ralph-watch/G22A-20261119-214200-037078-task-43/SUMMARY)  [TEST]
+- RC_host_plain=0 RC_host_asan=0 (54/54 each), RC_tools=0 (127 passed, 2 skipped), RC_bs=0 (41 passed), RC_build=0.
+- Signed archive: builds/20261119-230243-1465-sticks3, version guardian-20261119-230243.
+
+The two skipped tool tests, run by the supervisor  [TEST]
+- GUARDIAN_OFFER_VERIFY=<Mac-disk build>/tune_offer_verify, ESP-IDF 5.4 Python for espsecure:
+  tools/tests/test_tune_session.py 24 passed, 0 skipped. Covers: offers signed by the Mac tool verify in the
+  firmware verifier (tampered/replayed/expired/unsigned refused); an espsecure throwaway key's signature block
+  yields the key that verifies the tool's offer.
+
+Shipped artifact (builds/20261119-230243-1465-sticks3)  [TEST, on the archive bytes]
+- guardian_sticks3-signed.bin sha256 matches SHA256SUMS; 2,887,680 B (multiple of 4096).
+- Signature block at the final 4096-byte sector: magic 0xE7, version 2, CRC-32 valid, exponent 65537;
+  modulus equals ota-signing-public.pem of the archive (MODULUS-MATCH).
+- ota-signing-public.pem identical to the G22 archive's (same owner key; sha256 prefix cd41fc314278c303).
+- Image strings: "GUARDIAN-TUNE 2", "tune/offer?nonce=%s", STATUS carries ota_auto_deferred, ota_not_newer,
+  tune_key; "tune/next" absent (0 matches).
+
+Source review (supervisor)
+- offer_rsa.cpp: RSA-3072 PKCS#1 v1.5 SHA-256 via mbedtls_rsa_pkcs1_verify; key from the running image's
+  Secure Boot V2 block (same validity rule as ESP-IDF validate_signature_block). Public half only; no key in source.
+- session.cpp verify_offer: fixed order shape -> signature over the exact received bytes through "end\n" ->
+  nonce -> expiry on the stick's clock from nonce issue -> allowlist (a signature does not widen it).
+  Command copy bounded by kMaxCommand; trailing data after sig= refused.
+- measurement_main.cpp: nonce from esp_fill_random with the radio on; refusal counted and the update check
+  continues; poll deferred while presenter alert is active (AutoPoll::sample, counted once).
+- ota.cpp: manifest version and the image's own app_desc version must both be newer (version_stamp
+  YYYYMMDD-HHMMSS, optional -suffix); a hand-named running build counts older than every stamped one.
+- tools/tune_session.py: signs with /usr/bin/openssl, passing the key PATH only; stderr not echoed.
+- No defects found. Worker's "choices for the supervisor" accepted as stated.
+
+Operational consequence
+- The working-tree tools/tune_session.py now speaks protocol 2 only. The stick still runs G22
+  (guardian-20261119-214539), which asks /tune/offer without a nonce: the new tool answers 400.
+  The overnight STATUS/BATTRUN reads were restarted (same 23:53 schedule) with the pre-G22A tool
+  (watcher snapshot G16T-persist-supervisor-20261119/tools/tune_session.py, sha256 f0e6ecda…).
+- Per the Author: the G22A image is held until after the 07:53 read.
+
+Device acceptance — NOT RUN (morning order)
+1. Serve builds/20261119-230243-1465-sticks3 (self-fetch).
+2. Unsigned offer refused: tools/tune_session.py --unsigned-test.
+3. Signed STATUS lands: tune_offers_ok=1, tune_offers_refused_by=unsigned:1, tune_key=ota.
+4. Older image refused: serve an older archive (e.g. G22 20261119-214539) -> ota_not_newer=1, ota_auto_last=not_newer.
+5. ALERT kept on the glass with a poll due -> ota_auto_deferred up (owner-launched alert).
+
+Device proofs 2026-11-19 23:34-23:45 (supervisor; tools run from a frozen copy of tools/, sha256 tune_session.py d5d09dc7…, ota_serve.py 9c07e9c5…)  [REAL]
+0. Pre-install read 23:34:30 (G22 image, pre-G22A tool): app_version=guardian-20261119-214539, power=usb, batt 100 % charging,
+   heap_internal_min=107959, lock_losses=86 last=stopped, ota_auto_checks=52, rx_queue_full=0.
+1. Install: ota_serve builds/20261119-221810-90702-sticks3 (sha256 f581c3f2…); "one update served" 23:37:22.
+2. Unsigned offer refused: tune_session.py --unsigned-test, offer fetched by the stick, not answered (rc 0, 23:39:37).
+3. Signed offer lands (23:41:28): STATUS + BATTRUN answered, session ended done, replies 2, unanswered 0.
+   app_version=guardian-20261119-221810 last_update_result=ok:guardian-20261119-221810 reset=sw
+   tune_offers_ok=1 tune_offers_refused=1 tune_offers_refused_last=unsigned
+   tune_offers_refused_by=unsigned:1,format:0,nokey:0,signature:0,nonce:0,expired:0,command:0 tune_key=ota heap_internal_min=110251
+4. Older image refused: ota_serve of the G22 archive 20261119-214539 (23:41:42-23:45:04): requests were
+   /tune/offer?nonce=<32 hex> (404) and /manifest (200); /image never requested; server timed out.
+   Signed STATUS 23:45:28: ota_not_newer=1 ota_auto_last=not_newer app_version=guardian-20261119-221810
+   tune_offers_ok=2 heap_internal_min=101123 rx_queue_full=0.
+5. Alert-first (ota_auto_deferred with a red ALERT on the glass): needs the owner's own test run.
+   Host proof: firmware/tests/ota_check.cpp case auto_poll_is_deferred_while_an_alert_is_active (in the 54/54 SUMMARY).
+   Device proof: pending the Author's ruling (owner run tonight, or a named carry-over into G23's live-incident recording).
+Not measured: RSA verify time (not in STATUS). Heap: heap_internal_min 107959 (G22) -> 110251 -> 101123 after two
+signed offers and one not_newer check.
+Lock-loss counter on G22A: lock_losses=7 at uptime 241 s (2 polls), 10 at 481 s (4 polls), last=stopped.
+Night reads re-armed on this image at 01:37, 03:37, 05:37, 07:37, 09:37 (signed frozen tool).
+
+ACCEPTED 2026-11-19 23:5x (supervisor, Author ruling; runner idle): G22A passes=true (pure flip, row key unchanged) on the
+three device proofs above plus the host deferral case. CARRY-OVER into G23 (named): the alert-first device proof
+(a red ALERT stays on the glass while a poll is due; STATUS ota_auto_deferred +1, the poll runs after the alert ends)
+is recorded in the same owner run as G23's live-incident recording.

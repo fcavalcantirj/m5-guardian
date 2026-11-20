@@ -1,0 +1,12 @@
+# Deliberate exceptions for tools/public_check.py:  rule | path-glob | literal (or *) | reason
+# Every line needs a reason. private-map, forbidden-file and required-file cannot be allowed.
+
+private-ip | firmware/adapters/setup/setup.cpp | 192.168.1.10 | example update-server address shown as the placeholder of the setup page field
+private-ip | firmware/tests/setup_check.cpp | 192.168.1.10 | the same example address, typed by the simulated owner in the setup tests
+private-ip | firmware/tests/setup_check.cpp | 10.0.0.7 | synthetic server address in a host test
+private-ip | firmware/tests/ota_check.cpp | 192.168.1.20 | synthetic server address in a host test
+private-ip | firmware/tests/ota_check.cpp | 10.0.0.2 | synthetic server address in a host test
+private-ip | tools/tests/test_ota_tools.py | 192.168.1.20 | synthetic server address in a tool test
+private-ip | tools/tests/test_ota_tools.py | 10.0.0.2 | synthetic server address in a tool test
+local-hostname | firmware/tests/ota_check.cpp | mac.local | synthetic host name in a host test
+home-path | tools/tests/test_foundation_review.py | /Users/x | synthetic path in a tool test

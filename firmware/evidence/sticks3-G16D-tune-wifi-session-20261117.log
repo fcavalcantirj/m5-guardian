@@ -1,0 +1,18 @@
+TUNE offer ready on 0.0.0.0:8070 (session 1800s). On the stick: FRONT x3 fast (or both keys ~3 s), then FRONT=yes.
+G16C IMU POSE samples=400 age_ms=844 acc_mean=-4092.5,-164.1,7.9 gyro_dps=0.29 acc_lsb_per_g=4096
+G16C IMU POSE samples=400 age_ms=851 acc_mean=-4092.4,-164.7,7.2 gyro_dps=0.29 acc_lsb_per_g=4096
+G16C IMU POSE samples=400 age_ms=596 acc_mean=44.3,-4128.7,-119.5 gyro_dps=0.28 acc_lsb_per_g=4096
+G16C IMU POSE samples=400 age_ms=124 acc_mean=44.1,-4129.2,-119.7 gyro_dps=0.28 acc_lsb_per_g=4096
+TUNE OK imu.right=2 version=1.1 saved
+TUNE OK imu.up=-1 version=1.2 saved
+TUNE OK imu.out=3 version=1.3 saved
+TUNE ERROR use TUNE key=value or TUNE?
+TUNE imu.right=2 min=-3 max=3 default=0
+TUNE imu.up=-1 min=-3 max=3 default=0
+TUNE imu.out=3 min=-3 max=3 default=0
+TUNE OK params=3 of 83 prefix=imu version=1.3 store=saved
+G14 STATUS control=companion onboarding=0 screen=Details mode=LIVE selected=OWNER-AP-1 radio=0 store=1 alert=0 face=0 overlay=2 picker=0 picker_dropped=21 heap_internal_min=114375 task_stack_free=7160 imu=running@0x68 imu_samples=114594 imu_drops=632 orient=portrait-usb-down tune_version=1.3 tune_store=saved edge=0 ota_slot=ota_1 app_version=guardian-20261117-134252 last_update_result=ok:guardian-20261117-134252 ota_provisioned=yes selftest=display:1,store:1,radio:1,imu:0 batt=3826mV/65% charging=no power=battery art=16 motion=calm imu_map=2,-1,3 taps=0 frame_ms=10.5/20.9 render_ms=4.4 push_ms=6.0 fps=3.9 imu_glass_ms=13.6/24.5 frames=2343 art_ram=psram art_ram_bytes=86400 monitor_ram=psram radio_ram=psram text_ram=psram app_ram=psram tune_ram=psram reset=deepsleep uptime_s=578 warps=20 warp_reuses=40 art_copies=1 push_rows_avg=62 full_pushes=574 rx_received=230 rx_queue_full=0 rx_discarded=0 rx_bad=0 lock_losses=1 last_lock_loss=stopped console_writes=7 console_drops=0 console_stall_ms=0.1/0.0 log_lines=0 log_drops=0 degraded_transitions=1 nodata_transitions=1 tune_wifi=active:1230s tune_wifi_last_end=none tune_wifi_commands=9 tune_wifi_refused=0 power_state=active power_hold=tune power_source=battery vbus_mv=0 still_s=0 dim_s=30 sleep_s=120 wake_cause=ext1 wake_key=front asleep_s=42 sleep_count=2 asleep_total_s=207 sleep_faults=0x20 wake_swallowed=0 detectors=disconnect:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;baseline:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;probe_flood:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;beacon_flood:frames=230,in_window=0,events=81,incidents=0,last=none,cooldown=0;responder:frames=230,in_window=0,events=213,incidents=0,last=none,cooldown=0;auth_flood:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;sae_commit:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;assoc_sleep:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;channel_switch:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;name_mismatch:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;marked_beacon:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;owe_twin:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;area_disconnect:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0;rotation:frames=230,in_window=0,events=139,incidents=0,last=none,cooldown=0;handshake:frames=230,in_window=0,events=0,incidents=0,last=none,cooldown=0,unconfigured;frame_loss:frames=0,in_window=0,events=0,incidents=0,last=none,cooldown=0,unconfigured air=probes:0,beacons:0,tx:0,window_s:60 area_visible=0 datapath=off cb_calls_s=0 cb_cpu_permille=0 cb_max_cycles=0 rx_data=0 rx_eapol=0 rx_errors=0 rx_valid=230 loss_samples=16
+session ended: mac
+session ended
+
+[exited with code 0]

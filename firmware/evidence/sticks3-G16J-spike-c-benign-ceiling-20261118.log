@@ -1,0 +1,55 @@
+# G16J spike (c): benign ceiling per detector on the StickS3 (LAB-STICK-1), read with tools/soak_ceiling.py
+# Derived from the raw STATUS recordings in the store (evidence-raw/); nothing here is from a host build or a fixture.
+# Firmware guardian-20261117-203615, channel of the selected network, data path off, TUNE store 1.22
+# (t.probe_flood=16 / t.probe_flood_sources=12 / t.probe_window_ms=10000 saved by the owner on 2026-11-17).
+# Run 1 is complete (56 min). Run 2 is the 12 h soak, still running when this was written (00:30, 2026-11-18):
+# the 11 min snapshot below is PARTIAL; re-run the tool on the finished file before any threshold is frozen.
+# raw sha256 run 1: f324553eadce4d500a3b26c2a0b7564964660e7df868aed5c6e68956f038a866
+
+## run 1 (complete)
+G16J spike (c) benign ceiling: source=evidence-raw/soak-benign-20261117-232211.jsonl
+wall_start=2026-11-17T23:22:12-0300 statuses=3169 skipped=0 duration_s=3359 reboots=0
+heap_internal_min=136987 task_stack_free_min=6360 fps_min=24.3 rx_queue_full_first=0 rx_queue_full_last=0 rx_queue_full_max=0
+air_max probes_per_min=41 beacons_per_min=2958 transmitters=69
+detector in_window_max events events_per_min_max incidents
+  disconnect in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  baseline in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  probe_flood in_window_max=15 events=1021 events_per_min_max=41.7 incidents=0
+  beacon_flood in_window_max=197 events=62680 events_per_min_max=1164.0 incidents=0
+  responder in_window_max=3437 events=162630 events_per_min_max=3465.5 incidents=0
+  auth_flood in_window_max=2 events=4 events_per_min_max=2.0 incidents=0
+  sae_commit in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  assoc_sleep in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  channel_switch in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  name_mismatch in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  marked_beacon in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  owe_twin in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  area_disconnect in_window_max=1 events=3 events_per_min_max=1.0 incidents=0
+  rotation in_window_max=258 events=137030 events_per_min_max=2934.8 incidents=0
+  handshake in_window_max=0 events=0 events_per_min_max=0.0 incidents=0 unconfigured
+  frame_loss in_window_max=0 events=0 events_per_min_max=0.0 incidents=0 unconfigured
+incidents_total=0
+
+## run 2 (partial snapshot, first 11 min of the 12 h soak evidence-raw/soak-benign-20261118-001818.jsonl)
+G16J spike (c) benign ceiling: source=evidence-raw/soak-benign-20261118-001818.jsonl (snapshot)
+wall_start=2026-11-18T00:18:21-0300 statuses=630 skipped=0 duration_s=666 reboots=0
+heap_internal_min=136987 task_stack_free_min=6408 fps_min=24.3 rx_queue_full_first=0 rx_queue_full_last=0 rx_queue_full_max=0
+air_max probes_per_min=36 beacons_per_min=2984 transmitters=46
+detector in_window_max events events_per_min_max incidents
+  disconnect in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  baseline in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  probe_flood in_window_max=15 events=182 events_per_min_max=30.8 incidents=0
+  beacon_flood in_window_max=193 events=12459 events_per_min_max=1146.6 incidents=0
+  responder in_window_max=3557 events=34836 events_per_min_max=3536.1 incidents=0
+  auth_flood in_window_max=1 events=1 events_per_min_max=1.0 incidents=0
+  sae_commit in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  assoc_sleep in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  channel_switch in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  name_mismatch in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  marked_beacon in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  owe_twin in_window_max=0 events=0 events_per_min_max=0.0 incidents=0
+  area_disconnect in_window_max=1 events=4 events_per_min_max=1.0 incidents=0
+  rotation in_window_max=262 events=30007 events_per_min_max=2937.5 incidents=0
+  handshake in_window_max=0 events=0 events_per_min_max=0.0 incidents=0 unconfigured
+  frame_loss in_window_max=0 events=0 events_per_min_max=0.0 incidents=0 unconfigured
+incidents_total=0

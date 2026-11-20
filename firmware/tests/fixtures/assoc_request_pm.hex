@@ -1,0 +1,31 @@
+# name: assoc_request_pm
+# kind: assoc_request
+# provenance: Association request (9.3.3.6) with the Power Management bit set in Frame Control. Expected G16E reading: kind AssociationRequest, power_management true, listen interval 10, SSID 'home', status Complete, settings_present false (a client's RSNE is never AP evidence).
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 66
+# expect.fc0: 00
+# expect.bssid: 021122334455
+#
+# [  0] Frame Control
+  00 10
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  02 11 22 33 44 55
+# [ 10] Address 2
+  02 aa bb cc dd ee
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 19
+  30 01
+# [ 24] Capability Information 0x0011 (9.4.1.4)
+  11 00
+# [ 26] Listen Interval 10 (9.4.1.6)
+  0a 00
+# [ 28] SSID element, 'home'
+  00 04 68 6f 6d 65
+# [ 34] Supported Rates (9.4.2.3): 1 2 5.5 11 basic, 6 9 12 18
+  01 08 82 84 8b 96 0c 12 18 24
+# [ 44] RSNE chosen by the client (9.4.2.24): never an advertisement of the AP
+  30 14 01 00 00 0f ac 04 01 00 00 0f ac 04 01 00
+  00 0f ac 02 80 00

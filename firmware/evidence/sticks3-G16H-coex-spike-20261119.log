@@ -1,0 +1,49 @@
+G16H Wi-Fi/BLE coexistence spike — run A, 2026-11-19 (owner order "chew all 3", Author "SPIKE GO")
+================================================================================
+Image: guardian-20261119-195514-blespk (builds/20261119-195514-8687-sticks3-blespk, signed sha256 17b2d015...),
+self-fetched 21:18:49; no USB data connection (stick on its charger). Passive scan only, nothing transmitted.
+Plan: default (3 %, 10 %, 25 %, 50 % passive duty interleaved with OFF; 60 s phases, 3 s settle, 2 rounds = 17 phases).
+Run B (owner's BLE popup tool nearby) NOT run.
+
+## Timeline (MEASURED)
+- 21:20:19-21:20:57 TUNE session: STATUS app_version=guardian-20261119-195514-blespk power=usb alert=0;
+  BLESPIKE -> run=idle ble=off heap_internal=92495; BLESPIKE start -> ARMED phases=17 phase_s=60 rounds=2.
+- Run started after the session (Wi-Fi route, supervisor fix); no poll reached the Mac until the run ended.
+- 21:38:03 read session: run=finished phase=17/17 last_end=completed ble_errors=0 adv=4492.
+
+## Verdict line (MEASURED, verbatim)
+G16H SPIKE VERDICT overall=inconclusive best_window_ms=0 best_interval_ms=0 reference_delivery=0.993 phases=17 valid=11 max_beacon_loss=0.050 min_heap=20480 max_extra_queue_full_per_min=1.00 min_reference_delivery=0.50 min_expected_beacons=500 min_pairs=2
+
+## Selected-AP beacons per phase (MEASURED; channel 11, beacon interval 100 TU, ~557 announced per 57 s window)
+OFF phases (valid): 553, 553, 553, 553, 552, 553 (reference delivery 0.993).
+| duty | ON phases: beacons (state)       | loss vs 553 per valid phase | adv/s |
+| 3 %  | 535 (ok), 531 (not_monitoring)   | 3.3 %                       | 1.1   |
+| 10 % | 496 (ok), 492 (ok)               | 10.3 %, 11.0 %              | 4.4   |
+| 25 % | 381 (not_monitoring), 406 (ok)   | 26.6 %                      | 10.6  |
+| 50 % | 268 (ok), 254 (not_monitoring)   | 51.5 %                      | ~21   |
+All frames follow the same pattern (frame_ratio 1.008 / 0.931 / 0.742 at 3/10/25 %).
+Reading (MEASURED from the rows above): selected-AP beacon loss is about equal to the scan duty. Only 3 % is under
+the 5 % criterion, and with 1 valid OFF-ON-OFF pair (2 required) the rule says inconclusive. 10 %, 25 % and 50 %
+exceed 5 % on every valid phase.
+
+## Other criteria (MEASURED)
+- queue_full: 0 in all 17 phases (no G13 drops).
+- Heap: internal free 102027 B before BLE init, 63687 B after (NimBLE costs 38,340 B); heap_internal_min 45387 B
+  over the run (floor 20480).
+- Display frames 1421-1423 per phase in every phase (the panel kept its rate).
+- Lock: 6 of 17 phases faulted not_monitoring (OFF 5, 9, 17; ON 6 at 25 %, 10 at 3 %, 16 at 50 %), lock_losses 1-2,
+  channel=0 at the end of phases 10 and 17. Whether the scan causes these I DON'T KNOW: this run has no
+  no-BLE control on the same image, and both OFF and ON phases faulted.
+- Power: NOT MEASURED (on USB, every phase vbat_mv=usb_or_unknown).
+
+## Conclusion for the Author (supervisor)
+Overall inconclusive by rule. MEASURED cost curve: loss ~= duty; 10 % and above are out under the 5 % criterion.
+Open for a decision: (a) a longer run (`BLESPIKE start 60 4`, 33 phases, 33 min) to get >= 2 pairs at 3 %;
+(b) whether 3 % duty (1.1 adverts/s heard in this room) can feed the popup rules at all (3 messages from 3
+addresses in 1 s) - INFERRED doubtful outside a spam burst, needs run B with the owner's tool to measure.
+Raw lines: $GUARDIAN_STORE/evidence-raw/20261119-G16H-spike/run-A-lines.txt (26 lines, sha256 verified on the share).
+
+## Guardian image back (MEASURED)
+- 21:40:26 ota_serve served guardian-20261119-195724 (2887680 B); 21:42:33 TUNE STATUS app_version=guardian-20261119-195724
+  last_update_result=ok:guardian-20261119-195724 tune_version=1.31 tune_store=restored alert=0 imu=running@0x68
+  power=usb batt=3651mV/43%~usb ble_popup ...,unconfigured. No TUNE value changed.

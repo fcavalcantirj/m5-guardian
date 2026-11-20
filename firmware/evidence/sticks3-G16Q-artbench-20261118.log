@@ -1,0 +1,57 @@
+G16Q art bench, device session 2026-11-18 (supervisor log; format per firmware/README.md "Recording the pick")
+
+== Worker attempt ==
+attempt 20261118-211211-040659-task-37, receipt ledger_changed (G16R inserted mid-run; work valid, accepted by hand, no --retry)
+worker final marker: READY FOR REVIEW
+
+== Supervisor checks (frozen snapshot 2026-11-18 22:27:37, same steps as tools/ralph_watch.sh + build-art-bench) ==
+SUMMARY: $GUARDIAN_STORE/builds/ralph-watch/G16Q-20261118-211211-040659-task-37/SUMMARY
+RC_host_plain=0 RC_host_asan=0 (52/52 each) RC_tools=0 (103) RC_bs=0 (41) RC_build=0 RC_bench=0
+bench archive  $GUARDIAN_STORE/builds/20261118-223813-55388-sticks3-bench  version guardian-20261118-223813-bench
+normal archive $GUARDIAN_STORE/builds/20261118-223528-44185-sticks3        version guardian-20261118-223528
+shipped-image check: all 16 frame files of firmware/art/bench found byte-exact in the bench signed image; 0 of 16 in the normal signed image
+
+== Install by self-fetch ==
+tools/ota_serve.py on :8070, 2026-11-18 22:44: GET /tune/offer 404, GET /manifest 200, GET /image 200, sent 2953216 bytes
+served sha256=49e35ad2bc79c5ea127edd44fca57c4d47f9f6ded5039ce18cb89f072c9d914e [ART BENCH IMAGE]
+boot proof (passive 404 probe on :8070): 22:46:16 GET /manifest, 22:48:15 GET /manifest, no /tune/offer
+  => the bench is running (a Guardian asks /tune/offer first) and its self-fetch poll is alive (way back to the Guardian)
+  logs: builds/ralph-watch/G16Q-20261118-211211-040659-task-37/{serve-bench.log,poll-probe-after-bench.log}
+camera: offline at 22:49 (IP Webcam not answering); no sheets yet
+
+== Owner on the glass ==
+2026-11-18 ~22:50 owner (verbatim): "love the art"   (candidate not named yet; the bench opens on A-VeryGood)
+
+2026-11-18 ~22:55 owner after cycling (verbatim): "likes. 2 images are a degrade of colors, otherwise, all perfect"
+  supervisor note: the two gradient images are the 5-step grey ramps (`ramp`, `ramp-gamma`), camera calibration, not portraits
+
+== Per-candidate verdicts (<name> bl=<pct> verdict=<owner's words>) ==
+all 27 portrait entries (A..H x Very good / Horrible / Medium): "all perfect" (no candidate singled out); no camera sheets (camera offline)
+
+== Pick ==
+2026-11-18 ~23:00 owner pick (PROVISIONAL: chosen from the supervisor's recommendation; owner then asked "wait. which one is?",
+so it stands only after he has looked at D-VeryGood 4/29, D-Horrible 13/29, D-Medium 22/29 and confirmed)
+2026-11-18 ~23:05 CONFIRMED on the glass, owner (verbatim): "its the difuser. perfect"  => PICK = D: (linear-light LANCZOS, premultiplied alpha; unsharp 0.6/120/1; Floyd-Steinberg to RGB565;
+crop [40,0,472,512] as today). Not chosen: E (full-height crop), F/G (gamma table / 100 % backlight), H still (breath stays).
+Part 2 carries D's knobs into the Guardian's portrait pipeline; panel init, backlight and persona.breath stay as they are.
+
+== Part 2 (supervisor, 2026-11-19 00:00-00:15; tree quiet: G16R handed off 23:59, runner stopped) ==
+spike first: candidates.py D applied to the 15 v4 masters == bench D face bands byte for byte (3 moods), 3.6 s
+red  (builds/20261119-g16q-part2/red-*.log): test_candidate_d_is_the_shipped_portrait fails (shipped = A);
+     persona_check VeryGood pin c203ecea... fails (manifest = ab4177d5...)
+green: build_assets.py portrait_565 = candidates.dither565(unsharp(linear_resize(crop), 0.6/120/1)); 15 portraits
+     regenerated == spike byte for byte; NoData unchanged; test_art_candidates 20/20, persona_check green
+re-measured (not loosened): hood box columns 1..133 (was 1..130), rows 0..155 -> persona::hood_w 133;
+     Good chin specks 10 on rows 157..159 (was 6); burst lit 3x3 blocks 1,461..1,509 (was 1,357..1,391), still < capacity 1,600
+     (bursts carry ~8 % more particles: FRAMES burst ms to re-check on the device)
+final checks (ralph-watch/G16Q-part2-G16R-supervisor-20261119-r2/SUMMARY): host plain 52/52, asan 52/52, tools 103,
+     build-support 41, signed build + bench build all RC=0
+shipped image guardian-20261119-001104 (builds/20261119-001104-99066-sticks3): 16/16 new portraits byte-exact inside,
+     0/15 old rated/ALERT portraits, G16R strings present (same_name=, "Disconnect burst on"), no bench code
+pending: install by self-fetch, then the owner compares D on the Guardian glass (the same 3 moods)
+
+== Guardian glass look, 2026-11-19 (owner verbatim, via the Author session) ==
+image guardian-20261119-133525 (16/16 D portraits byte-exact inside); owner: "Functionality is perfect. I think the
+eyes could improve, but leave for the very last."
+accepted; CARRY-OVER into G23: the ALERT eyes on the glass (red + white highlight read washed on camera); measure on
+the panel with the desk camera before any change; no new art.

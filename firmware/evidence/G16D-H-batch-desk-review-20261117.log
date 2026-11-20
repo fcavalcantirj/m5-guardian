@@ -1,0 +1,224 @@
+# G16D–G16H overnight Ralph batch — supervisor desk review, 2026-11-17 00:06–05:20
+runner: ./ralph-claude.sh 5 (claude-opus-5-5), tools/ralph_runner.py HOST_BATCH extended to G16D–G16H (owner request).
+watcher: shell only (scratchpad batch/watch.sh) — snapshot of each handoff, host checks on the frozen copy.
+None of these tasks is accepted yet: device checks with the owner come first.
+
+| task | attempt | handoff | host plain/ASan | tools / build-support | notes |
+|---|---|---|---|---|---|
+| G16D battery dim→deep sleep | …000640…task-22 | awaiting_review 01:04 | 38/38 / 38/38 | 24 / 24 | ext1 keys only, never PM1 IRQ, never on USB/uncertain power, teardown per ai-usage lineage, wake press swallowed, BATTRUN v2 |
+| G16E detection platform | …010400…task-23 | awaiting_review 01:55 | 41/41 / 41/41 | 24 / 24 | IncidentScope{Network,Area}; area never changes rating (tested); registry bounded, no alloc; radar row; amber banner |
+| G16F 14 management detectors | …015546…task-24 | awaiting_review 03:18 | 42/42 / 42/42 | 24 / 24 | threat_detectors_check 32 cases/405 asserts; Monitor moved to PSRAM (internal free 101→57→103 KB) |
+| G16G data path (EAPOL, jamming) | …031849…task-25 | awaiting_review 04:21 | 43/43 / 43/43 | 24 / 24 | datapath_check 20 cases/1250 asserts; data path behind TUNE detect.datapath (off) |
+| G16H BLE coexistence | …042104…task-26 | **blocked** 05:08 (needs device spike) | 44/44 / 44/44 (worker) | — | spike image builds/20261117-045519-2333-sticks3-blespk; owner runs `BLESPIKE start` |
+
+final combined tree (supervisor, 05:15): host 44/44 plain and ASan, tools 25, build-support 26, lab/live 92/92 with a
+fresh engine (`cmake -S lab/live -DGUARDIAN_ROOT=<repo>`). The one lab failure seen first came from the stale
+/private/tmp/guardian-live-build engine of 2026-11-15, not from this batch.
+
+review findings to fix before acceptance:
+1. G16F/G16G thresholds are not TUNE keys (ledger requires every threshold live-tunable); TUNE registry 31/32 used.
+2. lab/live engine.cpp does not register the G16F detectors and no live scenarios exist yet for the owner's
+   Evil Cardputer proofs.
+3. G16G now drops driver-flagged error management frames before the queue (previously queued as unverified):
+   confirm the G13/L02 harness accounting (GRX rx_state) is unchanged in meaning.
+4. Core "signal here" RSSI takes any frame under the AP address, including client frames (pre-existing); with the
+   data path on, client EAPOL frames feed it — restrict to AP-transmitted frames.
+5. G16E: dim view has no amber state; G16G: largest radar rate text clipped; cooldown table 8 keys per detector.
+6. Device-unproven: fps/drops/heap with the PSRAM Monitor and 16 detectors; deep sleep current and wake; codec/IMU
+   low-power writes via IDF I2C; gyro rest threshold; data-path callback cost (off/on); BLE coexistence.
+
+## Supervisor fixes, 2026-11-17 05:20–06:00 (Ralph stopped; each test-first: red, then green)
+1. Thresholds live-tunable: new adapters/tune/threat_tune.{hpp,cpp} binds all 52 ThreatLimits fields to TUNE keys
+   "t.<field>" (defaults = today's limits; detectors still refuse inconsistent sets; refusal reported, previous kept).
+   TUNE registry 32 -> 96 params, keys up to 31 chars (stored blobs with shorter keys still restore); load/save
+   buffers moved off the main task stack (~3.6 KB free); "TUNE? <prefix>" lists one group; a listing that does not
+   fit ends with "TUNE MORE n not shown" (never a cut line); Wi-Fi TUNE allowlist accepts "TUNE? <prefix>" on the
+   device and in tools/tune_session.py. Firmware registers t.* at boot and applies them in configure_detectors().
+   Tests: tune_check (2 new cases, key-length case updated), threat_tune_check (4 cases), tune_session_check,
+   test_tune_session.py.
+2. Lab engine: lab/live/engine.cpp now runs the same 14 ThreatDetectors as the firmware (frame, tick, coverage) and
+   reports "area":[{family,count,visible}]. New test_engine case: a randomized-source probe flood is a visible
+   Probe-family area incident and never the network ALERT. Live scenario scripts wait for the owner's attack choice.
+3. Error-frame accounting: no change needed. Error frames reach the callback only with FCS-fail delivery (data path);
+   the board harness never reads the invalid counts and the receiver harness keeps only rx_state == 0 frames, so
+   coverage/drop accounting means the same.
+4. "Signal here": observe_signal() now takes only frames the AP transmitted (addr2 == BSSID); client frames to the
+   AP (auth, association, client data/EAPOL) no longer feed the AP's RSSI. Test: rating_check
+   signal_reading_comes_only_from_frames_the_ap_transmitted.
+5. Display: the dim view keeps a nearby observation amber (edge + "NEARBY"; never with an ALERT) — idle_check
+   dim_view_keeps_a_nearby_observation_amber; the radar rate text never exceeds the panel (transmitter count gives
+   way, values never cut) — threat_view_check widest-values case.
+
+## Device run of guardian-20261117-052123 (USB flash 13:13 after backup stick-backup-pre-g16dh-20261117-131246.bin,
+## sha256 ac665e97…f75f, MAC LAB-STICK-1 checked before backup and before write)
+MEASURED (60 s on USB, then a Wi-Fi TUNE session on battery):
+- fps 24.9-25.0 rated/nodata, render 9.3 ms, push 6.7 ms; rx_received 2,921 (60 s) / 42,623 (~11 min), rx_queue_full 0,
+  console_drops 0; 14 detectors counting, 0 incidents in the quiet house; air 14 probes, 2,539 beacons, 44 tx in 58 s.
+- IMU running@0x68 ~10 s after boot (boot self-test runs earlier and reports imu:0; optional, never gates rollback);
+  motion=unmapped (axis map not calibrated yet).
+- heap_internal_min 41,355 B (G16C 86-96 KB) and 19,011 B during the Wi-Fi TUNE session; task_stack_free 1,984 -> 1,696 B
+  (G16C ~4.4 KB). lock_losses 2 (silence_5s) in 60 s, 6 by the Wi-Fi session (G16C 0) - cause not established.
+- Wi-Fi TUNE session worked cable-less (STATUS, FRAMES, TUNE? t.probe). Owner saw dim and a key brighten it;
+  sleep_count=0, wake_cause=none and continuous frame counters (~11 min) => it did NOT deep-sleep (dim 30 s, then
+  120 s more to sleep; touched earlier). Deep sleep on battery still unproven on the device.
+CAUSES (measured on the build outputs): internal static data +31.7 KB vs G16C (DIRAM 223,347 -> 255,051 B): TUNE
+load/save buffers 10.4 KB, registry 96 params, status/snapshot/console text buffers; radio queue 39 KB (unchanged,
+always internal). Stack: -fstack-usage shows a 2.1 KB Snapshot copied per accepted frame (companion_drain 2,576 B) and
+another reserved in app_main (3,264 B) on the 12 KiB main task.
+FIXES (13:45-14:30, test-first where host-testable):
+- boards/sticks3/main/psram.hpp: one boot-time placement rule (PSRAM, internal fallback, never freed; IDF external-ram
+  rules cited). Placed: radio queue storage (~39 KB), TextBuffers (~33 KB), Companion (~14 KB), TUNE Registry with its
+  load/save buffers now members (~12 KB). STATUS reports radio_ram/text_ram/app_ram/tune_ram.
+- Monitor::last_security()/Core::last_security(): no Snapshot copy per frame; console screen snapshot in its own
+  noinline function. Main task stack 12 -> 16 KiB (sdkconfig.defaults). build.sh regenerates the sdkconfig every build
+  and build_support check_config refuses any built value that differs from sdkconfig.defaults (new tests).
+- STATUS reset=<esp_reset_reason> uptime_s=<s>: restart vs deep-sleep wake is read, never guessed.
+- IMU POSE (USB and Wi-Fi allowlist, device + tools/tune_session.py): latest 2 s still block (mean acc LSB, mean |gyro|),
+  adapters/imu/pose.hpp (4 host cases); tools/imu_axis_map.py reads POSE lines (2 new tests) -> calibration in the real
+  cable-less pose.
+Host after fixes: 45/45 plain and ASan, 0 warnings; tools 27; build-support 28; lab/live 93/93 (fresh engine).
+
+## Device run of guardian-20261117-134252 (OTA 14:33, sent 1,904,640 B; last_update_result=ok)
+- Wi-Fi TUNE session joined (worst case for internal RAM): heap_internal_min 114,939 -> 114,375 B (was 19,011),
+  task_stack_free 6,728 -> 7,160 B of 16 KiB (was 1,696 of 12 KiB). monitor/radio/text/app/tune_ram all psram.
+- Deep sleep proven once on battery: STATUS after the next wake reset=deepsleep wake_cause=ext1 sleep_count=1
+  power_source=battery (key not recorded in that line; which key woke it is still unproven: FRONT and SIDE each owed).
+- IMU axis map from three still poses over Wi-Fi (IMU POSE, gyro 0.28-0.29 deg/s each): lying +z 1.006 g, standing
+  -x 0.999 g, right edge -y 1.008 g -> imu.right=2 imu.up=-1 imu.out=3, right-edge cross-check agrees
+  (sticks3-imu-*-20261117.*). Saved over Wi-Fi (TUNE version 1.3, store=saved); motion=calm (live).
+  Note (corrected by the owner): the small button on the label edge is RESET, not a key; the SIDE key is the big side
+  button. In the right-edge pose the label/reset edge faced up.
+- Sessions: sticks3-G16D-tune-wifi-session1-20261117.log (ran its full 600 s), sticks3-G16D-tune-wifi-session-20261117.log.
+ACCEPTED: G16E (22/33) - host verify + device STATUS per-detector counters present, FRAMES 25 fps, rx_queue_full 0.
+OPEN: G16D (each key wakes, plugged never sleeps >150 s, 10 cycles, BATTRUN, 10-min runs, DEMO, video, microwave);
+G16F (live Evil Cardputer proofs, 12 h benign soak); G16G (data path off/on device numbers, live deauth+reconnect).
+- Live-proof prep (G16F "reviewer prepares scenarios"): tools/threat_watch.py, read-only USB STATUS recorder (identity by
+  MAC from GRX1 INFO, sends only STATUS, JSONL evidence, per-detector incident deltas, reboot detection by uptime,
+  owner MARK -> since_mark_s, worst heap/stack/queue summary). tools/tests/test_threat_watch.py 8 cases (red first),
+  plus parsed the real 16-detector STATUS lines of today's logs. Tools suite 35 passed.
+
+## Key wake, both proven on battery (guardian-20261117-134252, read over Wi-Fi TUNE sessions)
+- FRONT: wake_key=front reset=deepsleep wake_cause=ext1 (sleep_count 1 and 2).
+- SIDE (the big side button, GPIO12): wake_key=side reset=deepsleep wake_cause=ext1 asleep_s=1436 sleep_count=3
+  asleep_total_s=1643, battery 3797 mV / 62 %. Logs: sticks3-G16D-tune-wifi-session*.log and the 16:0x session.
+- FINDING: sleep_faults=0x20 (FaultCodec) on all three sleeps: the ES8311 low-power writes at 0x18 fail. Cause not
+  established: our firmware never initializes the codec (the ai-usage lineage does, through M5Unified, and does not
+  check its write results), and the writes run after the LCD rail (PM1 GPIO2) is cut.
+  FIX (test-first, idle_check): teardown probes 0x18 (address only) before writing; no ACK = InfoCodecUnpowered
+  (0x100, information, no write), ACK + refused writes = FaultCodec. STATUS: sleep_faults masks information bits,
+  sleep_codec=powered_down|unpowered|failed|-, codec_boot=ack|nack (probe with the rail on, before the IMU task).
+  Host 45/45 plain+ASan, tools 35, bs 28, lab 93.
+- guardian-20261117-153121 on device (OTA 15:3x): codec_boot=ack (ES8311 answers with the LCD rail on). After a deep sleep
+  (short test timers power.dim_s=5 / power.sleep_s=10, restored to 30/120 in the same read, TUNE 1.7):
+  reset=deepsleep wake_key=front asleep_s=432 sleep_codec=failed sleep_faults=0x20 -> the codec still ANSWERS its address
+  after the rail cut (so the rail does not power it down) but refuses the power-down writes: it likely stays powered
+  through deep sleep (the owner measured this class of leak). Cause of the refused writes: not established.
+  NEXT FIX (test-first; the Guardian has no audio path: no I2S/speaker code): power the ES8311 down at BOOT with the
+  same shared sequence (idle.hpp es8311_power_down), reporting codec_boot=down | nack | write_err:<esp_err>@<reg>.
+- guardian-20261117-154925 on device: codec_boot=down (all three ES8311 power-down writes accepted at boot) while the
+  sleep before it (same firmware) reported sleep_codec=failed. => the writes fail only inside the sleep sequence, which
+  cut the LCD rail (PM1 GPIO2) before them. FIX (test-first, idle_check order case): I2C power-downs (BMI270, ES8311)
+  run before display sleep and every rail cut. Measurement pending (one sleep). TUNE power.* left at 5/10 s for that
+  check; restore to 30/120 in the same read.
+- guardian-20261117-155649 on device (OTA ~16:00): after one deep sleep (asleep_s=151, wake_key=front):
+  sleep_faults=0x0 sleep_codec=powered_down codec_boot=down. CONFIRMED: the ES8311 refused writes only after the LCD
+  rail cut; I2C power-downs first fixes it. TUNE power.dim_s=30 / power.sleep_s=120 restored (TUNE 1.11).
+  Memory with Wi-Fi on: heap_internal_min 117,791 B, task_stack_free 6,856 B.
+G16D status: DONE on device = dim, deep sleep, FRONT and SIDE wake (ext1), clean teardown (0 faults), IMU map (3 poses),
+live Wi-Fi TUNE session standing, memory/stack. OPEN = plugged never sleeps (>150 s on USB), ten sleep/wake cycles in a
+row, BATTRUN readout, 10-min no-dropout runs, DEMO of every rating, owner video, microwave no-data check.
+- Owner: dim view = "medium with a yellow roblox ugly face" (G16D placeholder block). FIX (test-first, idle_check
+  dim_view_shows_the_still_portrait_when_the_art_is_on_board): with the 16 portraits on board the dim view paints the
+  real portrait STILL (t=0, portrait layer only, no IMU, identical frame every second; the backlight is what is dimmed),
+  ALERT portrait + red edge, NoData silhouette, label in the mood colour; a dimmed DEMO face is labelled DEMO (yellow,
+  never a mood word). The block stays only as the no-art fallback. Preview (real art, companion_preview 20-/21-dim-*):
+  G16D-dim-view-portrait-preview-20261117.png. Build guardian-20261117-161811: host 45/45 plain+ASan, tools 35, bs 28,
+  lab 93, 0 warnings, signature OK.
+
+## G16F live attempt 1 (owner's Evil Cardputer "deauther on my net", stick on Mac USB, 16:33, guardian-20261117-161811)
+tools/threat_watch.py 90 s, 85 STATUS (evidence-raw: threat-watch-deauth-20261117-163324.jsonl): rx 5,281 management frames on the selected
+network's channel, rx_queue_full 0, lock_losses 0, 0 reboots, heap_internal_min 137,035 B, stack min 6,312 B.
+disconnect / area_disconnect / auth_flood: events 0 (no deauth or disassoc frame reached the receiver) -> 0 incidents.
+Same as 2026-11-17 00:xx (45 s, 0 deauth on air). Conclusion (measured): this Evil Cardputer build emits no deauth
+frames on air (ESP32 raw-frame sanity check; Evil-M5 needs its libnet80211 bypass). Not a Guardian defect. A live deauth
+proof needs a transmitter that really sends them (owner's Pi lab emitter lab/live burst, or a bypass-enabled build).
+Tool bug found and fixed test-first: closed stdin produced a mark every poll (MarkReader; tools 36 passed).
+
+## G16F live probe flood (Evil-M5 v1.5.8 "Probe Attack", stick on Mac USB, guardian-20261117-161811)
+SOURCE FACT (Evil-Cardputer-v1-5-8.ino ~10579): new random MAC and random SSID per probe, channel hop EVERY probe,
+30 ms delay (~33/s over 13 channels) -> one channel hears ~1/13. Deauther needs the libnet80211 bypass (~12516).
+MEASURED 1 (threat-watch-probe2, 4 min, thresholds at AntiHunter defaults 80/60 per 5 s): quiet 5-s window 0-4 probes,
+13-17 probes/min, 20-35 tx/min; attack 10-14 per 5 s, ~150 probes/min, ~127 tx/min -> 0 incidents (threshold 80).
+TUNE from the measurement (USB, version 1.18): t.probe_window_ms=10000, t.probe_flood=16, t.probe_flood_sources=12
+(half the attack rate, 3-4x the quiet max).
+MEASURED 2 (threat-watch-probe3-20261117-164725.jsonl, 3 min): 4 probe_flood incidents during the attack (one per ~45 s cooldown), area_visible=1,
+owner saw amber text under "Medium"; first incident 2.8 s after the attack first showed in the window; 0 incidents in
+the quiet lead-in; heap_internal_min 135,303 B, stack 6,344 B, rx_queue_full 0. Benign 12 h soak pending (same thresholds).
+
+## G16F live deauth flood (Bruce on LilyGO T-Embed, real transmitter; stick on Mac USB, guardian-20261117-161811)
+Owner ran Bruce deauth against his own selected network OWNER-AP-1. Stick went RED (alert=1, face alarm).
+Live log threat-watch-live-20261117-165040.jsonl: 'disconnect' detector (selected network, G13 DisconnectBurst) 2 incidents, 128 deauth/disassoc
+in window -> RED network alert; 'area_disconnect' (nearby) 4 incidents -> amber underneath. area_visible=1.
+RESOLVES the 2026-11-16 "sticks3 not red during deauth" question: NOT a Guardian defect. The Evil-M5 Cardputer build
+emits no deauth on air without the libnet80211 bypass (measured 0 frames twice). A real transmitter (Bruce) -> Guardian
+detects and grades it red on the owner's network. deauth source/pair/broadcast + the selected-network burst all exercised.
+
+## Coverage hysteresis (owner: deauth flood made the "listening coverage degraded" line flap)
+ROOT CAUSE (measured, live log): under a deauth flood the 24-slot radio queue overflows (rx_queue_full 1324->1391)
+and the channel lock drops on 5 s silences, so each 1 s coverage window sees dropped_in_window>0 then 0, swinging
+Coverage Fresh<->Degraded (degraded_transitions 35->38). The red ALERT held steady (0 flips); only the overlay LINE
+flapped. The alert still fired and cleared cleanly (alert 1 through the ~45 s cooldown, then 0, face back to rating).
+FIX (test-first, core_check, guardian_core Core): coverage uses one-directional hysteresis - a bad window (channel 0,
+dropped_in_window>0, or a live core without passive receive) warns at once, but degraded clears only after coverage is
+clean for Core::coverage_recover_ms (3 s). Brief clean windows inside a storm no longer flip it back; a real sustained
+loss (AP gone) still degrades then goes stale/no-data via the existing age path. The honest grade stays blanked while
+degraded, and the "coverage degraded" overlay still shows (intended signal), just steady now. 2 core tests added/updated,
+1 condition test advanced past the hold. Host 45/45 plain+ASan, tools 36, bs 28, lab 93, 0 warnings.
+NOTE: rx_queue_full under flood left as-is (honest; detection survived - you only need enough deauth to alert).
+
+## guardian-20261117-172431 (hysteresis) on device + live scope proof + soak start (soak-20261117-173640.jsonl)
+- Hysteresis CONFIRMED live: with Brucegotchi active nearby, degraded_transitions=1 over 141 s (was 35-38 under the
+  pre-fix flood); alert flips 0. Flap fixed.
+- Scope split proven live: Bruce deauth on the selected network OWNER-AP-1 -> RED (network); Brucegotchi deauthing
+  NEARBY APs -> area_disconnect incident -> AMBER (area), rating unchanged. IncidentScope{Network,Area} works on air.
+- Health on final firmware: heap_internal_min 133,571 B, task_stack_free 6,456 B, rx_queue_full 0, lock_losses 0, 0 reboots.
+- OTA note: the first OTA of this build ERRORED while a deauth flood was running (the stick's own Wi-Fi station could not
+  reach the server through the flood). Stopping the attack, then OTA, installed fine (last_update_result ok). Expected.
+- 12 h benign+live soak running (threat_watch, 1 Hz) -> read tomorrow for false alarms (target 0 on the quiet baseline).
+G16F live proofs now captured: probe flood (amber), beacon spam (amber), deauth-on-your-net (RED), deauth-nearby (amber,
+Brucegotchi). Karma not run (no SD list; modern phones send no named probes). Auth/SAE floods not offered by these tools.
+
+## IMU motion: owner "IMU horrible ... RADICALLY WEAK, barely perceptible, weird on its edges" (plan approved)
+MEASURED: IMU pipeline healthy in normal mode (imu_drops 0, ~199 Hz, calm<->moving live, map 2,-1,3) -> amplitude only.
+Old defaults: max_shift 4 px, max_tilt 5 deg, tilt_gain 0.35, shift_gain 0.12 -> a 30-deg roll moved the face ~3.6 px.
+SPIKE (real v2 art, companion_preview 22-imu-*, G16C-imu-strength-candidates-20261117.png): "weird edges" = the hood
+fills the panel edge to edge, so any slide CHOPS the hood at the glass (not black fill: rated portraits' L/R/bottom
+borders are pure black; only top edge + ALERT ring touch). Clamp/overscan would not help.
+FIX (test-first): Placement.scale (persona), motion Output.scale + Params.pull_back: a moving face is pulled back
+(1 - pull_back at the motion bounds, exactly 1 at rest / no IMU) so the hood stays inside; strong defaults (preview C):
+max_shift 6, max_tilt 12, tilt_gain 0.8, shift_gain 0.3, nudge 12, stiffness 110, damping 12.6 (zeta 0.6), pull_back 0.10;
+live ranges single-sourced in motion.hpp (max_shift<=16, max_tilt<=15, shift_gain<=1, nudge<=30, pull_back<=0.3).
+Tests: persona_check a_pulled_back_portrait_stays_inside_the_glass; motion_check a_moving_face_is_pulled_back...,
+defaults_are_strong_inside_their_tune_ranges_and_near_critical. Still face, ALERT stare: unchanged.
+
+## Face motion REWRITTEN (owner: "ITS COMPLETELY OFF, HORRIBLE, DITCH THIS APPROACH/CODE", "DOESN'T TILT", "WHITE STRAPS",
+## then "SPIN... TILT WITH... REACT IN A FLUID WAY... 3 AXIS... CHECK MANUAL... STUDY STICKS3-TETRIS")
+Backup before deletion (no git): backups/guardian-pre-motion-removal-20261117-180748.tgz sha256 82177c84...cf58 (the store, read back).
+The pull-back/strong-defaults build (guardian-20261117-175405) was never installed (OTA server stopped, 0 /image).
+ROOT CAUSES found in the old G16C model (why "doesn't tilt"): (1) "calm" (slow rotation) forced the targets to 0, so a tilt
+HELD still showed nothing; (2) a "rest reference" slowly adopted the held pose; (3) screens.cpp applied motion only while
+!calm. WHITE STRAPS: every accel spike >0.45 g was a "tap" that flashed all HUD rules + the level line WHITE.
+NEW MODEL (from the owner's Stackfall, proven on this board: absolute held angle from gravity; axes per StickS3 manual p.6-7
+and Stackfall imu_axes.h, matching our map 2,-1,3): complementary filter (gyro rotates "up", accel corrects with tau 0.3 s,
+jolts down-weighted by |acc|-1g), three held axes: roll -> face spins WITH the stick (gain 1, bound 20 deg), pitch -> nod
+(0.35 px/deg, 10 px), yaw (gyro about the vertical) -> turn (0.5 px/deg, 12 px, eases back 1.5 s); critically damped follower
+3 Hz; pull_back 0.10 at the bounds; absolute up from the calibration (no rest adaptation, no calm reset, no tap flash).
+Tests: motion_check rewritten (13 cases incl. a_held_roll_spins_the_face_with_the_stick_and_stays: 15 deg held 10 s);
+companion_check: centred pose == still frame, no white HUD rule. Board: motion.* keys replaced; motion.rest_gyro/rest_acc
+kept for G16D handling detection; STATUS motion=following|waiting, pose=roll,pitch,yaw.
+- Owner on guardian-20261117-181954 (floating-fish physics, OTA 18:3x): "muuuch better now" (first motion version he liked).
+  Defaults: roll_gain -0.8 (keeps itself level in the water), drift 0.25 px/deg, inertia 14 px/g, float_hz 1.2,
+  water_damping 0.3, bob 1.5 px / 3.2 s, sway 1.5 deg / 4.7 s, yaw swirl 0.5 px/deg easing 1.5 s, pull_back 0.10.
+  Live TUNE keys: motion.roll_gain/max_roll/drift/max_x/pitch_gain/max_y/yaw_gain/yaw_return/inertia/float_hz/water/
+  bob/sway/fusion_tau/pull_back/parallax (+ motion.rest_gyro/rest_acc for G16D handling). Open: the cyan rotating level
+  line under the chin (offered removal), fine tuning to taste.

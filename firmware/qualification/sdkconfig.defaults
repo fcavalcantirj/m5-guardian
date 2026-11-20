@@ -1,0 +1,6 @@
+# No PSRAM component is selected, so its Kconfig symbol does not exist here.
+# The wrapper rejects any generated CONFIG_SPIRAM=y; no PSRAM init is linked.
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_COMPILER_CXX_RTTI=n
+# Test objects stay on the probe task's stack. This is not a product RAM budget.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768

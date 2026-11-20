@@ -1,0 +1,192 @@
+{
+ "task": "G16Q art bench candidates",
+ "tool": "tools/art/candidates.py build",
+ "frame": [
+  135,
+  240
+ ],
+ "frame_bytes": 64800,
+ "rgb565_byte_order": "little-endian",
+ "face_band": {
+  "rows": [
+   20,
+   179
+  ],
+  "size": [
+   135,
+   160
+  ]
+ },
+ "masters_at": "$GUARDIAN_STORE/art-exports/G15/20261117-v4/masters_png/",
+ "masters": {
+  "VeryGood": "234557de1c9209d3826b67fa4ec5868adfb6896f6e22f6b08e0d78a554751eb5",
+  "Horrible": "b6efb06b4eb3cf2295deda11a53ffe7235f3d506cfc854132667b5bedddb64c8",
+  "Medium": "803cb9b9161d8ade7b970c7a7922c238d5da76208d84882d93028de27258d6a1"
+ },
+ "candidates": {
+  "A": {
+   "crop": [
+    40,
+    0,
+    472,
+    512
+   ],
+   "resize": "LANCZOS on sRGB codes",
+   "unsharp": [
+    1.0,
+    90,
+    2
+   ],
+   "to565": "round",
+   "note": "today's pipeline; the face band equals art/persona/v2/portrait/<Mood>_portrait.rgb565"
+  },
+  "B": {
+   "crop": [
+    40,
+    0,
+    472,
+    512
+   ],
+   "resize": "LANCZOS in linear light, premultiplied alpha",
+   "unsharp": null,
+   "to565": "round"
+  },
+  "C": {
+   "crop": [
+    40,
+    0,
+    472,
+    512
+   ],
+   "resize": "LANCZOS in linear light, premultiplied alpha",
+   "unsharp": [
+    0.6,
+    120,
+    1
+   ],
+   "to565": "round"
+  },
+  "D": {
+   "crop": [
+    40,
+    0,
+    472,
+    512
+   ],
+   "resize": "LANCZOS in linear light, premultiplied alpha",
+   "unsharp": [
+    0.6,
+    120,
+    1
+   ],
+   "to565": "Floyd-Steinberg"
+  },
+  "E": {
+   "crop": [
+    112,
+    0,
+    400,
+    512
+   ],
+   "size": [
+    135,
+    240
+   ],
+   "resize": "LANCZOS in linear light, premultiplied alpha",
+   "unsharp": [
+    0.6,
+    120,
+    1
+   ],
+   "to565": "Floyd-Steinberg",
+   "hood_cut": {
+    "VeryGood": {
+     "alpha_box_x": [
+      48,
+      462
+     ],
+     "cut_master_px": [
+      64,
+      62
+     ],
+     "cut_glass_px": [
+      30.0,
+      29.1
+     ]
+    },
+    "Horrible": {
+     "alpha_box_x": [
+      47,
+      464
+     ],
+     "cut_master_px": [
+      65,
+      64
+     ],
+     "cut_glass_px": [
+      30.5,
+      30.0
+     ]
+    },
+    "Medium": {
+     "alpha_box_x": [
+      48,
+      463
+     ],
+     "cut_master_px": [
+      64,
+      63
+     ],
+     "cut_glass_px": [
+      30.0,
+      29.5
+     ]
+    }
+   }
+  },
+  "F": "D + the ST7789 gamma table (bench panel state, no frame)",
+  "G": "F at 100 % backlight (bench panel state, no frame)",
+  "H": "D through the Guardian's portrait painter: still (breath 0) and breathing (bench, no frame)"
+ },
+ "ramp": {
+  "levels_srgb": [
+   0,
+   64,
+   128,
+   191,
+   255
+  ],
+  "rows_per_band": 48,
+  "order": "top to bottom",
+  "rgb565": [
+   "0x0000",
+   "0x4208",
+   "0x8410",
+   "0xBDF7",
+   "0xFFFF"
+  ]
+ },
+ "rendered_with": {
+  "python": "3.10.10",
+  "Pillow": "11.3.0",
+  "numpy": "1.26.4"
+ },
+ "files": {
+  "A_VeryGood.rgb565": "5f5dc7273d392c585bc7e9887f50fee799675f81b7964469b7392a9c959f3bce",
+  "B_VeryGood.rgb565": "3a43c91250ac051127a901e36cd4b8cde4c252c5a414a95423f2db10aac82b89",
+  "C_VeryGood.rgb565": "40cc8ebe1643dd2740c838d2dcc49b41cd52a2823a919e9d8efa6665afa55316",
+  "D_VeryGood.rgb565": "50cbe0cdf44d2a458d4358476bb3e0814b8c7f477afddd914284668b94b3dfee",
+  "E_VeryGood.rgb565": "1bd11b1af8646ac4c111c6936a8bdda59c47c7ad0b27f5403916de8e2a4b1e30",
+  "A_Horrible.rgb565": "0d04548d452bdbdcc863949a62008f0c8c5f9cd4993d3e602930ac3fbaaac6b6",
+  "B_Horrible.rgb565": "b0cb81b462c50a53c87d7e2ab517583a6f3ff33b35b3a62ef9213ade0f8e2600",
+  "C_Horrible.rgb565": "9b743a8720f1030b678f08832c0d9fa564b56ea4ab6c8c53002e4a0701b1a403",
+  "D_Horrible.rgb565": "9e9a9a49c8195abfa0701453a5cba477617dbb95cc46f30724fef0daa81c6945",
+  "E_Horrible.rgb565": "35335293c37c2552e5126051da01c90d905141c20f1bbdf263d1c6dd55a7461c",
+  "A_Medium.rgb565": "4ff01ba38724c818bc3218eb7357397f9ef2f20c42c09d7d3e80abd239df08bc",
+  "B_Medium.rgb565": "2a15f1f29b1d91920a50805ae6c75b2709abfa4817f7c90d4da0e60ff15b08a2",
+  "C_Medium.rgb565": "6894cbfc5a1a44df9084c9e641d0ff5b1cf0708d957c467d4035dc82fcb933b9",
+  "D_Medium.rgb565": "3bfa39c827478ca72a011992838f562b04d93c5f149608e4155fcc4062499966",
+  "E_Medium.rgb565": "d22d2976304af2f5c3709ce47dbc844be9950648ae69bcb1a32717d6ced460d2",
+  "ramp.rgb565": "53c8f4609858233b3a0e8f5adb323a6058e217cbccb6a1d596c98e5eac5a7473"
+ }
+}

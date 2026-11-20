@@ -1,0 +1,151 @@
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037a4ce
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x170c
+load:0x403c8700,len:0x4
+load:0x403c8704,len:0xe24
+load:0x403cb700,len:0x317c
+entry 0x403c893c
+I (26) boot: ESP-IDF v5.4-dirty 2nd stage bootloader
+I (27) boot: compile time Nov 14 2026 22:14:54
+I (27) boot: Multicore bootloader
+I (27) boot: chip revision: v0.2
+I (27) boot: efuse block revision: v1.4
+I (27) qio_mode: Enabling default flash chip QIO
+I (28) boot.esp32s3: Boot SPI Speed : 80MHz
+I (28) boot.esp32s3: SPI Mode       : QIO
+I (28) boot.esp32s3: SPI Flash Size : 8MB
+I (28) boot: Enabling RNG early entropy source...
+I (28) boot: Partition Table:
+I (28) boot: ## Label            Usage          Type ST Offset   Length
+I (29) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (29) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (30) boot:  2 factory          factory app      00 00 00010000 00300000
+I (30) boot:  3 assets           Unknown data     01 83 00310000 004f0000
+I (30) boot: End of partition table
+I (31) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=0ef30h ( 61232) map
+I (40) esp_image: segment 1: paddr=0001ef58 vaddr=3fc96600 size=010c0h (  4288) load
+I (42) esp_image: segment 2: paddr=00020020 vaddr=42000020 size=29610h (169488) map
+I (67) esp_image: segment 3: paddr=00049638 vaddr=3fc976c0 size=01ef8h (  7928) load
+I (69) esp_image: segment 4: paddr=0004b538 vaddr=40374000 size=12538h ( 75064) load
+I (83) esp_image: segment 5: paddr=0005da78 vaddr=600fe100 size=0001ch (    28) load
+I (91) boot: Loaded app from partition at offset 0x10000
+I (91) boot: Disabling RNG early entropy source...
+I (92) octal_psram: vendor id    : 0x0d (AP)
+I (92) octal_psram: dev id       : 0x02 (generation 3)
+I (92) octal_psram: density      : 0x03 (64 Mbit)
+I (92) octal_psram: good-die     : 0x01 (Pass)
+I (92) octal_psram: Latency      : 0x01 (Fixed)
+I (93) octal_psram: VCC          : 0x01 (3V)
+I (93) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (93) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (93) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (93) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (94) octal_psram: DriveStrength: 0x00 (1/1)
+I (95) MSPI Timing: PSRAM timing tuning index: 4
+I (95) esp_psram: Found 8MB PSRAM device
+I (95) esp_psram: Speed: 80MHz
+I (95) cpu_start: Multicore app
+I (521) esp_psram: SPI SRAM memory test OK
+I (530) cpu_start: Pro cpu start user code
+I (530) cpu_start: cpu freq: 160000000 Hz
+I (530) app_init: Application information:
+I (530) app_init: Project name:     guardian_sticks3
+I (531) app_init: App version:      1
+I (531) app_init: Compile time:     Nov 14 2026 22:14:46
+I (531) app_init: ELF file SHA256:  eb286719c...
+I (531) app_init: ESP-IDF:          v5.4-dirty
+I (531) efuse_init: Min chip rev:     v0.0
+I (531) efuse_init: Max chip rev:     v0.99 
+I (531) efuse_init: Chip rev:         v0.2
+I (532) heap_init: Initializing. RAM available for dynamic allocation:
+I (532) heap_init: At 3FC99FA8 len 0004F768 (317 KiB): RAM
+I (532) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (532) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (532) heap_init: At 600FE11C len 00001ECC (7 KiB): RTCRAM
+I (533) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (534) spi_flash: detected chip: gd
+I (534) spi_flash: flash io: qio
+I (534) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (534) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (535) main_task: Started on CPU0
+I (536) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (537) main_task: Calling app_main()
+I (675) gpio: GPIO[45]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (675) gpio: GPIO[21]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (796) gpio: GPIO[11]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (797) gpio: GPIO[12]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 
+I (819) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=0 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (5569) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (5569) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (10586) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (10586) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (15603) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (15604) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (20620) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (20620) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (25637) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (25637) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (30654) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (30654) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (35671) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (35671) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (40688) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (40688) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (45705) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (45705) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (50722) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (50722) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (55739) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (55739) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (60756) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (60756) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (65773) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (65773) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (70790) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (70790) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (75807) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (75807) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (80824) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (80824) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (85841) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (85841) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (90858) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (90858) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (95875) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (95875) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (100892) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (100892) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (105909) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (105909) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (110926) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (110926) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (115943) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (115943) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (120960) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (120960) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (125977) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (125977) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (130994) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (130994) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (136011) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (136012) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (141028) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (141028) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (146045) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (146045) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (151062) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (151062) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (156079) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (156079) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (161096) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (161096) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (166113) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (166113) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (171130) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (171130) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0
+I (176147) guardian: BOARD profile=StickS3 identity=owner-selected pm1_response=1 pm1_id_raw=0x4f052050 pm1_config=1 panel_setup=1 transfer_complete=1 visible_pixels=unverified buttons_setup=1 flash=8388608 psram=8388608 psram_test=1 heap=8649272 nvs=1 boot_count=2 sd=none fw=guardian-sticks3 bringup-0.3
+I (176147) guardian: VIEW face=Unknown overlay=checking age_ms=0 front_down=0 side_down=0

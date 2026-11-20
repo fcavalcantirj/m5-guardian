@@ -1,0 +1,31 @@
+# IMU after a software restart (owner + supervisor, 2026-11-18 10:08-10:12). Stick LAB-STICK-1.
+# Image guardian-20261118-030709 (G16I + G16J + G21) installed over OTA at 10:08:02 (reset=sw).
+# STATUS lines read by the running 12 h soak (evidence-raw/soak-benign-20261118-001818.jsonl) right after the OTA reboot:
+#   screen=Face imu=init-failed imu_samples=0 motion=no_imu pose=0,0,0 reset=sw app_version=guardian-20261118-030709
+#   last_update_result=ok:guardian-20261118-030709 selftest=display:1,store:1,radio:1,imu:0 head_ms=14.8/14.8 heap_internal_min=140591
+# Owner: "the head stopped IMU moving. wtf" / "regression huge".
+# Test: the soak was stopped (pid 33101) and the USB port opened once (DTR low = hardware reset of the stick), same image:
+#   imu=running@0x68 imu_samples=63 motion=following reset=usb app_version=guardian-20261118-030709 heap_internal_min=137715
+# Owner: "imu came back".
+# MEASURED: the new code is not the cause (it runs with the IMU after a hardware reset). The BMI270 did not initialise
+# on the boot that followed esp_restart. The previous image (guardian-20261117-203615, same init code) was always
+# observed after USB resets (every console session opens the port), so this boot path was never exercised before.
+# Code: run_update() called esp_restart() with the IMU task still sampling the sensor at 200 Hz (only the deep-sleep
+# path stopped it first, idle.cpp teardown); Bmi270::begin made a single attempt.
+# Fix (host-tested: imu_check "a_transient_configuration_failure_is_retried_once_after_a_pause", idle_check
+# "a_software_restart_stops_the_imu_and_soft_resets_it_before_rebooting"): one more init attempt after 50 ms;
+# every software restart runs prepare_restart (radio off, sampler stopped, BMI270 CMD soft reset) first; console
+# verb RESTART reproduces the software-reset boot with the port open; STATUS names the failing init step.
+# Device proof pending: OTA of the fixed image, then `RESTART` over USB and STATUS imu=running@0x68 on that boot.
+# PROOF (2026-11-18 10:56 RESTART over USB, STATUS read 13:17 over a TUNE session, no USB reset in between):
+#   reset=sw app_version=guardian-20261118-101804 imu=running@0x68 motion=waiting uptime_s=8494 head_ms=14.3/15.6
+#   heap_internal_min=84163 (Wi-Fi up during the session; yesterday's Wi-Fi-on floor was ~114 KB: watch in G16J/G21 acceptance)
+# The boot that followed the software reset has the IMU. Regression closed. Fixed image installed over OTA at 10:5x
+# (served from builds/20261118-101804-20914-sticks3), host 50/50 plain + ASan on the fixed tree.
+# 2026-11-18 13:21 AUTO-OTA PROOF (image guardian-20261118-131550, TUNE ota.auto_s=120 default): with NO gesture the stick's
+# own poll found the Mac's TUNE offer (ota_auto_checks=1) and ran it: TUNE OK power.dim_s=30 / power.sleep_s=120 saved
+# (the camera-session values restored), STATUS reset=sw imu=running@0x68 motion=following head=off. The software-reset
+# boot keeps the IMU on this image too.
+# 2026-11-18 14:40 G16M image guardian-20261118-142345 installed by the stick's own poll (no gesture): STATUS
+# last_update_result=ok reset=sw imu=running@0x68 head=off setup=idle wifi_provisioned=yes ota_provisioned=yes
+# cred_store=plain (old partition table, vault absent by design until a USB flash) heap_internal_min=114387.

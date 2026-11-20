@@ -1,0 +1,82 @@
+G16T "a nearby burst that also touches the owner's network is RED" — device evidence (supervisor log), started 2026-11-19
+
+== Worker attempt ==
+attempt 20261119-121554-278512-task-39, receipt awaiting_review (READY FOR REVIEW, handed off ~13:15)
+loop started 12:16 by the Author session on the owner's explicit order ("do it. allowed")
+watcher SUMMARY ralph-watch/G16T-20261119-121554-278512-task-39 (snapshot 13:16:11, checked 13:22:54):
+  RC_host_plain=0 RC_host_asan=0 (52/52 each) RC_tools=0 (103) RC_bs=0 (41) RC_build=0
+reviewer decisions (Author): own: printed only above zero; mixed record under both last_burst fields;
+  burst_text_max 1280, STATUS line 7168 (< TUNE reply 8192); wording "Nearby burst also on <name>";
+  rule "at least one own frame" kept (a floor becomes a TUNE key only if the soak shows a false red with own:1)
+no hard-coded addresses added (grep of the tree: only the older tools/tests/test_live_matrix.py, owner decision pending)
+
+== Shipped image ==
+watcher archive builds/20261119-132006-92954-sticks3, version guardian-20261119-132006
+signed sha256 be0832411b53afbd5abbac63e9e1dd53a20163d4e3adb0085b1275ef57c91e09 (matches SHA256SUMS)
+inside: "Nearby burst also on", "own:%u," and ":own" formats, last_burst_network=; 16/16 G16Q D portraits byte-exact
+
+== Install by self-fetch ==
+tools/ota_serve.py :8070, 13:25: GET /tune/offer 404, GET /manifest 200, GET /image 200, sent 2887680 bytes
+STATUS 13:27 (uptime_s=123): app_version=guardian-20261119-132006 last_update_result=ok:guardian-20261119-132006
+  selftest=display:1,store:1,radio:1,imu:0 (boot snapshot, as before) imu=running@0x68 imu_samples=23815
+  tune_version=1.31 alert=0 same_name=0 last_burst_network=none last_burst_area=none
+log: builds/ralph-watch/G16T-20261119-121554-278512-task-39/{serve-guardian.log,tune-status-after-install.log}
+
+== Owner Bruce run (pending) ==
+same Bruce deauth as 12:12 (own network name), stick left powered. Expect: RED "Nearby burst also on <name>";
+STATUS last_burst_network with own:<n> and a tuple ending :own.
+
+== Owner Bruce run ~13:28 (owner reports RED, relayed by the Author session) ==
+STATUS 13:29:13 (supervisor, uptime_s=242; builds/ralph-watch/G16T-20261119-121554-278512-task-39/tune-status-bruce-1.log):
+  selected=OWNER-AP-1 alert=0 screen=Face face=0 overlay=3 area_visible=0 same_name=0 same_name_evicted=0
+  disconnect (Network): events=4 incidents=0 last=none        (counter since the 13:25 install restart)
+  area_disconnect:      events=67 incidents=2 last=96s
+  last_burst_network=none
+  last_burst_area=rule:deauth_broadcast,total:21,unlisted:0,tuples:7,age_s:51,open:0,top:ffffffffffff/AIR-2/AIR-2/11:3;ffffffffffff/AIR-6/AIR-6/11:3;ffffffffffff/AIR-3/AIR-3/11:3;ffffffffffff/AIR-7/AIR-7/11:3
+reading (measured): the stick recorded NO Network incident since boot (disconnect incidents=0, last_burst_network=none).
+  The last burst has no own: field and no :own tuple, and G16T prints every own tuple, so 0 of its 21 frames named
+  the selected address (or an approved / same-name one). Two Area incidents (67 frames) => amber by the rule.
+  The owner's "RED" is not in the stick's record at this read (see the correction below).
+
+== Correction 2026-11-19 ~13:45: RED is proven on the glass ==
+owner's phone video 13:28:39 ($GUARDIAN_STORE/evidence-raw/20261119-G16T/glass-red-1328.mp4, sha256 verified; frame
+glass-red-1328-f03.png sha256 ff80338a81e438ba8a478a695abf7803d6c771f3591c7ce5d94d06505e51e777):
+  header ALERT, red border, red-eye ALERT mask, text "ALERT / Nearby burst also on / <owner's network name> /
+  18 in 10s, 56s ago / looks like a known attack tool" => G16T's Network-scope line (printed only with own frames).
+reconciled: the glass burst (18 frames) is NOT the one in the 13:29:13 record (21 frames = 7 x 3, closed ~13:28:22).
+  Bruce produced at least two bursts; the second named no picked-network address and its nearby record replaced
+  the first, and the Network record then read none.
+DEFECT (supervisor, confirmed in code + host test): AreaDisconnectDetector::last_burst(Network) derived the record
+  from the single nearby record, so a later nearby-only burst erased the red one.
+  red:   coverage_check g16t_a_later_nearby_burst_without_the_picked_network_keeps_its_red_record 9/18 assertions fail
+         (builds/20261119-g16t-persist/red-coverage.log)
+  fix:   BurstTrace keeps own_record_ (copy of the record while its burst holds an own frame), last_own();
+         last_burst(Network) reads it; a later burst that names the picked network replaces it.
+  green: host plain 52/52 (builds/20261119-g16t-persist/green-plain.log); full supervisor check pending
+Not yet accepted: needs the fixed image on the stick and one more Bruce run read straight after.
+
+== Fixed image on the stick ==
+supervisor check ralph-watch/G16T-persist-supervisor-20261119 (snapshot 13:33:36): RC_host_plain=0 RC_host_asan=0 (52/52)
+  RC_tools=0 (103) RC_bs=0 (41) RC_build=0
+archive builds/20261119-133525-57481-sticks3, guardian-20261119-133525, signed sha256
+  f1ebb8b8fab9796af4e52c9dbd38c5f740fc2045796f633346cd517bffe230b1; fix inside (source.tar.gz threats.cpp last_own,
+  ELF symbol last_own); 16/16 portraits byte-exact
+self-fetch 13:39:13 (GET /tune/offer 404, /manifest 200, /image 200, 2887680 B); STATUS 13:41:42 uptime_s=122:
+  app_version=guardian-20261119-133525 last_update_result=ok:guardian-20261119-133525 imu=running@0x68
+  last_burst_network=none last_burst_area=none
+
+== Owner Bruce run ~13:46 on the fixed image (read by the supervisor straight after) ==
+STATUS 13:47:42 (uptime_s=482; builds/ralph-watch/G16T-persist-supervisor-20261119/tune-status-bruce-3.log):
+  app_version=guardian-20261119-133525 selected=OWNER-AP-1 same_name=0
+  disconnect (Network): events=5 incidents=0      area_disconnect: events=65 incidents=2 last=93s
+  last_burst_network=rule:deauth_broadcast,total:64,unlisted:42,tuples:8,own:4,age_s:94,open:0,top:ffffffffffff/AIR-2/AIR-2/11:3;ffffffffffff/AIR-6/AIR-6/11:3;ffffffffffff/AIR-3/AIR-3/11:3;ffffffffffff/AIR-8/AIR-8/11:3;ffffffffffff/OWNER-AP-1/OWNER-AP-1/11:3:own;OWNER-AP-1/AIR-1/OWNER-AP-1/11:1:own
+  last_burst_area = the same record
+reading (measured): 64 frames, a broadcast deauth per access point on channel 11 cycling through many addresses
+  (42 unlisted), the selected network's tuples kept and printed below the top 4: 3 broadcast frames from the selected
+  address and 1 frame from a client to it => own:4 => Network incident (RED rule). The record is still readable 94 s
+  after the burst (the persistence fix). Glass line for this rule proven on video at 13:28 (above).
+  "A burst that avoids his network stays amber": the 13:28 second burst on guardian-20261119-132006 (21 frames,
+  own 0) => Area incident only, Network record none (not a separate deliberate neighbour-target run).
+
+== Acceptance (supervisor, 2026-11-19, runner idle) ==
+G16S, G16T and G16R accepted from this evidence; see the ledger acceptance lines.

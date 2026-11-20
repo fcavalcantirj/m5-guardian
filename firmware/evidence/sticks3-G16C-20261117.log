@@ -1,0 +1,27 @@
+# G16C acceptance — 2026-11-17 ~00:10 (rework attempt ralph/20261116-220348-633767-task-21, claude-opus-5-5)
+runner state of that attempt: ledger_changed (the reviewer edited the ledger during the run; the work itself completed)
+supervisor desk checks: host plain 37/37, ASan 37/37, tools 24, build-support 24; clean signed build
+  builds/20261116-234711-6053-sticks3 (guardian-20261116-234711, 0 warnings, SHA256SUMS OK, RSA signature OK,
+  partition table unchanged, 177 sources match, app 1,904,640 B = 60.5 % of a slot, 16 portraits once each).
+  Wi-Fi TUNE link reviewed: outbound HTTP client only, allowlist STATUS/FRAMES/FRAMES 0/TUNE?/TUNE ..., 4 s request
+  timeouts, bounded session. Minor (accepted): a reply later than 5 s can be garbled; any LAN host spoofing the Mac
+  during an owner-started session could send TUNE (display/motion parameters only).
+install: OTA (owner triple tap) 23:55, "/image: sent 1904640 bytes"; boot "slot=ota_1 version=guardian-20261116-234711
+  selftest=pass result=ok:guardian-20261116-234711".
+
+device measurements (USB port open and read, 75 s, STATUS every 5 s):
+  fps 24.4-25.4 (required >= 20; first attempt 12.2); render_ms 8.3-10.2, push_ms 5.8-7.4 (avg ~15.5 ms per frame)
+  FRAMES rated: 1682 frames, total_max_ms 35.6, fps 24.9; nodata: total_max_ms 36.6 (required <= 40)
+  rx_queue_full 0, rx_discarded 0, lock_losses 0, console_drops 0, console_stall_ms 1.2 total / 0.2 max, log_drops 0
+  degraded_transitions 1 (the boot transition, unchanged for 75 s), heap_internal_min 72,015 B (was 75,747), stack 3,616 B
+
+deauth question (owner ran the Evil Cardputer "Deauther" during this window, stick "not red"):
+  lab/live/deauth_truth.py, stick fixed on channel 11 for 45 s: 3,351 frames received (1 dropped):
+  beacons 2824, probe responses 515, probe requests 8, action 4, deauth 0, disassoc 0.
+  => no deauthentication or disassociation frame reached channel 11; the Guardian is correct not to alert.
+  The Cardputer is not transmitting deauths at the home AP (likely the ESP32 raw-frame block that Evil-M5's
+  "deauth_prerequisites" bypass addresses, or another channel/BSSID) — to be confirmed from its own log.
+
+carried to G16D verify (owner: "validate all tomorrow"): IMU axis calibration + motion tuning, one live Wi-Fi TUNE
+  session standing, 10-min no-dropout runs unplugged and plugged-with-port-closed, DEMO ratings on the glass, owner
+  handling video, microwave no-data.

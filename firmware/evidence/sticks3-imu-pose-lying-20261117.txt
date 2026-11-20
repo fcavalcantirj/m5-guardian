@@ -1,0 +1,1 @@
+G16C IMU POSE samples=400 age_ms=1665 acc_mean=-65.1,-163.9,4119.3 gyro_dps=0.28 acc_lsb_per_g=4096

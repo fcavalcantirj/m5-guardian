@@ -1,0 +1,55 @@
+menu "M5 Guardian"
+config GUARDIAN_COUNTRY
+    string "Regulatory country for passive 2.4 GHz listening"
+    default "BR"
+    help
+        Two upper-case letters passed to esp_wifi_set_country_code() with
+        802.11d adoption disabled before the companion starts passive,
+        receive-only listening at boot. Empty leaves the radio off (the screen
+        says so). The owner lab's measured scope is BR. A console `select` with
+        a different country still requires a reboot (G13 rule).
+config GUARDIAN_OTA_SELFTEST_FAIL
+    bool "TEST ONLY: this image fails its boot self-test (G16B rollback proof)"
+    default n
+    help
+        Reviewer-only image for the G16B acceptance step "an image that fails
+        its self-test rolls back automatically". Built by
+        `boards/sticks3/tools/build.sh build-selftest-fail` into its own build
+        directory and archive (version suffix -stfail). Never set it in a normal build.
+config GUARDIAN_BLE_SPIKE
+    bool "SPIKE ONLY: passive BLE scanning beside Wi-Fi capture (G16H coexistence measurement)"
+    depends on BT_NIMBLE_ENABLED
+    default n
+    help
+        G16H spike image: adds the BLESPIKE console command, which alternates
+        phases without and with PASSIVE BLE scanning (observer role only,
+        no scan requests, nothing transmitted) and reports what the scanning
+        costs the Wi-Fi capture of the selected AP. Built by
+        `boards/sticks3/tools/build.sh build-ble-spike` into its own build
+        directory and archive (version suffix -blespk). Never in a normal build.
+config GUARDIAN_ART_BENCH
+    bool "BENCH ONLY: boot into the art bench (G16Q candidate portraits on the glass)"
+    default n
+    help
+        G16Q art bench image: the same app boots into a bench screen that shows the
+        candidate renderings of the approved v4 portraits (firmware/art/bench, made
+        by tools/art/candidates.py) one at a time. FRONT = next candidate, SIDE =
+        backlight 60/80/100 %, STATUS bench=<name>. The self-fetch poll, the signed
+        update and the boot self-test stay; the Wi-Fi driver is started for that
+        poll only and nothing is captured. The 3D head frame sets are left out to
+        make room. Built by `boards/sticks3/tools/build.sh build-art-bench` into
+        its own build directory and archive (version suffix -bench). Never in a
+        normal build.
+config GUARDIAN_CRED_HMAC_KEY_ID
+    int "eFuse key block (0..5) holding the HMAC key of the credential vault (G16M)"
+    range 0 5
+    default 0
+    help
+        The Wi-Fi credential is stored in the "nvs_cred" partition with NVS
+        encryption. Its XTS keys are derived at boot by the HMAC peripheral
+        from the key in eFuse block KEY<n> (purpose HMAC_UP). The firmware only
+        reads: it never generates or burns that key. The owner burns it once
+        over USB with espefuse (firmware/README.md, "Credential vault"). While
+        the block has no such key the vault is absent and the credential stays
+        in the plain record (STATUS cred_store=plain cred_vault=no_key).
+endmenu

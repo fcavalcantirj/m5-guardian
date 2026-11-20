@@ -1,0 +1,14 @@
+# G14 on-device validation — 2026-11-16T14:41:20Z
+board: LAB-STICK-1 (StickS3), port /dev/cu.usbmodem101
+flashed archive: builds/20261115-171921-22108-sticks3
+bin sha256:  1b77e719d4472f3a... (esptool 'Hash of data verified')
+elf sha256:  bc741e8dfd97e030... == archive COMPLETE.json (match)
+rollback image: $GUARDIAN_STORE/backups/stick-backup-pre-g14-20261116-112505.bin (ca5edf02)
+
+boot: guardian_sticks3, app offset 0x10000, 8MB PSRAM OK, IDF v5.4
+
+STATUS line after boot:
+G14 STATUS control=companion onboarding=0 screen=Face mode=LIVE selected=AE:4C:5A:EE:70:23 radio=3 store=1 alert=0 face=0 overlay=2 picker=16 picker_dropped=394 heap_internal_min=96323 task_stack_free=4448
+
+AGENT-VERIFIED: companion boot; NVS persistence (store=1 Restored, selection+onboarding survived flash-erase+reset); heap 96kB; stack free 4448B (12KB task); picker_dropped=394 = 16-slot pending overflow in dense RF (expected).
+PENDING FELIPE HANDS: button nav/feel (A/B short+hold, picker choose/cancel), DEMO<->LIVE gesture, AP-off no-data screen, controlled-incident ALERT.

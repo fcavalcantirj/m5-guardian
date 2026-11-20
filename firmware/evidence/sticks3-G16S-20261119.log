@@ -1,0 +1,51 @@
+G16S burst forensics — device evidence (supervisor log), started 2026-11-19
+
+== Worker attempt ==
+attempt 20261119-010316-486500-task-38, receipt awaiting_review (READY FOR REVIEW, handed off ~02:08)
+watcher SUMMARY ralph-watch/G16S-20261119-010316-486500-task-38 (snapshot 02:09:34, checked 02:14:48):
+  RC_host_plain=0 RC_host_asan=0 (52/52 each) RC_tools=0 (103) RC_bs=0 (41) RC_build=0
+reviewer decisions (Author, confirmed in source by supervisor): tune::wifi::kMaxReply 4096 -> 8192 is a PSRAM buffer
+  allocated once (tune_link.cpp:17); status_line 6144 sits in the PSRAM TextBuffers (measurement_main.cpp:171, :1474),
+  not on the 6144-byte tune_link task stack; tools/tune_session.py reads up to 8192.
+
+== Shipped image ==
+watcher archive builds/20261119-021247-95167-sticks3, version guardian-20261119-021247
+signed sha256 c88ecdd2db1892245ae15929a6884660f528dc968511613c0d358ae44957f89f (matches SHA256SUMS)
+inside the signed image: last_burst_network=, last_burst_area=, same_name=, unlisted present;
+  16/16 portrait .rgb565 (G16Q D) byte-exact
+
+== Install by self-fetch ==
+tools/ota_serve.py :8070, 02:17: GET /tune/offer 404, GET /manifest 200, GET /image 200, sent 2887680 bytes
+STATUS after install (uptime_s=123): app_version=guardian-20261119-021247 last_update_result=ok:guardian-20261119-021247
+  selftest=display:1,store:1,radio:1,imu:0 tune_version=1.31 alert=0 twin=1
+  same_name=0 same_name_evicted=0 last_burst_network=none last_burst_area=none
+  => the longer STATUS reply (8192 B buffer) arrived whole over the TUNE poll
+log: builds/ralph-watch/G16S-20261119-010316-486500-task-38/{serve-guardian.log,tune-status-after-install.log}
+
+== Owner Bruce run (pending) ==
+one Bruce deauth against the owner's own network name; then read last_burst_network / last_burst_area tuples
+(a1/a2/bssid/ch:n) over TUNE STATUS and send them to the Author for the G16R fix direction.
+
+== Overnight gap (measured, cause unknown) ==
+supervisor STATUS reader started ~02:25; its first reply came back 12:09:17 (cause of the gap unknown).
+12:09:17 STATUS: uptime_s=35 wake_cause=none power=battery batt=4106mV/100% app_version=guardian-20261119-021247
+  last_burst_network=none last_burst_area=none => the stick restarted ~12:08:40 (who/why unknown);
+  a restart clears the burst records, so nothing from before 12:08 is readable.
+12:10:43 STATUS: uptime_s=122, records none/none, imu=running, imu_samples=22001.
+IMU: imu=running@0x68 on every read (imu_samples 22001 -> 45541 -> 68843); selftest imu:0 is the boot snapshot,
+  same value on the previous image => not a regression.
+
+== Owner Bruce run, ~12:12 (stick powered since 12:08; reported by the Author session) ==
+STATUS 12:12:46 (Author's read, uptime_s=243; raw: wifi-lab session scratchpad tune-status-1209.log) and
+STATUS 12:14:43 (supervisor, uptime_s=361; builds/ralph-watch/G16S-20261119-010316-486500-task-38/tune-status-1215.log):
+  selected=OWNER-AP-1 alert=0 same_name=0 same_name_evicted=0
+  disconnect (Network): frames=20268 events=3 incidents=0 last=none
+  area_disconnect:      events=40 incidents=1 last=156s
+  last_burst_network=none
+  last_burst_area=rule:deauth_broadcast,total:40,unlisted:0,tuples:7,age_s:156,open:0,top:ffffffffffff/AIR-2/AIR-2/11:9;ffffffffffff/AIR-3/AIR-3/11:9;ffffffffffff/AIR-4/AIR-4/11:9;ffffffffffff/AIR-5/AIR-5/11:9
+reading (measured): 40 broadcast deauths on channel 11, each sent as from an access point to everyone (a2 = bssid);
+  7 access points, the top 4 at 9 frames each (36); the other 3 tuples share 4 frames and are NOT printed (STATUS shows
+  the top 4). The selected network's address is not in the top 4. The Network detector counted 3 events, below its
+  threshold, so no Network incident; the Area detector fired => amber.
+  Not shown by the record: whether the selected address is among the 3 unprinted tuples (inferred from events=3).
+=> sent to the Author; Author's direction: row G16T (an Area burst that also touches the owner's network is Network scope).

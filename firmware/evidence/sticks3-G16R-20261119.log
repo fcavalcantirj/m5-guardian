@@ -1,0 +1,37 @@
+G16R "your network is its name" — device evidence (supervisor log), started 2026-11-19
+
+== Worker attempt ==
+attempt 20261118-223635-179813-task-37, receipt awaiting_review (READY FOR REVIEW, 23:59:18)
+watcher SUMMARY ralph-watch/G16R-20261118-223635-179813-task-37: host plain 52/52, asan 52/52, tools 103, build-support 41,
+signed build RC=0
+supervisor review: G16R tests use synthetic addresses only (constraint 4 clean). Two OLDER files hard-code the owner's
+router address (lab/live/deauth_truth.py 2026-11-16, also the network name; tools/tests/test_live_matrix.py) — reported
+to the owner, not changed (outside G16R)
+
+== Image on the stick ==
+guardian-20261119-001104 (G16R + G16Q part 2), by self-fetch 2026-11-19 ~00:20 (ota_serve GET /manifest, GET /image 2887680 B)
+STATUS after install: last_update_result=ok:guardian-20261119-001104 selftest=display:1,store:1,radio:1,imu:0 tune_version=1.31
+logs: builds/ralph-watch/G16Q-part2-G16R-supervisor-20261119-r2/{serve-guardian.log,tune-status-after-install.log,tune-status-plus10min.log}
+
+== Baseline before any attack (no Bruce) ==
+uptime_s=123: same_name=0 same_name_evicted=0 alert=0; disconnect frames=8063 events=0 incidents=0; area_disconnect events=2 incidents=0
+uptime_s=721: same_name=0 same_name_evicted=0 alert=0 (twin=1 = the same-name watch is ON, TUNE detect.twin; not a twin found)
+=> after 12 min only the selected address (plus approved ones) advertises the picked name on the locked channel.
+   Implication: if Bruce's target for "your own name" is another address, it is not one that beacons the name here;
+   the owner's run decides (open question: Bruce's target address).
+
+== Owner runs (pending, morning 2026-11-19) ==
+1. Bruce deauth against his own network name: expect RED within the 10 s window; read STATUS disconnect + same_name after.
+2. Bruce deauth against a neighbour's name: expect amber (area_disconnect), disconnect incidents unchanged.
+
+== Owner run 1 (reported by the Author session, 2026-11-19) ==
+~00:23 Bruce deauth against the owner's own network name, image guardian-20261119-001104: AMBER (not RED)
+STATUS 00:28: area_disconnect events=16 incidents=1; same_name=0 same_name_evicted=0
+=> the G16R same-name set was empty: no second address advertising the name was heard, so nothing matched.
+   Cause UNKNOWN (not guessed). Next: USB ground-truth capture with lab/live/deauth_truth.py for one Bruce burst (Author),
+   decoded frames show which addresses Bruce uses. G16R NOT accepted; supervisor holds all serving/TUNE on :8070.
+
+== Accepted 2026-11-19 (supervisor) with G16S and G16T ==
+RED on the glass for the owner's own name (video 13:28, $GUARDIAN_STORE/evidence-raw/20261119-G16T/) and own:4 in
+last_burst_network at 13:47 on guardian-20261119-133525; same_name stayed 0 here, the RED came through the G16T rule.
+Details: firmware/evidence/sticks3-G16T-20261119.log.

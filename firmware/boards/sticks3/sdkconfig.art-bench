@@ -1,0 +1,10 @@
+# G16Q art bench image, applied on top of sdkconfig.defaults by `tools/build.sh build-art-bench`
+# (own build directory, archive and version suffix -bench). Never part of a normal build.
+#
+# The same app, booting into the art bench: the candidate renderings of the approved v4 portraits
+# (firmware/art/bench, made by tools/art/candidates.py), one at a time on the glass. FRONT = next
+# candidate, SIDE = backlight 60/80/100 %, STATUS bench=<name>. The self-fetch poll, the signed
+# update and the boot self-test stay, so the next image lands by itself. The Wi-Fi driver is started
+# for that poll only: nothing is captured (no promiscuous listening), and the image holds no 3D head
+# frame sets (their room in the OTA slot goes to the bench frames).
+CONFIG_GUARDIAN_ART_BENCH=y

@@ -1,0 +1,36 @@
+# name: beacon_hidden_nul_ssid
+# kind: beacon
+# provenance: Hidden network that keeps its name length: SSID element of 4 NUL bytes. Expected G16E reading: ssid_kind HiddenNul (distinct from the zero-length Hidden), identity length 4, ssid_utf8 false, rsn Valid.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 77
+# expect.fc0: 80
+# expect.bssid: 021122334455
+# expect.rsn_offset: 55
+#
+# [  0] Frame Control
+  80 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  ff ff ff ff ff ff
+# [ 10] Address 2
+  02 11 22 33 44 55
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 291
+  30 12
+# [ 24] Timestamp (TSF, little-endian)
+  33 22 11 00 00 00 00 00
+# [ 32] Beacon Interval 100 TU
+  64 00
+# [ 34] Capability Information 0x0011
+  11 00
+# [ 36] SSID element (9.4.2.2), 4 bytes
+  00 04 00 00 00 00
+# [ 42] Supported Rates (9.4.2.3): 1 2 5.5 11 basic, 6 9 12 18
+  01 08 82 84 8b 96 0c 12 18 24
+# [ 52] DS Parameter Set (9.4.2.4): channel 6
+  03 01 06
+# [ 55] RSNE (9.4.2.24): v1, group CCMP-128, 1 pairwise CCMP-128, 1 AKM PSK (00-0F-AC:2), caps MFPC only (PMF optional)
+  30 14 01 00 00 0f ac 04 01 00 00 0f ac 04 01 00
+  00 0f ac 02 80 00

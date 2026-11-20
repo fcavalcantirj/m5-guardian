@@ -1,0 +1,36 @@
+# name: beacon_element222
+# kind: beacon
+# provenance: Open, hidden beacon carrying a 40-byte payload in element 222 from BSSID de:ad:be:ef:de:ad. Expected G16E reading: element222 count 1, 40 bytes, a bounded 32-byte head copy; status Complete.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 93
+# expect.fc0: 80
+# expect.bssid: deadbeefdead
+#
+# [  0] Frame Control
+  80 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  ff ff ff ff ff ff
+# [ 10] Address 2
+  de ad be ef de ad
+# [ 16] Address 3 (BSSID for these management frames)
+  de ad be ef de ad
+# [ 22] Sequence Control: fragment 0, sequence 291
+  30 12
+# [ 24] Timestamp (TSF, little-endian)
+  33 22 11 00 00 00 00 00
+# [ 32] Beacon Interval 100 TU
+  64 00
+# [ 34] Capability Information 0x0001
+  01 00
+# [ 36] SSID element (9.4.2.2), 0 bytes = hidden/zero-length
+  00 00
+# [ 38] Supported Rates (9.4.2.3): 1 2 5.5 11 basic, 6 9 12 18
+  01 08 82 84 8b 96 0c 12 18 24
+# [ 48] DS Parameter Set (9.4.2.4): channel 6
+  03 01 06
+# [ 51] Element ID 222 (not assigned by IEEE 802.11-2020 Table 9-92 to a public element; some community devices carry a JSON status here), 40 bytes
+  de 28 7b 22 6e 61 6d 65 22 3a 22 6c 61 62 2d 75
+  6e 69 74 22 2c 22 66 61 63 65 22 3a 22 28 6f 5f
+  6f 29 22 2c 22 65 70 6f 63 68

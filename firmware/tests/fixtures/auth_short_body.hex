@@ -1,0 +1,24 @@
+# name: auth_short_body
+# kind: auth
+# provenance: Counterexample for G16E: authentication body of 4 bytes (Status Code missing). Expected G16E reading: Malformed, ShortFixedBody, auth_valid false (no algorithm reported).
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 28
+# expect.fc0: b0
+# expect.bssid: 021122334455
+#
+# [  0] Frame Control
+  b0 00
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  02 11 22 33 44 55
+# [ 10] Address 2
+  02 aa bb cc dd ee
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 18
+  20 01
+# [ 24] Authentication Algorithm Number 0
+  00 00
+# [ 26] Transaction 1; the 2-byte Status Code is missing
+  01 00

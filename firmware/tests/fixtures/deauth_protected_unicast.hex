@@ -1,0 +1,26 @@
+# name: deauth_protected_unicast
+# kind: deauth
+# provenance: Unicast deauthentication with the Protected Frame bit set. Expected G04 reading: kind Deauthentication, protected_frame true, status Unsupported, reason_readable false, header_valid true.
+# generator: firmware/tests/fixtures/make_fixtures.py (hand-assembled from IEEE 802.11-2020; no capture, no third-party decoder)
+# expect.length: 42
+# expect.fc0: c0
+# expect.bssid: 021122334455
+#
+# [  0] Frame Control
+  c0 40
+# [  2] Duration
+  00 00
+# [  4] Address 1
+  02 aa bb cc dd ee
+# [ 10] Address 2
+  02 11 22 33 44 55
+# [ 16] Address 3 (BSSID for these management frames)
+  02 11 22 33 44 55
+# [ 22] Sequence Control: fragment 0, sequence 6
+  60 00
+# [ 24] CCMP header: PN0 PN1, reserved, KeyID/ExtIV byte 0x20, PN2..PN5
+  01 00 00 20 00 00 00 00
+# [ 32] encrypted Reason Code (placeholder bytes)
+  5a 5a
+# [ 34] CCMP MIC (placeholder)
+  00 00 00 00 00 00 00 00
