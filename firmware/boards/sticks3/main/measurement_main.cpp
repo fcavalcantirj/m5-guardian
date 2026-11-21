@@ -72,9 +72,8 @@
 #include "art_bench.hpp"   // G16Q: used only under CONFIG_GUARDIAN_ART_BENCH (art bench build variant)
 #include "esp_sleep.h"
 #include "esp_attr.h"
-#if CONFIG_GUARDIAN_DARK_CPU
-#include "esp_pm.h"        // G23: the CPU frequency while dark (dark-cpu build variant only; needs CONFIG_PM_ENABLE)
-#endif
+#include "esp_pm.h"        // G23 dark-cpu variant; G24: 80 MHz light sleep while a cycled guard has the radio off (CONFIG_PM_ENABLE)
+#include "guardian/guard_cycle.hpp"   // G24: the guard listen cycle on battery
 #include "driver/rtc_io.h"
 #include <sys/time.h>
 #include "sdkconfig.h"
@@ -173,7 +172,7 @@ struct TextBuffers {
     char wire_line[grx::max_packet*2+7];
     char state_line[8192];      // G16F: 14 detector records in the G13 JSON
     char snapshot_line[8256];   // one USB write keeps state prefix/body together
-    char status_line[7848];     // G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
+    char status_line[8120];     // G24: + settings= / guard_cycle= / parts= (272); G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
     char detect[2048];          // G16E/G16F: per-detector counters (14), air meter, area observations
     char bursts[measurement::Monitor::burst_text_max];   // G16S: last_burst_network= / last_burst_area= (its own buffer: never lost with `detect`)
     char frames_reply[1024];
@@ -458,6 +457,15 @@ void apply_cpu(std::uint16_t mhz) {
 }
 #endif
 guardian::battery::Phase battery_phase();
+// G24: the guard levers (defined beside the radio hand-over, below).
+namespace levers {
+void locked(Millis now);
+std::size_t status_text(char* out,std::size_t capacity);
+bool light_sleep();
+void release(Millis now);
+}
+// G24: the backlight percent while lit: the owner's BRIGHTNESS (its draft while the page is shown).
+std::uint8_t lit_pct();
 // G23: the setting values in effect, for BATTRUN's drain segments (a change on battery starts a new segment).
 guardian::battery::Settings battery_settings() {
     guardian::battery::Settings v;
@@ -764,6 +772,17 @@ void companion_status() {
         std::snprintf(energy,sizeof energy," ota_auto_batt_s=%d poll_s=%u cpu_mhz=%u dark_cpu_mhz=%u dark_cpu=%s cpu_set_fail=%u cpu_switches=%u",
             batt_s<0.0f?-1:int(std::lround(batt_s)),unsigned(poll_period_ms(power_source.source()==gp::Source::Battery)/1000u),
             unsigned(cpu_applied_mhz),unsigned(dark_mhz()),dark_cpu_built?"built":"unbuilt",cpu_set_fail,cpu_switches);}
+    char g24[272];   // G24: " settings=... guard_cycle=... parts=..." (each one space-free token)
+    {   std::size_t used=0;g24[0]=0;
+        char a[companion::settings_status_max],b[companion::guard_cycle_status_max],c[companion::parts_status_max];
+        if(!companion::settings_status(app->device(),app->settings_store(),a,sizeof a))std::snprintf(a,sizeof a,"settings=status_overflow");
+        if(!levers::status_text(b,sizeof b))std::snprintf(b,sizeof b,"guard_cycle=status_overflow");
+        companion::PartsRead pr;
+        if(board_ptr){board_ptr->read_parts(pr.pwr_cfg,pr.gpio_out,pr.ir_oe,pr.ir_level);pr.codec_0d=board_ptr->i2c_read(gp::es8311_addr,0x0D);}
+        if(!companion::parts_status(pr,c,sizeof c))std::snprintf(c,sizeof c,"parts=status_overflow");
+        const int n=std::snprintf(g24,sizeof g24," %s %s %s",a,b,c);
+        used=n>0?static_cast<std::size_t>(n):0;if(used>=sizeof g24)g24[0]=0;
+    }
     char power[640];gp::status_text(idle,power_source.source(),power_source.last_vin_mv(),static_cast<std::uint32_t>(clock_ptr->now()),
         wake_info,retained,wake_guard.swallowed(),power,sizeof power);
     {   // G16N: the last incident wake's latency (ms from the evidence instant; -1 = none since boot)
@@ -801,7 +820,7 @@ void companion_status() {
         " shakes=%u bursts=%u burst_ram=%s burst_ram_bytes=%u"
         " head=%s head_sets=%u/%u head_frames=%u head_refused=%s head_at=%d:%d,%d head_inflates=%u head_reuses=%u head_fail=%u:%s head_ms=%u.%u/%u.%u head_ram=%s head_ram_bytes=%u"
         " rx_received=%u rx_queue_full=%u rx_discarded=%u rx_bad=%u lock_losses=%u last_lock_loss=%s %s %s %s"
-        " tune_wifi=%s tune_wifi_last_end=%s tune_wifi_commands=%u tune_wifi_refused=%u %s tune_key=%s%s%s%s%s%s%s\n",
+        " tune_wifi=%s tune_wifi_last_end=%s tune_wifi_commands=%u tune_wifi_refused=%u %s tune_key=%s%s%s%s%s%s%s%s\n",
         control==Control::Console?"console":"companion",unsigned(app->onboarding()?app->onboarding_page()+1:0),screen_text(v.screen),view_mode_text(v.mode),v.has_selection?v.selected_bssid.c_str():"none",
         int(radio_state()),int(app->store()),int(v.alert),int(v.face),int(v.overlay),unsigned(app->presenter().picker().count),unsigned(app->presenter().picker().dropped),
         unsigned(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),unsigned(uxTaskGetStackHighWaterMark(nullptr)),
@@ -823,7 +842,7 @@ void companion_status() {
         unsigned(radio.received()),unsigned(radio.queue_full()),unsigned(radio.discarded()),unsigned(radio.bad()),
         unsigned(survey.lock_losses()),measurement::Survey::loss_text(survey.last_loss()),lock_by,silence_log,link,
         tune_wifi,guardian::tune::wifi::end_text(tune_session.end()),unsigned(tune_session.commands()),unsigned(tune_session.refused()),
-        offers,tune_key.loaded()?"ota":tune_key_read?"none":"unread",power,energy,detect,bursts,datapath,setup_text);
+        offers,tune_key.loaded()?"ota":tune_key_read?"none":"unread",power,energy,g24,detect,bursts,datapath,setup_text);
 #if CONFIG_GUARDIAN_ART_BENCH
     bench_status_append(line,sizeof line);   // G16Q: " bench=<name> ..." before the line's newline
 #endif
@@ -1227,7 +1246,7 @@ void companion_drain() {
             const auto* observation=monitor->last_security();   // no Snapshot copy on the main stack
             const auto advertised=observation && observation->settings.ds_channel_present?observation->settings.ds_channel:0;
             const bool locked=survey.locked();survey.observed(packet.meta.channel,packet.meta.acquired.at,advertised,packet.meta.rssi_dbm);
-            if(!locked && survey.locked())stable_since=clock_ptr->now();
+            if(!locked && survey.locked()){stable_since=clock_ptr->now();levers::locked(stable_since);}   // G24: relock after a restart
         }
     }
 }
@@ -1272,7 +1291,10 @@ bool companion_step(Millis now,bool front,bool side) {
         for(const auto a:actions) {
             if(a==Action::None || suppress)continue;
             if(update_confirm.is_open()){yes|=a==Action::Primary;no|=a==Action::Secondary || a==Action::SecondaryLong || a==Action::PrimaryLong;continue;}
-            if(a==Action::Primary) {   // owner one-handed gesture: FRONT pressed three times fast
+            // G24 (owner, 2026-11-21): FRONT x3 fast (UPDATE, or SETUP with no Wi-Fi stored) counts ONLY on the face. On
+            // Details, the Settings screen and the list FRONT is just "next" however fast it is pressed: stepping pages
+            // fast opened UPDATE on the third press and the fourth answered yes.
+            if(a==Action::Primary && app->presenter().screen()==Screen::Face) {   // owner one-handed gesture: FRONT pressed three times fast
                 const auto t=update_taps.tap(now32);
                 if(t==guardian::ota::TripleTap::Tap::Hold)continue;
                 if(t==guardian::ota::TripleTap::Tap::Fire) {
@@ -1331,6 +1353,83 @@ void companion_radio_resume() {
     companion_radio=companion::RadioState::Discovering;channel=survey.channel();stable_since=last_cover=now;
 }
 void companion_radio_resume();
+// ---- G24: the guard listen cycle on battery (Settings: GUARD ON BATTERY) ----------------------------------
+// The plan is the portable guardian::guard_cycle_plan (host-tested); this applies it. Ported from the G24 spike's
+// mode G (branch spike/power-exp, never merged; MEASURED: 434 awake minutes from full to the floor, 380 cycles,
+// 0 radio, rail or power-management failures, firmware/evidence/sticks3-G24-spike-20261121.log). With a cycled
+// choice, on battery while the screen is Dark (after the 2 s notice): the IMU in its low-power motion mode, the
+// LCD rail cut, the radio stopped in each off period (esp_wifi_stop) and 80 MHz light sleep only while it is
+// off. Anything that lights the screen or USB power restores every lever at once and the radio listens at once.
+namespace levers {
+guardian::CycleStats stats;
+bool radio_off=false,imu_lp=false,light=false,was_dark=false;
+Millis dark_since=0;
+guardian::CycleInput last_in{};
+void radio_power(bool on,Millis now) {
+    if(!radio_initialized)return;
+    if(!on) {
+        if(radio_off)return;
+        survey.stop();
+        const bool ok=(!radio.listening() || radio.stop()) && esp_wifi_stop()==ESP_OK;
+        companion_radio=companion::RadioState::Off;radio_off=true;stats.stopped(now);
+        if(!ok)stats.failed();
+        return;
+    }
+    if(!radio_off)return;
+    radio_off=false;
+    const bool ok=esp_wifi_start()==ESP_OK && esp_wifi_set_ps(WIFI_PS_NONE)==ESP_OK && radio.set_data_path(radio.data_path());
+    stats.resumed(now,ok);
+    companion_radio_resume();
+}
+void rail(bool on) {
+    if(!board_ptr || board_ptr->lcd_rail_on()==on)return;
+    if(!on){if(!board_ptr->lcd_rail(false))stats.failed();return;}
+    if(!board_ptr->lcd_rail(true))stats.failed();
+    backlight_applied=-1;   // the panel was set up again: the next apply_backlight writes
+    for(const auto& w:gp::es8311_power_down)board_ptr->i2c_write(gp::es8311_addr,w[0],w[1]);   // the codec came back with its rail
+    dirty.invalidate();
+}
+void pm_light(bool on) {
+#if CONFIG_GUARDIAN_DARK_CPU
+    (void)on;   // the dark-cpu measurement image owns esp_pm_configure (apply_cpu)
+#else
+    if(light==on)return;
+    esp_pm_config_t c{};c.max_freq_mhz=on?80:gp::cpu_default_mhz;c.min_freq_mhz=c.max_freq_mhz;c.light_sleep_enable=on;
+    if(esp_pm_configure(&c)==ESP_OK)light=on;else stats.failed();
+#endif
+}
+void imu(bool on){if(imu_lp==on)return;sticks3::imu::lowpower(on);imu_lp=on;}
+void apply(const guardian::CyclePlan& p,Millis now) {
+    if(!p.levers){pm_light(false);rail(true);imu(false);radio_power(true,now);return;}   // all at once, the rail first (a frame follows)
+    imu(true);rail(false);
+    if(p.radio_on){pm_light(false);radio_power(true,now);}
+    else {radio_power(false,now);pm_light(p.light_sleep);}
+}
+// After the idle policy each loop. `glass_dark`: the backlight is off (Dark after its 2 s notice).
+void step(gp::State state,bool glass_dark,Millis now) {
+    const bool dark=control==Control::Companion && state==gp::State::Dark && glass_dark;
+    if(dark && !was_dark)dark_since=now;
+    was_dark=dark;
+    guardian::CycleInput in;in.choice=app?app->device().guard:guardian::GuardCycle::Always;
+    in.on_battery=power_source.source()==gp::Source::Battery;in.dark=dark;in.now=now;in.dark_since=dark_since;
+    last_in=in;
+    apply(guardian::guard_cycle_plan(in),now);
+}
+// The update poll (or an owner update) owns the radio: the plan with `updating` (radio on, no light sleep), and
+// the rail back up because the update path may show its screens even while dark. The next loop re-applies.
+void release_for_update(Millis now) {
+    guardian::CycleInput in=last_in;in.now=now;in.updating=true;
+    const auto p=guardian::guard_cycle_plan(in);
+    pm_light(p.light_sleep);rail(true);radio_power(p.radio_on,now);
+}
+void release(Millis now){pm_light(false);rail(true);imu(false);radio_power(true,now);}
+void locked(Millis now){stats.locked(now);}
+bool light_sleep(){return light;}
+std::size_t status_text(char* out,std::size_t capacity) {
+    return companion::guard_cycle_status(app?app->device().guard:guardian::GuardCycle::Always,stats,out,capacity);
+}
+} // namespace levers
+std::uint8_t lit_pct(){return app?app->lit_brightness_pct():sticks3::Board::backlight_active_pct;}
 void update_failed(guardian::ota::Reason why) {
     if(why==guardian::ota::Reason::NotNewer)++ota_not_newer;   // G22A: counted whoever asked (the poll or the owner's gesture)
     if(update_quiet && (why==guardian::ota::Reason::JoinFailed || why==guardian::ota::Reason::ManifestFetch || why==guardian::ota::Reason::NotNewer)) {
@@ -1340,7 +1439,7 @@ void update_failed(guardian::ota::Reason why) {
     ota_record=guardian::ota::Record{};ota_record.state=guardian::ota::State::Failed;ota_record.reason=why;
     const bool saved=guardian::ota::save(*ota_blob,ota_record);
     char line[96];std::snprintf(line,sizeof line,"G16B UPDATE failed reason=%s record=%s\n",guardian::ota::reason_text(why),saved?"saved":"unsaved");text(line);
-    apply_backlight(sticks3::Board::backlight_active_pct);   // G16N: a failed update is shown even when the screen was dark (the loop restores it)
+    apply_backlight(lit_pct());   // G16N: a failed update is shown even when the screen was dark (the loop restores it)
     guardian::ota::View v;v.stage=guardian::ota::Stage::Failed;v.reason=why;show_update(v);
     vTaskDelay(pdMS_TO_TICKS(5000));
 }
@@ -1348,6 +1447,7 @@ void update_failed(guardian::ota::Reason why) {
 // Any failure keeps the running image and resumes passive monitoring.
 void run_update() {
     update_requested=false;
+    levers::release_for_update(clock_ptr->now());   // G24: the join needs the Wi-Fi driver started (and the panel for the update screens)
     text("G16B UPDATE start\n");
     if(!provisioner || !provisioner->provisioned()){update_failed(guardian::ota::Reason::NotProvisioned);return;}
     if(!radio_initialized){update_failed(guardian::ota::Reason::JoinFailed);return;}   // no radio driver (country unset)
@@ -1396,7 +1496,7 @@ void run_update() {
         const bool saved=guardian::ota::save(*ota_blob,ota_record);
         char line[128];std::snprintf(line,sizeof line,"G16B UPDATE installed version=%s slot=%s record=%s rebooting\n",
             outcome.manifest.version.data(),sticks3::ota::slot_text(slot.slot_index()),saved?"saved":"unsaved");text(line);
-        apply_backlight(sticks3::Board::backlight_active_pct);   // G16N: shown even when the screen was dark
+        apply_backlight(lit_pct());   // G16N: shown even when the screen was dark
         guardian::ota::View v;v.stage=guardian::ota::Stage::Installed;v.new_version=outcome.manifest.version.data();show_update(v);
         vTaskDelay(pdMS_TO_TICKS(2000));
         board_restart("update");
@@ -1551,7 +1651,8 @@ int incident_evidence_age_ms() {
 // a restart if the keys could not be armed as the wake source.
 bool sleep_now() {
     char line[96];std::snprintf(line,sizeof line,"G16D SLEEP start still_s=%u\n",unsigned(idle.still_ms(static_cast<std::uint32_t>(clock_ptr->now()))/1000));text(line);
-    apply_backlight(sticks3::Board::backlight_active_pct);
+    levers::release(clock_ptr->now());   // G24: the rail, the radio, the IMU and the CPU as the G16D teardown knows them
+    apply_backlight(lit_pct());
     draw_sleeping();
     for(int i=0;i<100;++i) {
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -1775,6 +1876,11 @@ extern "C" void app_main() {
     // Review 2026-11-17 (device: sleep_codec=failed, codec_boot=ack): the Guardian never uses audio,
     // so the ES8311 is powered down here, at boot, in a known-good bus state; the exact error and
     // register are reported if a write fails (codec_boot=down | nack | write_err:<esp_err>@<reg>).
+    {   // G24 (owner order): every part the Guardian does not use is off from boot: the green status LED, the 5 V boost,
+        // the speaker amplifier and the IR TX gate (G46 held low). STATUS parts= reads them back from the registers.
+        // (No console line here: the USB driver is installed below. A refused write shows as a 1 in parts=.)
+        board.parts_off();
+    }
     if(!board.i2c_present(gp::es8311_addr))codec_boot="nack";
     else {
         static char why[48];codec_boot="down";
@@ -1797,6 +1903,8 @@ extern "C" void app_main() {
     // G14: owner selection from NVS (identity + approved baseline only), then passive listening.
     static sticks3::NvsBlob blob;static companion::EncodedSelectionStore store(blob);
     static sticks3::NvsBlob onboarded("onboarded");   // shown-once welcome pages
+    // G24: the owner's device settings (GUARD ON BATTERY, BRIGHTNESS) in their own versioned, CRC-checked record.
+    static sticks3::NvsBlob settings_blob("settings");static companion::DeviceSettingsStore settings_store(settings_blob);
     // G16B: OTA boot record, provisioning (Wi-Fi + Mac URL), battery run log.
     static sticks3::NvsBlob ota_store("ota");ota_blob=&ota_store;guardian::ota::load(ota_store,ota_record);
     // G16M: the Wi-Fi credential lives in the encrypted vault when this stick has one (the "nvs_cred" partition and
@@ -1826,6 +1934,7 @@ extern "C" void app_main() {
         if(!app){std::printf("GRX1 ERROR companion allocation failed (%u bytes)\n",unsigned(sizeof(companion::Companion)));abort();}
     }
     if(tuning && tune_det_twin>=0)app->set_impostor_watch(tuning->get(tune_det_twin)>=0.5f);   // G16J: before the restore
+    app->attach_settings(settings_store);   // G24: boot() loads it (corrupt or absent: the defaults, STATUS settings=...store:)
     app->boot();companion_radio_start();
     {   // G16B: first frame (display self-test), then validate or roll back this image.
         guardian::battery::Raw raw;board.read_power(raw);battery_state=battery_monitor.update(raw);
@@ -1896,7 +2005,8 @@ extern "C" void app_main() {
             bool front=false,side=false;
             if(buttons_ok){front=board.key_front_down();side=board.key_side_down();}
             const auto now32=static_cast<std::uint32_t>(now);
-            gp::Inputs pin;pin.motion=activity.take();pin.key=front || side;pin.alert=app->presenter().view().alert;
+            // G24: motion also comes from the low-power IMU mode (dark on battery with a cycled guard choice).
+            gp::Inputs pin;pin.motion=activity.take();pin.motion=sticks3::imu::motion_take() || pin.motion;pin.key=front || side;pin.alert=app->presenter().view().alert;
             // G16N: every new incident report (red or amber) is activity; the floor reads the filtered battery percent.
             pin.incident_seq=app->presenter().view().incident_seq;pin.batt_pct=battery_state.known?battery_state.level:-1;
             pin.update=update_confirm.is_open() || update_requested || setup_visible();pin.tune=tune_session.active() || tune_link.running();
@@ -1916,7 +2026,8 @@ extern "C" void app_main() {
             if(gp::wake_press(before,after,pin.key))wake_guard.arm(front,side,now32);   // the press that brightened Dim or lit Dark is not an action
             // G16N: the backlight follows the state every loop (Dark: the dim level for the 2 s notice, then 0),
             // so nothing that lit the screen for a message can leave it lit, or dark, by mistake.
-            const auto glass=gp::glass(after,idle.dark_for_ms(now32),sticks3::Board::backlight_active_pct,dim_backlight_pct());
+            const auto glass=gp::glass(after,idle.dark_for_ms(now32),lit_pct(),dim_backlight_pct());   // G24: the owner's BRIGHTNESS
+            levers::step(after,after==gp::State::Dark && glass.backlight_pct==0,now);   // G24: before the backlight (a restored rail is set up first)
             apply_backlight(glass.backlight_pct);glass_frames=glass.frames;
 #if CONFIG_GUARDIAN_DARK_CPU
             apply_cpu(gp::cpu_mhz(after,dark_mhz()));   // G23: the dark-cpu image only (STATUS cpu_mhz, cpu_set_fail)
@@ -2080,6 +2191,6 @@ extern "C" void app_main() {
                 redraw.drawn(draw_now,v.last_seen_known,v.last_seen_ms,Core::fresh_ms);
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(levers::light_sleep()?100:1));   // G24: room for light sleep while a cycled guard has the radio off (spike mode G)
     }
 }

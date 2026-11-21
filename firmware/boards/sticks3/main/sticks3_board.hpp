@@ -71,6 +71,22 @@ public:
     // panel's own power-on gamma the only certain way, a hardware reset and the normal setup again (the
     // glass is blank until the next full frame). False when a panel call failed.
     bool set_panel_gamma(bool on, const std::uint8_t* positive14, const std::uint8_t* negative14);
+    // G24 (ported from the never-merged spike/power-exp levers, MEASURED in firmware/evidence/sticks3-G24-spike-20261121.log):
+    // the unused parts off from boot: the green status LED (PM1 PWR_CFG 0x06 bit 4), the 5 V boost (bit 3), the
+    // speaker amplifier (PM1 GPIO_OUT bit 3) and the IR TX gate G46 driven low with pad hold. Never the PM1 IRQ
+    // line (GPIO1, owner order #29). True when every write was accepted.
+    bool parts_off();
+    // Register reads behind STATUS parts= (-1 = the read failed): PM1 PWR_CFG and GPIO_OUT, G46 output enable and
+    // the level its output register drives.
+    void read_parts(int& pwr_cfg, int& gpio_out, int& ir_oe, int& ir_level) const;
+    // G24: the LCD rail (PM1 GPIO2, which also feeds the audio LDO: schematic CM1801 3V3_L3B_AU enabled by PYG2_L3B_EN).
+    // Off: backlight 0, rail cut. On: rail up, the boot settle, the full panel setup (the caller redraws a whole
+    // frame and re-sends the ES8311 power-down: the codec comes back with its rail). False when a step failed.
+    bool lcd_rail(bool on);
+    bool lcd_rail_on() const { return rail_on_; }
+    // One register of another device on the internal bus (never the PM1): the value, or -1 (no ACK / error).
+    int i2c_read(std::uint8_t addr, std::uint8_t reg);
+    // G24: the backlight percent while lit before the owner's Settings choice is known (Settings: BRIGHTNESS, default 60).
     static constexpr std::uint8_t backlight_active_pct = 60;   // init duty 153/255
     static constexpr int width = screen_w;
     static constexpr int height = screen_h;
@@ -93,6 +109,7 @@ private:
     void* panel_io_{nullptr}; // esp_lcd_panel_io_handle_t
     void* i2c_bus_{nullptr};  // i2c_master_bus_handle_t
     void* pm1_dev_{nullptr};  // i2c_master_dev_handle_t
+    bool rail_on_{true};      // G24: the LCD rail as lcd_rail() left it
 };
 
 // G16P: the PM1 power registers alone, for the timer-wake USB check that runs BEFORE Board::init().

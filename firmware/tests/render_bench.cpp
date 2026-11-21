@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
     const std::uint32_t reuses_3d = cache.reuses - reuses_before_3d;
     clock.at += Core::fresh_ms + 1000; c.tick();
     print("nodata-rest", run(c, clock, st, art.set, &cache, false, frames / 4));
-    c.input(Action::PrimaryLong);   // DEMO
+    c.set_demo(true);   // DEMO (G24 retry: the direct method; no key enters DEMO)
     print("demo-rest", run(c, clock, st, art.set, &cache, false, frames / 4));
     std::printf("cache copies=%u warps=%u reuses=%u\n", cache.copies, cache.warps, cache.reuses);
     if (argc > 3 && std::strcmp(argv[3], "--check") == 0) {

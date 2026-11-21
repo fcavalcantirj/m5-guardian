@@ -247,11 +247,23 @@ class BuildSupportTests(unittest.TestCase):
   self.assertIn('CONFIG_PM_ENABLE=y',overlay);self.assertIn('CONFIG_GUARDIAN_DARK_CPU=y',overlay)
   self.assertNotIn('CONFIG_PM_DFS_INIT_AUTO=y',overlay)   # boots at the sdkconfig frequency, scaling only while dark
   defaults=(m.PROJECT/'sdkconfig.defaults').read_text()
-  self.assertNotIn('CONFIG_PM_ENABLE=y',defaults);self.assertNotIn('CONFIG_GUARDIAN_DARK_CPU=y',defaults)   # the normal image is unchanged
+  self.assertNotIn('CONFIG_GUARDIAN_DARK_CPU=y',defaults)   # the normal image never runs the dark-cpu policy (G24: PM itself is in every image)
   kconfig=(m.PROJECT/'main/Kconfig.projbuild').read_text()
   block=kconfig[kconfig.index('config GUARDIAN_DARK_CPU'):]
   block=block[:block.index('\nconfig ',1)]
   self.assertIn('depends on PM_ENABLE',block);self.assertIn('default n',block)
+ # ---- G24: power management in every image (the guard cycle's 80 MHz light sleep) -----------------
+ def test_g24_power_management_and_tickless_idle_are_in_every_image(self):
+  defaults=(m.PROJECT/'sdkconfig.defaults').read_text()
+  self.assertIn('\nCONFIG_PM_ENABLE=y\n',defaults)                  # esp_pm_configure refuses everything without it
+  self.assertIn('\nCONFIG_FREERTOS_USE_TICKLESS_IDLE=y\n',defaults) # the idle task can enter light sleep
+  self.assertNotIn('CONFIG_PM_DFS_INIT_AUTO=y',defaults)              # boots at the sdkconfig frequency: no scaling until a lever asks
+  with tempfile.TemporaryDirectory() as d:   # a normal build whose sdkconfig lost power management is refused
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);(b/'sdkconfig').write_text((b/'sdkconfig').read_text().replace('CONFIG_PM_ENABLE=y\n',''))
+   with self.assertRaisesRegex(ValueError,'PM_ENABLE'):m.archive(b,o)
+  with tempfile.TemporaryDirectory() as d:   # and one with it is archived
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);m.archive(b,o)
+   self.assertTrue((o/'COMPLETE.json').exists())
  # ---- G16Q: the art bench image -----------------------------------------------------
  BENCH_VERSION='guardian-20261118-220000-bench'
  def test_art_bench_image_is_labelled_and_never_a_normal_build(self):

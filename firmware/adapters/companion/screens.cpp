@@ -36,6 +36,7 @@ constexpr int zone_top = Frame::face_zone_y, zone_bottom = Frame::face_zone_y + 
 constexpr int hud_y = Frame::hud_y;     // 181
 constexpr int hud_last = 215;           // last 1x HUD row above the hints
 constexpr int hint1_y = 224, hint2_y = 232;
+constexpr int settings_hint1_y = 216, settings_hint2_y = 228;   // G24: the Settings screen's own two hint rows
 // Details pages: title (2 rows), a reserved status slot (2 rows), then the body.
 constexpr int details_title_y = 21, details_status_y = 39, details_body_y = 59, details_body_last = 214;
 constexpr int details_body_rows = (details_body_last - details_body_y) / pitch1 + 1;   // 18
@@ -696,7 +697,7 @@ void compose_onboarding(std::uint8_t page, Frame& f) {
         add(f, 2, 26, cyan, 2, "BLUE");      add(f, 2, 44, color::white, 2, "next / info");
         add(f, 2, 68, cyan, 2, "SIDE");      add(f, 2, 86, color::white, 2, "choose");
         add(f, 2, 110, cyan, 2, "HOLD SIDE"); add(f, 2, 128, color::white, 2, "list");
-        wrap(f, 156, color::grey, "Hold BLUE on the face: demo faces", 200);
+        wrap(f, 156, color::grey, "Hold BLUE: settings", 200);   // G24 retry: hold FRONT opens Settings (no key enters DEMO)
         break;
     default:
         add(f, 2, 2, color::yellow, 2, "Start");        // G16B: clear of the battery corner
@@ -710,13 +711,66 @@ void compose_onboarding(std::uint8_t page, Frame& f) {
 }
 
 // The two hint rows announce a TUNE session instead (any key ends it).
-static void session_hints(Frame& f, const Status& st) {
+// G24: on the Settings screen its own key hints go too (during a session any key only ends it).
+static void session_hints(Frame& f, const Status& st, bool settings) {
     std::uint8_t kept = 0;
-    for (std::uint8_t i = 0; i < f.count && i < f.lines.size(); ++i)
-        if (f.lines[i].y != hint1_y && f.lines[i].y != hint2_y) f.lines[kept++] = f.lines[i];
+    for (std::uint8_t i = 0; i < f.count && i < f.lines.size(); ++i) {
+        const int y = f.lines[i].y;
+        if (y == hint1_y || y == hint2_y || (settings && (y == settings_hint1_y || y == settings_hint2_y))) continue;
+        f.lines[kept++] = f.lines[i];
+    }
     f.count = kept;
     add(f, 2, hint1_y, color::yellow, 1, "TUNE WI-FI %us", unsigned(st.tune_session_s));
     add(f, 2, hint2_y, cyan, 1, "any key: end tune");
+}
+
+// G24: the Settings screen, exactly the owner-approved look (firmware/evidence/sticks3-G24-settings-look-20261121.png,
+// "perfect", 2026-11-21): one big option per page, its MEASURED battery hours (or "not measured yet"), the
+// highest / lowest measured marked, the cost in amber, the SAVED / SAVE FAILED plate and the key hints. The
+// existing font and colours only; the battery indicator is the board's, as on every screen.
+int settings_centred(const char* t, int scale) { return std::max(0, (Frame::width - text_w(t, scale)) / 2); }
+void settings_line(Frame& f, int y, int scale, std::uint16_t c, const char* t) { add(f, settings_centred(t, scale), y, c, static_cast<std::uint8_t>(scale), "%s", t); }
+void settings_screen(const Presenter& p, Frame& f) {
+    const auto& sv = p.settings();
+    const bool guard = sv.page == SettingsPage::Guard;
+    f.header_color = color::grey;
+    plate(add(f, 0, Frame::tag_y, color::black, 1, "SETTINGS %u/%u", unsigned(sv.number), unsigned(settings_pages)), color::grey);
+    settings_line(f, 26, 1, color::grey, guard ? "GUARD ON BATTERY" : "BRIGHTNESS");
+    add(f, 2, 78, color::grey, 2, "<");
+    add(f, Frame::width - 14, 78, color::grey, 2, ">");
+    Hours hours; Extreme mark = Extreme::None;
+    char cost1[40] = "", cost2[40] = "";
+    if (guard) {
+        const auto g = sv.shown.guard;
+        switch (g) {
+        case GuardCycle::Always: settings_line(f, 76, 2, color::white, "ALWAYS"); break;
+        case GuardCycle::Every30s: settings_line(f, 64, 2, color::white, "EVERY"); settings_line(f, 86, 2, color::white, "30 S"); break;
+        case GuardCycle::EveryMinute: settings_line(f, 64, 2, color::white, "EVERY"); settings_line(f, 86, 2, color::white, "MINUTE"); break;
+        }
+        hours = guard_hours(g); mark = guard_extreme(g);
+        const auto t = cycle_timing(g);
+        if (t.off_ms == 0) std::snprintf(cost1, sizeof cost1, "never blind");
+        else {   // docs/G23-delivery.md section 11.4: up to one off period late, a burst inside it is not counted
+            std::snprintf(cost1, sizeof cost1, "alert up to %us late", unsigned(t.off_ms / 1000));
+            std::snprintf(cost2, sizeof cost2, "short bursts missed");
+        }
+    } else {
+        char big[16]; std::snprintf(big, sizeof big, "%u%%", unsigned(sv.shown.bright_pct));
+        settings_line(f, 76, 3, color::white, big);
+        hours = brightness_hours(sv.shown.bright_pct); mark = brightness_extreme(sv.shown.bright_pct);
+        std::snprintf(cost1, sizeof cost1, "costs only while lit");
+    }
+    char h[16] = "";
+    if (hours.measured && hours_text(hours.minutes, h, sizeof h)) settings_line(f, 120, 2, color::white, h);
+    else settings_line(f, 126, 1, color::grey, "not measured yet");
+    if (mark == Extreme::Lowest) settings_line(f, 142, 1, color::grey, "lowest, measured");
+    else if (mark == Extreme::Highest) settings_line(f, 142, 1, color::green, "highest, measured");
+    if (cost1[0]) settings_line(f, 166, 1, amber, cost1);
+    if (cost2[0]) settings_line(f, 177, 1, amber, cost2);
+    if (sv.plate == SavePlate::Saved) plate(add(f, settings_centred("   SAVED   ", 2), 196, color::black, 2, "   SAVED   "), color::green);
+    else if (sv.plate == SavePlate::Failed) plate(add(f, settings_centred("SAVE FAILED", 2), 196, color::white, 2, "SAVE FAILED"), color::red);
+    settings_line(f, settings_hint1_y, 1, color::grey, "FRONT next  SIDE back");
+    settings_line(f, settings_hint2_y, 1, color::grey, "hold FRONT = save");
 }
 
 void compose(const Presenter& p, const Status& st, Frame& f) {
@@ -725,8 +779,9 @@ void compose(const Presenter& p, const Status& st, Frame& f) {
     case Screen::Face: face_screen(p, st, f); break;
     case Screen::Details: details_screen(p, st, f); break;
     case Screen::Picker: picker_screen(p, st, f); break;
+    case Screen::Settings: settings_screen(p, f); break;   // G24
     }
-    if (st.tune_session_s) session_hints(f, st);
+    if (st.tune_session_s) session_hints(f, st, p.screen() == Screen::Settings);
 }
 
 void compose_dim(const Presenter& p, const Status& st, Frame& f) {

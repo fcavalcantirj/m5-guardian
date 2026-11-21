@@ -515,8 +515,8 @@ GUARDIAN_CASE(calm_starts_the_reform_and_lands_exactly) {
         }
         std::printf("     %s: reform began %u ms and landed %u ms after the hand stopped\n", name, unsigned(reform_at - still_from), unsigned(landed_at - still_from));
         CHECK(reform_at != 0); CHECK(landed_at != 0); CHECK_EQ(grew, 0); CHECK(!r.b->active());
-        CHECK(reform_at - still_from >= 600 && reform_at - still_from <= 600 + 40);      // burst.calm_s, default 0.6 s
-        CHECK(landed_at - still_from >= 2600 && landed_at - still_from <= 2600 + 80);    // "it reforms in about 2.6 s"
+        CHECK(reform_at - still_from >= 1000 && reform_at - still_from <= 1000 + 40);    // burst.calm_s, default 1.0 s (G24: from 0.6)
+        CHECK(landed_at - still_from >= 3000 && landed_at - still_from <= 3000 + 80);    // 1.0 s calm + the 2.0 s reform
         persona::paint_portrait(want.canvas, r.art.data(), 0, persona::Placement{zone, 0, 0, 0}, persona::Layers{true, false, false}, still, false);
         int differing = 0; for (std::size_t i = 0; i < last.px.size(); ++i) differing += last.px[i] != want.px[i];
         CHECK_EQ(differing, 0);                                         // the landed frame IS the still portrait
@@ -535,7 +535,9 @@ GUARDIAN_CASE(calm_starts_the_reform_and_lands_exactly) {
 
 GUARDIAN_CASE(max_time_always_reforms) {
     const burst::Params d;
-    CHECK_EQ(d.still_dps, 12.0f); CHECK_EQ(d.still_g, 0.10f); CHECK_EQ(d.calm_s, 0.6f); CHECK_EQ(d.max_s, 20.0f); CHECK_EQ(d.total_s, burst::default_total_s);
+    // G24 carry-over (G23 owner run, firmware/evidence/sticks3-G23-20261121.log step 11, still_trace on the slow-tilt
+    // and recorded traces): still_dps 10 (from 12) and calm_s 1.0 (from 0.6): tilt reaches calm 0 times (2 before).
+    CHECK_EQ(d.still_dps, 10.0f); CHECK_EQ(d.still_g, 0.10f); CHECK_EQ(d.calm_s, 1.0f); CHECK_EQ(d.max_s, 20.0f); CHECK_EQ(d.total_s, burst::default_total_s);
     CHECK(d.still_dps >= burst::still_dps_range.lo && d.still_dps <= burst::still_dps_range.hi);
     CHECK(d.still_g >= burst::still_g_range.lo && d.still_g <= burst::still_g_range.hi);
     CHECK(d.calm_s >= burst::calm_s_range.lo && d.calm_s <= burst::calm_s_range.hi);
@@ -590,5 +592,5 @@ GUARDIAN_CASE(a_new_shake_rescatters_a_pile) {
     h.tilt(6000, 0.0f, 8.0f);                                            // the hand keeps moving: it falls and piles again
     CHECK(r.b->phase() == Phase::Drift); CHECK(r.b->resting() * 100 >= r.b->count() * 95);
     int frames = 0; while (r.b->active() && frames++ < 200) h.hold();   // held still: the face comes back
-    CHECK(!r.b->active()); CHECK(frames >= 65 && frames <= 68);         // 0.6 s calm + 2.0 s reform (+ the landed frame)
+    CHECK(!r.b->active()); CHECK(frames >= 75 && frames <= 78);         // 1.0 s calm + 2.0 s reform (+ the landed frame)
 }

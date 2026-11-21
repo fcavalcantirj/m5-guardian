@@ -144,8 +144,8 @@ int main(int argc, char** argv) {
     { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
       Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot(); c.tick(); Status s2 = st; s2.radio = RadioState::Discovering;
       c.render(s2, f); save("01-no-selection", f, in, &batt);
-      // DEMO: five ratings.
-      c.input(Action::PrimaryLong);
+      // DEMO: five ratings (G24 retry: the direct method; no key enters DEMO).
+      c.set_demo(true);
       for (int i = 0; i < 5; ++i) { c.render(st, f); char n[32]; std::snprintf(n, sizeof n, "02-demo-%d-%s", i + 1, mood_text(f.face)); for (char* q = n; *q; ++q) if (*q == ' ') *q = '_'; save(n, f, in, &batt);
           n[0] = '2'; n[1] = '0'; save(n, f, in, &batt, true); c.input(Action::Secondary); }   // 20-demo-*: the dim view
       c.input(Action::PrimaryLong); }
@@ -280,5 +280,31 @@ int main(int argc, char** argv) {
       c.tick(); c.render(st, f); save("21-red-alert-with-amber-nearby", f, in, &batt);
       clock.at += Core::incident_ms + 1000; c.receive(wpa3(clock)); for (std::uint16_t i = 0; i < 5; ++i) c.receive(probe(clock, i));
       c.tick(); c.render(st, f); save("22-radar-verygood-pulse", f, in, &batt); }
+    // G24: the Settings screen through the real Companion (hold FRONT on the face opens it, G24 retry), in the order
+    // of the owner-approved look (firmware/evidence/sticks3-G24-settings-look-20261121.png;
+    // tools/settings_look_compare.py compares 24-settings-1..6 with it pixel by pixel), plus SAVE FAILED.
+    { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob, settings_blob; EncodedSelectionStore store(blob);
+      DeviceSettingsStore settings(settings_blob);
+      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.attach_settings(settings); c.boot(); c.receive(wpa3(clock)); c.tick();
+      c.input(Action::PrimaryLong);   // hold FRONT on the face
+      c.render(st, f); save("24-settings-1-guard-always", f, in, &batt);
+      c.input(Action::Primary); c.render(st, f); save("24-settings-2-guard-30s", f, in, &batt);
+      c.input(Action::Primary); c.render(st, f); save("24-settings-3-guard-1min", f, in, &batt);
+      c.input(Action::PrimaryLong); c.render(st, f); save("24-settings-4-guard-1min-saved", f, in, &batt);
+      clock.at += Presenter::settings_plate_ms; c.tick();
+      for (int i = 0; i < 4; ++i) c.input(Action::Primary);   // 60 -> 80, 100, 10, 30
+      c.render(st, f); save("24-settings-5-brightness-30", f, in, &batt);
+      for (int i = 0; i < 3; ++i) c.input(Action::Primary);   // 60, 80, 100
+      c.render(st, f); save("24-settings-6-brightness-100", f, in, &batt);
+      c.input(Action::Secondary); }
+    { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
+      struct Refusing final : BlobStorage {
+          BlobRead read(std::uint8_t*, std::size_t, std::size_t&) const override { return BlobRead::Absent; }
+          bool write(const std::uint8_t*, std::size_t) override { return false; }
+      } refusing;
+      DeviceSettingsStore settings(refusing);
+      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.attach_settings(settings); c.boot(); c.receive(wpa3(clock)); c.tick();
+      c.input(Action::PrimaryLong); c.input(Action::Primary); c.input(Action::PrimaryLong);
+      c.render(st, f); save("24-settings-7-save-failed", f, in, &batt); }
     return 0;
 }

@@ -385,7 +385,7 @@ GUARDIAN_CASE(demo_mode_is_labelled_and_never_persists_or_changes_selection) {
     Companion c(clock, m, store, lcd(), Origin::Imported); c.boot();
     c.receive(beacon(clock, 1)); c.tick(); pick(c, net(1), Action::Secondary);
     const auto writes = blob.writes;
-    c.input(Action::PrimaryLong); CHECK(c.presenter().view().demo);
+    CHECK(c.set_demo(true)); CHECK(c.presenter().view().demo);   // G24 retry: no key enters DEMO
     Frame f; Status st{}; st.radio = RadioState::Monitoring;
     const Mood moods[] = {Mood::VeryGood, Mood::Good, Mood::Medium, Mood::Bad, Mood::Horrible};
     for (auto mood : moods) {
@@ -396,7 +396,8 @@ GUARDIAN_CASE(demo_mode_is_labelled_and_never_persists_or_changes_selection) {
         c.input(Action::Secondary);
     }
     CHECK_EQ(blob.writes, writes); CHECK(m.scope().selected().network == net(1));
-    c.input(Action::PrimaryLong); CHECK(!c.presenter().view().demo);
+    c.input(Action::PrimaryLong); CHECK(!c.presenter().view().demo);   // hold FRONT in DEMO returns to LIVE
+    CHECK_EQ(c.presenter().screen(), Screen::Face);
     CHECK(c.presenter().view().selected_bssid.text[16] == '1');
 }
 
@@ -549,7 +550,7 @@ GUARDIAN_CASE(demo_very_good_uses_the_portrait_with_an_obvious_demo_badge) {
     Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio);
     MemoryBlob blob; EncodedSelectionStore store(blob);
     Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot();
-    c.input(Action::PrimaryLong); CHECK(c.presenter().view().demo);                // hold blue on the face: DEMO 1/5
+    c.set_demo(true); CHECK(c.presenter().view().demo);                             // DEMO 1/5 (the direct method since G24)
     Frame f; Status st{}; st.radio = RadioState::Monitoring; st.persona_art = true;
     c.render(st, f);
     CHECK_EQ(c.presenter().view().face, Mood::VeryGood);
@@ -648,7 +649,7 @@ GUARDIAN_CASE(every_screen_fits_the_portrait_panel) {
     if (!fits_now(c, st, "no data, old")) ++bad;
     walk_details(c, st, "details (no data)", bad);
     // DEMO: five moods, with and without the portrait art, plus their details.
-    c.input(Action::PrimaryLong); CHECK(c.presenter().view().demo);
+    c.set_demo(true); CHECK(c.presenter().view().demo);
     for (int i = 0; i < 5; ++i) {
         st.persona_art = false; if (!fits_now(c, st, "demo")) ++bad;
         st.persona_art = true; if (!fits_now(c, st, "demo + art")) ++bad;
@@ -793,7 +794,7 @@ GUARDIAN_CASE(header_gives_the_network_name_its_own_full_width_row_on_every_scre
     { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
       Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot(); c.tick(); Frame f;
       compose(c.presenter(), art_status(), f); if (!header_ok(f, nullptr, "no selection")) ++bad;
-      c.input(Action::PrimaryLong); compose(c.presenter(), art_status(), f); if (!header_ok(f, "not a real reading", "demo")) ++bad;
+      c.set_demo(true); compose(c.presenter(), art_status(), f); if (!header_ok(f, "not a real reading", "demo")) ++bad;
       CHECK_EQ(color_of(f, "DEMO 1/5"), color::black); CHECK(line_with(f, "DEMO 1/5") && line_with(f, "DEMO 1/5")->plate == color::yellow); }
     CHECK_EQ(bad, 0u);
 }
@@ -828,8 +829,12 @@ GUARDIAN_CASE(tune_session_is_announced_with_its_time_and_how_to_end_it) {
     CHECK(has(f, "RADIO OFF")); CHECK(fits_without_overlap(f));
     r.c.input(Action::Primary); compose(r.c.presenter(), st, f);   // details page
     CHECK(has(f, "TUNE WI-FI 125s")); CHECK(has(f, "any key: end tune")); CHECK(fits_without_overlap(f));
+    r.c.input(Action::PrimaryLong); compose(r.c.presenter(), st, f);   // G24: the Settings screen (hold FRONT) during a TUNE session
+    CHECK_EQ(r.c.presenter().screen(), Screen::Settings);
+    CHECK(has(f, "TUNE WI-FI 125s")); CHECK(has(f, "any key: end tune")); CHECK(!has(f, "hold FRONT = save"));
+    CHECK(!has(f, "FRONT next")); CHECK(fits_without_overlap(f));
     r.c.input(Action::Secondary);
-    r.c.input(Action::PrimaryLong); compose(r.c.presenter(), st, f);   // DEMO faces while tuning motion
+    r.c.set_demo(true); compose(r.c.presenter(), st, f);   // DEMO faces while tuning motion (G24 retry: the direct method)
     CHECK(has(f, "TUNE WI-FI 125s")); CHECK(fits_without_overlap(f));
     st.tune_session_s = 0; compose(r.c.presenter(), st, f); CHECK(!has(f, "TUNE WI-FI"));
 }
@@ -858,7 +863,7 @@ GUARDIAN_CASE(every_rating_shows_its_own_portrait_and_alert_pulses) {
     FakeArt art; Panel p;
     Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
     Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot();
-    c.input(Action::PrimaryLong);                                                      // DEMO walks the five ratings
+    c.set_demo(true);                                                                  // DEMO walks the five ratings
     const Mood moods[] = {Mood::VeryGood, Mood::Good, Mood::Medium, Mood::Bad, Mood::Horrible};
     for (int i = 0; i < 5; ++i) {
         Frame f; c.render(art_status(), f);
@@ -926,7 +931,7 @@ GUARDIAN_CASE(hud_draws_each_element_only_with_its_evidence) {
     CHECK(!f.hud.rssi); CHECK(!has(f, "dBm")); CHECK(!has(f, "CCMP")); CHECK(!has(f, "SEEN")); CHECK(f.hud.listening);
     // DEMO: no signal, no age, no channel lock claim about the demo network.
     { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
-      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot(); c.input(Action::PrimaryLong);
+      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot(); c.set_demo(true);
       for (int i = 0; i < 5; ++i) { c.render(st, f); CHECK(!f.hud.rssi); CHECK(!has(f, "dBm")); CHECK(!has(f, "SEEN")); CHECK(!has(f, "CH0")); c.input(Action::Secondary); } }
     // ALERT: the incident marker and its reason.
     VeryGoodRig a; for (int i = 0; i < 20; ++i) a.c.receive(wpa3_deauth(a.clock));
@@ -1360,4 +1365,140 @@ GUARDIAN_CASE(dim_view_shows_the_alert_and_the_rating_whatever_screen_was_left_o
         Frame f; r.c.render_dim(plain, f); Panel p; draw_dim(p.c, f);
         CHECK(f.alert); CHECK(red(p) > 2000);
     }
+}
+
+// ---- G24: the device settings through the Companion, and the Settings screen's look (TDD, red first) ----
+namespace {
+// The owner-approved look (firmware/evidence/sticks3-G24-settings-look-20261121.png, "perfect", 2026-11-21),
+// rebuilt line by line from the S6 preview that drew it: compose() must give exactly these lines.
+struct LookOption { const char* big; const char* big2; const char* hours; const char* mark; std::uint16_t mark_c; const char* cost1; const char* cost2; };
+void look_add(Frame& f, const char* t, int x, int y, int scale, std::uint16_t c, bool plated = false, std::uint16_t plate_c = color::black) {
+    Line& l = f.lines[f.count++];
+    std::snprintf(l.text.data(), l.text.size(), "%s", t);
+    l.x = static_cast<std::int16_t>(x); l.y = static_cast<std::int16_t>(y); l.scale = static_cast<std::uint8_t>(scale); l.color = c;
+    l.plated = plated; l.plate = plate_c;
+}
+int look_centered(const char* t, int scale) { const int w = int(std::strlen(t)) * 6 * scale; return (Frame::width - w) / 2 < 0 ? 0 : (Frame::width - w) / 2; }
+void look_center(Frame& f, const char* t, int y, int scale, std::uint16_t c) { look_add(f, t, look_centered(t, scale), y, scale, c); }
+Frame look(const char* title, int idx, const LookOption& o, bool saved_flash) {
+    Frame f; f.header_color = color::grey;
+    char tag[24]; std::snprintf(tag, sizeof tag, "SETTINGS %d/%d", idx, 2);
+    look_add(f, tag, 0, Frame::tag_y, 1, color::black, true, color::grey);
+    look_center(f, title, 26, 1, color::grey);
+    look_add(f, "<", 2, 78, 2, color::grey);
+    look_add(f, ">", Frame::width - 14, 78, 2, color::grey);
+    if (o.big2) { look_center(f, o.big, 64, 2, color::white); look_center(f, o.big2, 86, 2, color::white); }
+    else look_center(f, o.big, 76, o.big[0] >= '0' && o.big[0] <= '9' ? 3 : 2, color::white);
+    if (o.hours[0] == '-') look_center(f, "not measured yet", 126, 1, color::grey); else look_center(f, o.hours, 120, 2, color::white);
+    if (o.mark) look_center(f, o.mark, 142, 1, o.mark_c);
+    if (o.cost1) look_center(f, o.cost1, 166, 1, amber);
+    if (o.cost2) look_center(f, o.cost2, 177, 1, amber);
+    if (saved_flash) look_add(f, "   SAVED   ", look_centered("   SAVED   ", 2), 196, 2, color::black, true, color::green);
+    look_center(f, "FRONT next  SIDE back", 216, 1, color::grey);
+    look_center(f, "hold FRONT = save", 228, 1, color::grey);
+    return f;
+}
+std::string line_diff(const Frame& got, const Frame& want) {
+    std::string out;
+    if (got.count != want.count) out += "count " + std::to_string(got.count) + " vs " + std::to_string(want.count) + "; ";
+    for (std::uint8_t i = 0; i < std::max(got.count, want.count); ++i) {
+        const Line g = i < got.count ? got.lines[i] : Line{}, w = i < want.count ? want.lines[i] : Line{};
+        if (std::strcmp(g.text.data(), w.text.data()) || g.x != w.x || g.y != w.y || g.scale != w.scale || g.color != w.color
+            || g.plated != w.plated || (g.plated && g.plate != w.plate))
+            out += "[" + std::to_string(i) + "] '" + g.text.data() + "'@" + std::to_string(g.x) + "," + std::to_string(g.y) + " vs '" + w.text.data()
+                + "'@" + std::to_string(w.x) + "," + std::to_string(w.y) + "; ";
+    }
+    if (got.overflow) out += "overflow; ";
+    if (got.header_color != want.header_color || got.hud.shown || got.face_shown || got.persona) out += "frame flags; ";
+    return out;
+}
+struct SettingsRig {
+    Clock clock; Monitor m{clock, profiles::all_2g4_channels(), Origin::LiveRadio};
+    MemoryBlob blob, settings_blob; EncodedSelectionStore store{blob}; DeviceSettingsStore settings{settings_blob};
+    Companion c{clock, m, store, lcd(), Origin::LiveRadio};
+    void boot() { c.attach_settings(settings); c.boot(); }
+    void open_settings() { c.input(Action::PrimaryLong); }   // G24 retry: hold FRONT on the face
+    Frame frame() { Frame f; Status st{}; st.radio = RadioState::Monitoring; compose(c.presenter(), st, f); return f; }
+};
+} // namespace
+
+GUARDIAN_CASE(g24_companion_loads_saves_and_reports_device_settings) {
+    SettingsRig r;
+    std::uint8_t rec[settings_record_bytes]; DeviceChoices stored; stored.guard = GuardCycle::EveryMinute; stored.bright_pct = 80;
+    CHECK_EQ(encode_settings(stored, rec, sizeof rec), settings_record_bytes);
+    r.settings_blob.bytes.assign(rec, rec + sizeof rec); r.settings_blob.exists = true;
+    r.boot();
+    CHECK(r.c.device() == stored); CHECK(r.c.settings_store() == SettingsStore::Restored); CHECK_EQ(unsigned(r.c.lit_brightness_pct()), 80u);
+    CHECK(r.c.input(Action::PrimaryLong)); CHECK_EQ(r.c.presenter().screen(), Screen::Settings);   // hold FRONT on the face
+    r.c.input(Action::Primary);                                                    // EVERY MINUTE -> ALWAYS
+    CHECK(r.c.input(Action::PrimaryLong));
+    CHECK(r.c.settings_store() == SettingsStore::Saved); CHECK(r.c.device().guard == GuardCycle::Always);
+    DeviceChoices back; CHECK(decode_settings(r.settings_blob.bytes.data(), r.settings_blob.bytes.size(), back));
+    CHECK(back.guard == GuardCycle::Always); CHECK_EQ(unsigned(back.bright_pct), 80u);
+    CHECK(r.c.presenter().settings().plate == SavePlate::Saved);
+    // A failed write: SAVE FAILED on the glass, the value in effect unchanged.
+    r.clock.at += Presenter::settings_plate_ms; r.c.tick();
+    CHECK(r.c.presenter().settings().page == SettingsPage::Brightness);
+    r.settings_blob.fail_write = true;
+    r.c.input(Action::Primary); CHECK_EQ(unsigned(r.c.lit_brightness_pct()), 100u);   // previewed
+    r.c.input(Action::PrimaryLong);
+    CHECK(r.c.settings_store() == SettingsStore::Failed); CHECK_EQ(unsigned(r.c.device().bright_pct), 80u);
+    CHECK(r.c.presenter().settings().plate == SavePlate::Failed);
+    const auto f = r.frame(); const Line* plate = line_with(f, "SAVE FAILED");
+    CHECK(plate != nullptr); if (plate) { CHECK(plate->plated); CHECK_EQ(plate->y, 196); CHECK_EQ(plate->scale, 2); CHECK_EQ(plate->plate, color::red); }
+    CHECK(fits_without_overlap(f));
+    // No store attached: the defaults, and every save fails.
+    Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
+    Companion bare(clock, m, store, lcd(), Origin::LiveRadio); bare.boot();
+    CHECK(bare.device() == DeviceChoices{}); CHECK(bare.settings_store() == SettingsStore::Default);
+}
+
+GUARDIAN_CASE(g24_a_corrupt_settings_record_boots_the_defaults) {
+    SettingsRig r; r.settings_blob.bytes.assign(settings_record_bytes, 0x5A); r.settings_blob.exists = true; r.boot();
+    CHECK(r.c.device() == DeviceChoices{}); CHECK(r.c.settings_store() == SettingsStore::Corrupt);
+    SettingsRig a; a.boot(); CHECK(a.c.settings_store() == SettingsStore::Default);
+}
+
+GUARDIAN_CASE(g24_settings_pages_are_exactly_the_approved_look) {
+    SettingsRig r; r.boot(); r.open_settings();
+    const LookOption always{"ALWAYS", nullptr, "2h 05m", "lowest, measured", color::grey, "never blind", nullptr};
+    const LookOption half{"EVERY", "30 S", "-", nullptr, color::grey, "alert up to 20s late", "short bursts missed"};
+    const LookOption minute{"EVERY", "MINUTE", "7h 14m", "highest, measured", color::green, "alert up to 50s late", "short bursts missed"};
+    const LookOption b30{"30%", nullptr, "-", nullptr, color::grey, "costs only while lit", nullptr};
+    const LookOption b100{"100%", nullptr, "-", nullptr, color::grey, "costs only while lit", nullptr};
+    const LookOption b60{"60%", nullptr, "-", nullptr, color::grey, "costs only while lit", nullptr};
+    std::string d;
+    d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, always, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Primary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, half, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Primary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::PrimaryLong); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, true)); CHECK_EQ(d, std::string());
+    r.clock.at += Presenter::settings_plate_ms; r.c.tick();
+    d = line_diff(r.frame(), look("BRIGHTNESS", 2, b60, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary);   // 80, 100, 10, 30
+    d = line_diff(r.frame(), look("BRIGHTNESS", 2, b30, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary);                              // 60, 80, 100
+    d = line_diff(r.frame(), look("BRIGHTNESS", 2, b100, false)); CHECK_EQ(d, std::string());
+    CHECK(fits_without_overlap(r.frame()));
+    CHECK_EQ(scale_of(r.frame(), "100%"), 3);
+}
+
+GUARDIAN_CASE(g24_hold_front_opens_settings_and_the_details_pages_are_as_before) {
+    // G24 retry (owner 2026-11-21): no DEVICE SETTINGS details page; hold FRONT opens Settings from the face and details.
+    SettingsRig r; r.boot();
+    r.c.input(Action::Primary); CHECK_EQ(r.c.presenter().screen(), Screen::Details);
+    CHECK(has_words(r.frame(), "Advertised Wi-Fi settings"));                       // the first page, as before G24
+    for (int i = 0; i < 20 && r.c.presenter().screen() == Screen::Details; ++i) {
+        const auto f = r.frame();
+        CHECK(!has(f, "DEVICE SETTINGS")); CHECK(!has(f, "SIDE = open")); CHECK(has(f, "side: back"));
+        r.c.input(Action::Primary);
+    }
+    CHECK_EQ(r.c.presenter().screen(), Screen::Face);
+    r.c.input(Action::Primary); r.c.input(Action::Primary);
+    CHECK(r.c.input(Action::PrimaryLong)); CHECK_EQ(r.c.presenter().screen(), Screen::Settings); CHECK(!r.c.presenter().view().demo);
+    CHECK(has(r.frame(), "GUARD ON BATTERY"));
+    CHECK(r.c.input(Action::Secondary)); CHECK_EQ(r.c.presenter().screen(), Screen::Face);
+    r.open_settings(); CHECK_EQ(r.c.presenter().screen(), Screen::Settings); CHECK(!r.c.presenter().view().demo);
+    // The Buttons onboarding page tells the new hold: settings, never demo faces.
+    Frame b; compose_onboarding(1, b);
+    CHECK(has_words(b, "Hold BLUE: settings")); CHECK(!has_words(b, "demo")); CHECK(fits_without_overlap(b));
 }

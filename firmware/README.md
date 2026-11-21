@@ -280,7 +280,8 @@ makes the bootloader return to the previous slot, reported as
 `rolled_back:reset_before_selftest`. `build.sh build-selftest-fail` builds the
 reviewer test image (`CONFIG_GUARDIAN_OTA_SELFTEST_FAIL`, version suffix `-stfail`).
 
-**UPDATE mode** (owner only): press **FRONT three times fast** (one-handed; or hold both keys ~3 s),
+**UPDATE mode** (owner only): on the face, press **FRONT three times fast** (one-handed; or hold both keys ~3 s;
+since G24 the three presses count only on the face, so stepping the details pages fast never opens it),
 then after ~1 s FRONT = yes, SIDE = no
 (15 s timeout = no). Monitoring pauses; the stick joins the provisioned network,
 fetches `<url>/manifest` and `<url>/image`, checks size, Content-Length, sha256 and
@@ -696,6 +697,95 @@ claims an improvement. The power inventory, the duty-cycle design note and the o
   ("-" before the rate, as `drain_mv_10min`). A deep-sleep wake continues the segment; USB ends it with the run. The
   board's reply buffer is `battery::run_text_max` (1024; battery_check proves the longest line fits).
 - **TUNE capacity:** 40 literal + 18 `motion.*` = 58 board keys, + 68 `t.*` = 126 of `tune::max_params` 128.
+
+## G24 Settings: guard on battery, brightness, unused parts off (worker 2026-11-21; ledger G24 open)
+
+Release 1's Settings screen, Bruce-style (one big option per page), with every number taken from the G24 battery
+spike ([evidence/sticks3-G24-spike-20261121.log](evidence/sticks3-G24-spike-20261121.log)). **The defaults are the
+behaviour before G24** (guard Always, brightness 60 %); only the unused parts change from boot. Implemented and
+host-tested; nothing of G24 is measured on the stick yet (the supervisor's device acceptance is in the ledger row).
+
+- **Entry and keys** (single key, the owner is one-handed; owner 2026-11-21 after the first device look: "like side
+  opens net list, blue opens settings", and DEMO "is for development, ditch"). Face: FRONT = Details (first page
+  Advertised Wi-Fi settings, as before G24), **hold FRONT = Settings screen**, hold SIDE = network list. Details:
+  FRONT = next page (Advertised Wi-Fi settings, Explanation, Signal and evidence, Owner checks, What it cannot see,
+  Nearby while something is nearby, then the face), SIDE = face, **hold FRONT = Settings screen**, hold SIDE = network
+  list. No details page opens Settings (the DEVICE SETTINGS page of the first attempt is gone). On the Settings
+  screen: FRONT = next value (wraps); hold FRONT = save this page (green `SAVED` plate for 1 s, then the next page,
+  after the last page the face; `SAVE FAILED` on a red plate in the same place keeps the value in effect and stays on
+  the page); SIDE (or a hold of SIDE) = back to the face, nothing more saved. The network list keeps its keys (hold
+  FRONT = "this AP is mine too" on a same-name row). **No key enters DEMO**: the capability stays behind
+  `Presenter::set_demo(bool)` / `Companion::set_demo(bool)` for tests and tools (there is no console verb for it);
+  if the stick is somehow in DEMO, hold FRONT returns to LIVE. The Buttons onboarding page says `Hold BLUE: settings`.
+  **FRONT x3 fast** (UPDATE, or SETUP with no Wi-Fi stored) counts only on the face (boards/sticks3/main/
+  measurement_main.cpp): on Details, Settings and the list FRONT is just "next", however fast. A hold (800 ms) is
+  longer than the triple-tap gap (450 ms), so a tap the counter holds back is delivered before a hold fires and never
+  reaches the Settings screen as a stray "next value". `guardian::Presenter` (`Screen::Settings`, `settings()`,
+  `take_settings_save()` / `settings_saved()`, `lit_brightness_pct()`, `set_demo()`); tests/presenter_check.cpp
+  `g24_*`, tests/companion_check.cpp `g24_*`.
+- **The look** is the owner-approved one (evidence/sticks3-G24-settings-look-20261121.png, "perfect"): existing font
+  and colours, no new art. `companion_preview` renders the pages through the real Companion as `24-settings-1..7`
+  (opened with a hold of FRONT on the face); `tools/settings_look_compare.py <preview dir>` compares pages 1 to 6
+  with the approved PNG pixel by pixel (2026-11-21: 0 differing pixels on each), and companion_check compares the composed
+  lines with the look's own construction.
+- **Guard on battery** (`guardian::guard_cycle_plan`, components/guardian_core/guard_cycle.*, tests/guard_cycle_check.cpp):
+  ALWAYS = the radio listens all the time, no other lever (exactly as before); EVERY 30 S = listen 10 s / off 20 s;
+  EVERY MINUTE = listen 10 s / off 50 s (the spike's mode G). The cycled choices act only on battery while the screen
+  is Dark after its 2 s notice, listening first from that instant. Then every lever of mode G, ported from the
+  never-merged `spike/power-exp` into production code: the IMU in its low-power motion mode (accelerometer only,
+  25 Hz; a change above 0.08 g is motion and lights the screen as before), the LCD rail (PM1 GPIO2) cut, the radio
+  stopped in each off period (`esp_wifi_stop`) and 80 MHz light sleep only while it is off. A key, motion, USB power
+  or a counted burst (G16N) lights the screen and restores every lever at once (rail and panel setup first, the
+  ES8311 power-down re-sent because the codec returns with the rail), and the radio listens at once. The update poll
+  keeps its own period: it gets the radio and the panel back before its join, and the next loop re-applies the plan.
+  While Dark nothing is drawn, so a planned off period never draws "No fresh data"; once lit, freshness and every rule
+  apply from the resume as before. What a listen period cannot see: docs/G23-delivery.md section 11.4.
+- **Brightness**: the backlight percent while lit (awake), 10 / 30 / 60 / 80 / 100, default 60
+  (`sticks3::Board::backlight_active_pct`); the page previews the value on the glass at once and the screen returns to
+  the value in effect when the page is left without saving. The dim level stays TUNE `power.dim_pct`. The update and
+  sleep messages that light a dark screen use the same value.
+- **Hours table** (adapters/companion/device_settings.cpp, one constant table, each entry citing its spike log line):
+  ALWAYS 2 h 05 min (line 38, lowest, measured), EVERY MINUTE 7 h 14 min (line 43, highest, measured), EVERY 30 S and
+  every brightness "not measured yet" (line 56). Highest and lowest are computed over the measured entries only
+  (fewer than two measured: neither). The supervisor enters EVERY 30 S after its full drain; nothing is interpolated.
+- **Storage**: the two values in their own record (NVS key `settings`, magic `GSET`, format 1, 12 bytes, CRC-32), never
+  TUNE keys (the registry stays at 126 of 128). Absent: the defaults; unreadable, foreign or corrupt: the defaults and
+  the record is kept (never silently erased). tests/device_settings_check.cpp (round trip, every flipped bit,
+  absent, corrupt, failed write).
+- **Unused parts off from boot, in every choice** (`sticks3::Board::parts_off`): green status LED (PM1 PWR_CFG 0x06
+  bit 4), 5 V boost (bit 3), speaker amplifier (PM1 GPIO_OUT bit 3), IR TX gate G46 driven low with pad hold; the
+  codec power-down at boot is unchanged. PM1 GPIO1 (the IRQ line, owner order #29) is never touched.
+- **STATUS** (three space-separated tokens after the G23 energy fragment; the line buffer grew 7848 -> 8120, under
+  the 8192 TUNE reply):
+  `settings=guard:<always|every_30s|every_minute>,bright:<pct>,store:<default|restored|corrupt|saved|failed>`
+  (`saved` / `failed`: the owner's latest save in this boot),
+  `guard_cycle=<choice>,listen_ms=<n>,off_ms=<n>,cycles=<n>,resume_fail=<n>,relock_ms_avg=<n>` (Always prints 0 and 0:
+  no cycle; `resume_fail` counts every lever switch that failed: radio stop or restart, rail, power management;
+  `relock_ms_avg` is from a radio restart to the next lock on the picked network),
+  `parts=led:<0|1|?>,ir:<low|?>,boost5v:<0|1|?>,amp:<0|1|?>,codec:<down|?>` read back from the PM1 registers, the G46
+  output-enable and output registers and ES8311 register 0x0D (0xFC after the power-down; no answer, for example
+  with the rail cut, prints `?`).
+- **Power management in every image.** `sdkconfig.defaults` now sets `CONFIG_PM_ENABLE=y` and
+  `CONFIG_FREERTOS_USE_TICKLESS_IDLE=y` (the G23 note above, "the normal image does not set it", is superseded), and
+  `build_support.py` refuses an image without them (test_build_support.py). MEASURED on the built image
+  `guardian-20261121-132309` against the delivery image `guardian-20261121-103138`: the built sdkconfig gains exactly
+  `CONFIG_PM_ENABLE=y`, `CONFIG_FREERTOS_USE_TICKLESS_IDLE=y`, `CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP=3`,
+  `CONFIG_PM_LIGHTSLEEP_RTC_OSC_CAL_INTERVAL=1` and `CONFIG_PM_SLP_DISABLE_GPIO=y` (GPIOs are disabled during an
+  automatic light sleep; the keys are read when the loop wakes, at most every 100 ms, as in the spike);
+  `CONFIG_PM_DFS_INIT_AUTO` stays off, so every image boots and runs at 160 MHz and nothing calls `esp_pm_configure`
+  unless a cycled guard choice has the radio off. The bootloader is **byte-identical** (bootloader.bin sha256
+  a5df9165...9d93 in both) and so is the partition table. The dark-cpu image keeps its own `esp_pm_configure` and
+  never applies the guard's light sleep.
+- **Carry-overs from the G23 owner run**: the shake stillness defaults are `burst.still_dps` 10 (from 12) and
+  `burst.calm_s` 1.0 s (from 0.6), MEASURED with still_trace (evidence/sticks3-G23-20261121.log step 11: the slow
+  tilt reaches calm 0 times); TUNE keys unchanged (tests/burst_check.cpp). **Alert-first**: when a NEW red ALERT
+  starts, the presenter goes to the face whatever page or screen was open (a Settings draft is dropped, nothing is
+  saved); the owner can still open another page while it lasts, and further reports of the same alert do not pull
+  the screen again; amber keeps the open page (tests/presenter_check.cpp
+  `g24_alert_first_a_new_red_alert_returns_to_the_face_amber_does_not`).
+- **Not done here (the supervisor's acceptance, ledger row):** install over USB; STATUS `parts=` all off and
+  `settings=`; the Settings screen photographed against the look; full drains for EVERY MINUTE, ALWAYS and EVERY 30 S
+  (its hours then entered in the table, with the log line); zero `resume_fail`; any `reset=brownout` stops it.
 
 ## G16I upright by gravity and the snow-globe burst (implemented 2026-11-17; ledger G16I: accepted 2026-11-18, upright mode off by default by the owner's ruling)
 

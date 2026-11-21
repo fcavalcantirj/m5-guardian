@@ -23,4 +23,13 @@ Ring& ring();
 // G16D: stops the sampler before deep sleep (the BMI270 suspend writes follow);
 // waits up to timeout_ms for the task to leave the bus. True when it no longer runs.
 bool stop(std::uint32_t timeout_ms);
+// G24: the low-power motion mode while the screen is dark on battery with a cycled guard choice (ported from the
+// G24 spike, MEASURED in mode G). On request the task switches the BMI270 to accelerometer-only 25 Hz with
+// averaging (gyro off) and checks motion itself every 200 ms (a change above 0.08 g on any axis); off restores
+// the 200 Hz configuration. No samples reach the ring meanwhile.
+void lowpower(bool on);
+bool lowpower_active();
+bool motion_take();                  // motion seen in low-power mode since the last call (cleared)
+std::uint32_t lowpower_entries();
+std::uint32_t lowpower_fail();       // mode switches with a refused register write
 } // namespace sticks3::imu

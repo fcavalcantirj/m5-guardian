@@ -53,6 +53,42 @@ std::atomic<bool> started_{false};
 std::atomic<bool> stop_requested_{false}, running_{false};
 i2c_master_bus_handle_t bus_handle;
 
+// G24 low-power motion mode (ported from the spike/power-exp pexp_step, MEASURED in mode G over 380 cycles with
+// motion still waking the screen): on request the BMI270 runs accelerometer-only at 25 Hz with averaging, gyro
+// off, advanced power save; the task checks motion itself every 200 ms (a change above 0.08 g on any axis =
+// motion, taken by motion_take). Off again restores the 200 Hz configuration. Not the chip's any-motion engine.
+std::atomic<bool> lp_req_{false}, lp_active_{false}, lp_motion_{false};
+std::atomic<std::uint32_t> lp_entries_{0}, lp_fail_{0};
+constexpr int lp_motion_lsb = 328;   // 0.08 g at 4096 LSB/g
+bool lowpower_step(I2cBus& bus, std::uint8_t addr) {   // true while the low-power mode owns the loop
+    namespace r = guardian::imu::reg;
+    bool ok = true;
+    const auto w = [&](std::uint8_t reg, std::uint8_t v) { ok &= bus.write(addr, reg, &v, 1); vTaskDelay(pdMS_TO_TICKS(2)); };
+    static std::int16_t prev[3]{}; static bool have_prev = false;
+    if (lp_req_ && !lp_active_) {
+        w(r::pwr_conf, 0x02); w(r::acc_conf, 0x26); w(r::pwr_ctrl, 0x04); w(r::pwr_conf, 0x03);   // acc only, 25 Hz avg4 low power, adv_power_save
+        lp_active_ = true; have_prev = false; ++lp_entries_;
+        if (!ok) ++lp_fail_;
+    } else if (!lp_req_ && lp_active_) {
+        w(r::pwr_conf, 0x02); w(r::pwr_ctrl, guardian::imu::pwr_ctrl_acc_gyr_temp); w(r::acc_conf, guardian::imu::acc_conf_200hz);
+        w(r::gyr_conf, guardian::imu::gyr_conf_200hz); vTaskDelay(pdMS_TO_TICKS(50));   // gyro start-up
+        lp_active_ = false;
+        if (!ok) ++lp_fail_;
+        return false;
+    }
+    if (!lp_active_) return false;
+    std::uint8_t b[6]{};
+    if (bus.read(addr, r::acc_x, b, sizeof b)) {
+        std::int16_t now[3];
+        for (int k = 0; k < 3; ++k) now[k] = static_cast<std::int16_t>(static_cast<std::uint16_t>(b[2 * k] | (b[2 * k + 1] << 8)));
+        if (have_prev) for (int k = 0; k < 3; ++k) { const int d = now[k] - prev[k]; if (d > lp_motion_lsb || d < -lp_motion_lsb) lp_motion_ = true; }
+        for (int k = 0; k < 3; ++k) prev[k] = now[k];
+        have_prev = true;
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    return true;
+}
+
 void task(void*) {
     static I2cBus bus(bus_handle);
     static guardian::imu::Bmi270 bmi;
@@ -66,6 +102,7 @@ void task(void*) {
     for (;;) {
         vTaskDelayUntil(&last, period ? period : 1);
         if (stop_requested_) { running_ = false; vTaskDelete(nullptr); return; }   // G16D: before deep sleep
+        if (lowpower_step(bus, bmi.address())) { last = xTaskGetTickCount(); continue; }   // G24: dark on battery, cycled guard
         guardian::imu::Sample sample;
         if (bmi.poll(bus, esp_timer_get_time(), sample)) ring_.push(sample);
         bus_errors_ = bmi.bus_errors();
@@ -103,4 +140,9 @@ bool stop(std::uint32_t timeout_ms) {
     for (std::uint32_t waited = 0; running_ && waited < timeout_ms; waited += 5) vTaskDelay(pdMS_TO_TICKS(5));
     return !running_;
 }
+void lowpower(bool on) { lp_req_ = on; }
+bool lowpower_active() { return lp_active_; }
+bool motion_take() { return lp_motion_.exchange(false); }
+std::uint32_t lowpower_entries() { return lp_entries_; }
+std::uint32_t lowpower_fail() { return lp_fail_; }
 } // namespace sticks3::imu

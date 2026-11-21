@@ -221,7 +221,7 @@ GUARDIAN_CASE(empty_picker_and_cancel_never_emit_a_request) {
 
 GUARDIAN_CASE(demo_cycles_five_moods_isolates_requests_and_live_incident_breaks_through) {
     Presenter p(display()); p.update(fresh(), at()); CHECK(p.offer(candidate()));
-    CHECK(p.handle(Action::PrimaryLong, at())); CHECK_EQ(p.mode(), ViewMode::Demo);
+    CHECK(p.set_demo(true)); CHECK_EQ(p.mode(), ViewMode::Demo);   // G24 retry: the direct method (no key enters DEMO)
     const Mood moods[] = {Mood::VeryGood, Mood::Good, Mood::Medium, Mood::Bad, Mood::Horrible};
     for (auto mood : moods) {
         CHECK(p.view().demo); CHECK_EQ(p.view().face, mood); CHECK(p.view().animate);
@@ -234,15 +234,15 @@ GUARDIAN_CASE(demo_cycles_five_moods_isolates_requests_and_live_incident_breaks_
     auto s = fresh(); s.incidents[2] = true; s.evidence[2].acquired = at(); s.evidence[2].count = 5;
     p.update(s, at(2500)); CHECK_EQ(p.mode(), ViewMode::Live); CHECK_EQ(p.screen(), Screen::Face);
     CHECK(!p.view().demo); CHECK(p.view().incident.visible); CHECK(!p.view().celebrate);
-    CHECK(!p.handle(Action::PrimaryLong, at(2500))); CHECK_EQ(p.mode(), ViewMode::Live);
+    CHECK(!p.set_demo(true)); CHECK_EQ(p.mode(), ViewMode::Live);   // refused while the live incident shows
 }
 
 GUARDIAN_CASE(demo_toggle_preserves_live_selection_and_does_not_swallow_pending_request) {
     Presenter p({}); p.update(fresh(), at()); p.offer(candidate(0x66));
     p.handle(Action::SecondaryLong, at()); p.handle(Action::Secondary, at());
-    CHECK(!p.handle(Action::PrimaryLong, at())); CHECK(p.has_request()); p.take_request();
-    p.handle(Action::PrimaryLong, at()); CHECK(p.view().demo);
-    p.handle(Action::PrimaryLong, at()); CHECK(!p.view().demo);
+    CHECK(!p.set_demo(true)); CHECK(p.has_request()); p.take_request();
+    CHECK(p.set_demo(true)); CHECK(p.view().demo); CHECK(!p.set_demo(true));
+    p.handle(Action::PrimaryLong, at()); CHECK(!p.view().demo);   // G24 retry: hold FRONT in DEMO returns to LIVE
     CHECK_EQ(std::string(p.view().selected_label.c_str()), "home"); CHECK_EQ(p.picker().count, 1);
     auto alien = fresh(); alien.origin = Origin::Demo; alien.selected = home(0x77);
     p.update(alien, at()); CHECK_EQ(std::string(p.view().selected_bssid.c_str()), "02:11:22:33:44:55");
@@ -346,7 +346,7 @@ GUARDIAN_CASE(details_expose_source_and_listening_measurements_without_an_incide
     CHECK_EQ(p.details().coverage.window_ms, Millis{10000}); CHECK_EQ(p.details().coverage.dropped_in_window, 2u);
     CHECK_EQ(p.details().coverage_age_ms, Millis{1000}); CHECK(p.details().coverage.hopping);
     CHECK_EQ(p.details().coverage.passive_receive, Support::Unsupported);
-    p.handle(Action::PrimaryLong, at(2000));
+    p.set_demo(true);
     CHECK_EQ(std::string(p.view().source_label), "DEMO"); CHECK_EQ(p.details().origin, Origin::Demo);
     CHECK(!p.details().has_coverage);
 }
@@ -473,7 +473,7 @@ GUARDIAN_CASE(g14_alert_overlay_trigger_expiry_and_stale_coexistence) {
     Presenter q(display()); q.update(u, at(2000));
     CHECK(q.view().alert); CHECK_EQ(std::string(q.view().alert_reason), alert_text(IncidentKind::UnexpectedAp));
     // DEMO fixtures never raise an alert; a live alert breaks through DEMO.
-    Presenter d(display()); d.update(fresh(), at()); d.handle(Action::PrimaryLong, at());
+    Presenter d(display()); d.update(fresh(), at()); d.set_demo(true);
     for (int i = 0; i < 5; ++i) { CHECK(!d.view().alert); d.handle(Action::Secondary, at()); }
     d.update(s, at(1500)); CHECK(d.view().alert); CHECK(!d.view().demo);
 }
@@ -502,7 +502,7 @@ GUARDIAN_CASE(view_incident_seq_follows_the_live_snapshot_also_in_demo) {
     CHECK(!p.view().alert); CHECK(p.view().caution); CHECK_EQ(p.view().incident_seq, 5u);
     // DEMO shows fixtures, and an amber observation does not leave DEMO: the LIVE count is still in the view.
     Presenter d(display()); d.update(fresh(), at());
-    CHECK(d.handle(Action::PrimaryLong, at())); CHECK_EQ(d.mode(), ViewMode::Demo);
+    CHECK(d.set_demo(true)); CHECK_EQ(d.mode(), ViewMode::Demo);
     CHECK_EQ(d.view().incident_seq, 0u);
     auto live = fresh(); live.incident_seq = 9; live.area_visible[0] = true; live.area_visible_ms = 60000;
     live.area[0].scope = IncidentScope::Area; live.area[0].family = DetectorFamily::Beacon; live.area[0].acquired = at(1400);
@@ -742,4 +742,217 @@ GUARDIAN_CASE(g16t_a_nearby_burst_on_the_picked_network_has_its_own_red_sentence
     char tiny[8]{'#'};
     CHECK_EQ(alert_sentence(v, tiny, sizeof tiny), 0u);
     CHECK_EQ(tiny[0], '\0');
+}
+
+// ---- G24: the device settings screen, its entry (hold FRONT) and the alert-first face (TDD, red first) ----
+namespace {
+DeviceChoices choice(GuardCycle g, std::uint8_t pct) { DeviceChoices c; c.guard = g; c.bright_pct = pct; return c; }
+// G24 retry (owner 2026-11-21: "like side opens net list, blue opens settings"): hold FRONT on the face opens Settings.
+void open_settings(Presenter& p, Instant now) { p.handle(Action::PrimaryLong, now); }
+Snapshot red_alert(Millis acquired) {
+    auto s = fresh(); s.incidents[0] = true; auto& e = s.evidence[0];
+    e.acquired = at(acquired); e.count = 24; e.window_ms = 10000; e.bssid = home().bssid; s.incident_seq = 1; return s;
+}
+} // namespace
+
+GUARDIAN_CASE(g24_device_choices_defaults_and_set_device) {
+    Presenter p(display()); p.update(fresh(), at());
+    CHECK(p.device() == DeviceChoices{}); CHECK(p.device().guard == GuardCycle::Always); CHECK_EQ(unsigned(p.device().bright_pct), 60u);
+    CHECK_EQ(unsigned(p.lit_brightness_pct()), 60u);
+    CHECK(p.set_device(choice(GuardCycle::EveryMinute, 30))); CHECK(p.device() == choice(GuardCycle::EveryMinute, 30));
+    CHECK_EQ(unsigned(p.lit_brightness_pct()), 30u);
+    CHECK(!p.set_device(choice(GuardCycle::Always, 45))); CHECK(p.device() == choice(GuardCycle::EveryMinute, 30));   // refused
+    CHECK(!p.set_device(choice(static_cast<GuardCycle>(7), 60))); CHECK(p.device() == choice(GuardCycle::EveryMinute, 30));
+    CHECK(!p.settings().open); CHECK(!p.has_settings_save());
+}
+
+GUARDIAN_CASE(g24_hold_front_opens_settings_from_the_face_and_from_details_never_demo) {
+    // From the face.
+    Presenter p(display()); p.update(fresh(), at());
+    p.set_device(choice(GuardCycle::Every30s, 80));
+    CHECK(p.handle(Action::PrimaryLong, at())); CHECK_EQ(p.screen(), Screen::Settings); CHECK_EQ(p.view().screen, Screen::Settings);
+    CHECK_EQ(p.mode(), ViewMode::Live); CHECK(!p.view().demo);
+    CHECK(p.settings().open); CHECK(p.settings().page == SettingsPage::Guard); CHECK_EQ(unsigned(p.settings().number), 1u);
+    CHECK(p.settings().shown == choice(GuardCycle::Every30s, 80)); CHECK(p.settings().saved == choice(GuardCycle::Every30s, 80));
+    CHECK(p.settings().plate == SavePlate::None);
+    // From every details page, Nearby included.
+    auto a = fresh(); a.area_visible[0] = true; a.area_visible_ms = 60000;
+    a.area[0].scope = IncidentScope::Area; a.area[0].family = DetectorFamily::Probe; a.area[0].acquired = at(); a.area[0].count = 9;
+    for (const auto page : {DetailsPage::Settings, DetailsPage::Explanation, DetailsPage::SignalAndEvidence, DetailsPage::OwnerChecks,
+                            DetailsPage::Limits, DetailsPage::Nearby}) {
+        Presenter q(display()); q.update(a, at()); q.handle(Action::Primary, at());
+        for (int i = 0; i < 20 && q.screen() == Screen::Details && q.details().page != page; ++i) q.handle(Action::Primary, at());
+        CHECK_EQ(q.screen(), Screen::Details); CHECK_EQ(q.details().page, page);
+        CHECK(q.handle(Action::PrimaryLong, at())); CHECK_EQ(q.screen(), Screen::Settings); CHECK_EQ(q.mode(), ViewMode::Live);
+        CHECK(q.settings().page == SettingsPage::Guard);
+        q.handle(Action::Secondary, at()); CHECK_EQ(q.screen(), Screen::Face);   // SIDE leaves to the face
+    }
+    // Hold FRONT never enters DEMO, however often; a hold of FRONT on the Settings screen is a save, not a toggle.
+    Presenter r(display()); r.update(fresh(), at());
+    for (int i = 0; i < 4; ++i) {
+        r.handle(Action::PrimaryLong, at()); CHECK_EQ(r.mode(), ViewMode::Live); CHECK(!r.view().demo);
+        if (r.has_settings_save()) { r.take_settings_save(); r.settings_saved(true); }
+    }
+    // Somehow in DEMO (the direct method): hold FRONT returns to LIVE, on the face and on a details page.
+    Presenter d(display()); d.update(fresh(), at()); CHECK(d.set_demo(true)); CHECK_EQ(d.mode(), ViewMode::Demo);
+    CHECK(d.handle(Action::PrimaryLong, at())); CHECK_EQ(d.mode(), ViewMode::Live); CHECK_EQ(d.screen(), Screen::Face); CHECK(!d.settings().open);
+    CHECK(d.set_demo(true)); d.handle(Action::Primary, at()); CHECK_EQ(d.screen(), Screen::Details); CHECK(d.details().demo);
+    CHECK(d.handle(Action::PrimaryLong, at())); CHECK_EQ(d.mode(), ViewMode::Live); CHECK_EQ(d.screen(), Screen::Face);
+    // The direct method both ways; a second call that changes nothing says so.
+    CHECK(d.set_demo(true)); CHECK(!d.set_demo(true)); CHECK(d.set_demo(false)); CHECK(!d.set_demo(false)); CHECK_EQ(d.mode(), ViewMode::Live);
+    // Hold SIDE keeps opening the network list from the face and from details.
+    Presenter n(display()); n.update(fresh(), at()); CHECK(n.handle(Action::SecondaryLong, at())); CHECK_EQ(n.screen(), Screen::Picker);
+    n.handle(Action::Back, at()); n.handle(Action::Primary, at()); CHECK(n.handle(Action::SecondaryLong, at())); CHECK_EQ(n.screen(), Screen::Picker);
+}
+
+GUARDIAN_CASE(g24_details_order_is_as_before_g24_and_side_always_goes_back) {
+    // Face: FRONT -> Advertised Wi-Fi settings first; then Explanation, Signal, Owner checks, Limits, (Nearby), Face.
+    Presenter p(display()); p.update(fresh(), at());
+    CHECK(p.handle(Action::Primary, at())); CHECK_EQ(p.screen(), Screen::Details); CHECK_EQ(p.details().page, DetailsPage::Settings);
+    CHECK_EQ(std::string(p.details().title), std::string("Advertised Wi-Fi settings"));
+    const DetailsPage order[] = {DetailsPage::Explanation, DetailsPage::SignalAndEvidence, DetailsPage::OwnerChecks, DetailsPage::Limits};
+    for (const auto page : order) {
+        for (int i = 0; i < 20 && p.details().page != page && p.screen() == Screen::Details; ++i) {
+            const auto before = p.details().page; p.handle(Action::Primary, at());
+            CHECK(p.details().page == before || p.details().page == page);   // nothing in between (paginated pages repeat)
+        }
+        CHECK_EQ(p.details().page, page);
+    }
+    p.handle(Action::Primary, at()); CHECK_EQ(p.screen(), Screen::Face);
+    // With something nearby: Limits, Nearby, then the face.
+    auto a = fresh(); a.area_visible[0] = true; a.area_visible_ms = 60000;
+    a.area[0].scope = IncidentScope::Area; a.area[0].family = DetectorFamily::Probe; a.area[0].acquired = at(); a.area[0].count = 9;
+    Presenter n(display()); n.update(a, at()); n.handle(Action::Primary, at());
+    for (int i = 0; i < 20 && n.details().page != DetailsPage::Limits; ++i) n.handle(Action::Primary, at());
+    n.handle(Action::Primary, at()); CHECK_EQ(n.details().page, DetailsPage::Nearby);
+    n.handle(Action::Primary, at()); CHECK_EQ(n.screen(), Screen::Face);
+    // SIDE (and the abstract Back) from every page goes to the face; no page opens anything else.
+    for (const auto page : {DetailsPage::Settings, DetailsPage::Explanation, DetailsPage::SignalAndEvidence, DetailsPage::OwnerChecks,
+                            DetailsPage::Limits, DetailsPage::Nearby}) {
+        for (const auto key : {Action::Secondary, Action::Back}) {
+            Presenter q(display()); q.update(a, at()); q.handle(Action::Primary, at());
+            for (int i = 0; i < 20 && q.details().page != page; ++i) q.handle(Action::Primary, at());
+            CHECK_EQ(q.details().page, page); q.handle(key, at()); CHECK_EQ(q.screen(), Screen::Face);
+        }
+    }
+    // The page count is back to six kinds (no DEVICE SETTINGS page).
+    CHECK_EQ(static_cast<unsigned>(DetailsPage::Count), 6u);
+}
+
+GUARDIAN_CASE(g24_front_cycles_values_and_wraps_side_leaves_without_saving) {
+    Presenter p(display()); p.update(fresh(), at());
+    open_settings(p, at());
+    CHECK(p.settings().shown.guard == GuardCycle::Always);
+    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
+    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::EveryMinute);
+    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::Always);   // wraps
+    p.handle(Action::Primary, at()); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
+    CHECK(p.device() == DeviceChoices{}); CHECK(!p.has_settings_save());                          // a draft only
+    CHECK_EQ(p.screen(), Screen::Settings);
+    CHECK(p.handle(Action::Secondary, at())); CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.settings().open);
+    CHECK(p.device() == DeviceChoices{}); CHECK(!p.has_settings_save());
+    // Opened again: the draft starts from the values in effect.
+    open_settings(p, at()); CHECK(p.settings().shown.guard == GuardCycle::Always);
+    // A hold of SIDE leaves too (never the network list from here).
+    CHECK(p.handle(Action::SecondaryLong, at())); CHECK_EQ(p.screen(), Screen::Face);
+    open_settings(p, at()); p.handle(Action::Back, at()); CHECK_EQ(p.screen(), Screen::Face);
+}
+
+GUARDIAN_CASE(g24_hold_front_saves_this_page_shows_saved_then_next_page_then_face) {
+    Presenter p(display()); p.update(fresh(), at(1000));
+    p.set_device(choice(GuardCycle::Always, 60));
+    open_settings(p, at(1000));
+    p.handle(Action::Primary, at(1000)); p.handle(Action::Primary, at(1000));                       // EVERY MINUTE
+    CHECK(p.handle(Action::PrimaryLong, at(1000))); CHECK(p.has_settings_save());
+    const auto save = p.take_settings_save(); CHECK(!p.has_settings_save());
+    CHECK(save == choice(GuardCycle::EveryMinute, 60));                                             // this page only
+    p.settings_saved(true);
+    CHECK(p.settings().plate == SavePlate::Saved); CHECK(p.settings().page == SettingsPage::Guard);
+    CHECK(p.device() == choice(GuardCycle::EveryMinute, 60)); CHECK(p.settings().saved == choice(GuardCycle::EveryMinute, 60));
+    // FRONT during the plate does nothing; the plate stays for settings_plate_ms.
+    CHECK(!p.handle(Action::Primary, at(1000 + Presenter::settings_plate_ms - 1)) || p.settings().shown.guard == GuardCycle::EveryMinute);
+    CHECK(p.settings().shown.guard == GuardCycle::EveryMinute); CHECK(p.settings().plate == SavePlate::Saved);
+    p.handle(Action::PrimaryLong, at(1000 + Presenter::settings_plate_ms - 1)); CHECK(!p.has_settings_save());
+    p.update(fresh(), at(1000 + Presenter::settings_plate_ms));                                    // the plate's time is over
+    CHECK(p.settings().plate == SavePlate::None); CHECK(p.settings().page == SettingsPage::Brightness);
+    CHECK_EQ(unsigned(p.settings().number), 2u); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 60u);
+    // Brightness: 60 -> 80 -> 100 -> 10 (wraps) -> 30, previewed at once, saved by a hold.
+    const Instant t = at(3000);
+    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 80u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);
+    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 100u);
+    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 10u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 10u);
+    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 30u);
+    CHECK_EQ(unsigned(p.device().bright_pct), 60u);
+    p.handle(Action::PrimaryLong, t); CHECK(p.take_settings_save() == choice(GuardCycle::EveryMinute, 30)); p.settings_saved(true);
+    CHECK(p.settings().plate == SavePlate::Saved); CHECK_EQ(p.screen(), Screen::Settings);
+    p.handle(Action::Tick, at(3000 + Presenter::settings_plate_ms));                                // after the last page: Face
+    CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.settings().open); CHECK(p.device() == choice(GuardCycle::EveryMinute, 30));
+    CHECK_EQ(unsigned(p.lit_brightness_pct()), 30u);
+}
+
+GUARDIAN_CASE(g24_a_failed_save_shows_save_failed_keeps_the_value_and_stays) {
+    Presenter p(display()); p.update(fresh(), at(1000));
+    open_settings(p, at(1000));
+    p.handle(Action::Primary, at(1000));                                                             // EVERY 30 S
+    p.handle(Action::PrimaryLong, at(1000)); CHECK(p.take_settings_save() == choice(GuardCycle::Every30s, 60));
+    p.settings_saved(false);
+    CHECK(p.settings().plate == SavePlate::Failed); CHECK(p.device() == DeviceChoices{});
+    p.handle(Action::Tick, at(1000 + Presenter::settings_plate_ms));
+    CHECK_EQ(p.screen(), Screen::Settings); CHECK(p.settings().page == SettingsPage::Guard); CHECK(p.settings().plate == SavePlate::None);
+    CHECK(p.settings().shown.guard == GuardCycle::Every30s);                                       // the draft stays: try again
+    // Without a report no plate shows; a second hold does not stack a second request.
+    p.handle(Action::PrimaryLong, at(2500)); CHECK(p.has_settings_save());
+    p.handle(Action::PrimaryLong, at(2500)); p.take_settings_save(); CHECK(!p.has_settings_save());
+    CHECK(p.settings().plate == SavePlate::None);
+    p.settings_saved(false); CHECK(p.settings().plate == SavePlate::Failed); CHECK(p.device() == DeviceChoices{});
+    // A report with nothing taken changes nothing.
+    Presenter q(display()); q.update(fresh(), at(1000)); q.settings_saved(true);
+    CHECK(q.settings().plate == SavePlate::None); CHECK(q.device() == DeviceChoices{}); CHECK_EQ(q.screen(), Screen::Face);
+    open_settings(q, at(1000)); q.handle(Action::Primary, at(1000)); q.settings_saved(true);
+    CHECK(q.settings().plate == SavePlate::None); CHECK(q.device() == DeviceChoices{});
+}
+
+GUARDIAN_CASE(g24_the_brightness_preview_ends_when_leaving_and_the_side_leaves_during_a_plate) {
+    Presenter p(display()); p.update(fresh(), at(1000)); p.set_device(choice(GuardCycle::Always, 60));
+    open_settings(p, at(1000));
+    p.handle(Action::PrimaryLong, at(1000)); p.take_settings_save(); p.settings_saved(true);       // guard saved as it was
+    p.handle(Action::Tick, at(1000 + Presenter::settings_plate_ms));
+    p.handle(Action::Primary, at(2500)); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);           // previewed
+    p.handle(Action::Secondary, at(2500)); CHECK_EQ(p.screen(), Screen::Face);
+    CHECK_EQ(unsigned(p.lit_brightness_pct()), 60u);                                                // back to the value in effect
+    // SIDE during a SAVED plate leaves at once (the save already happened).
+    open_settings(p, at(3000)); p.handle(Action::Primary, at(3000));
+    p.handle(Action::PrimaryLong, at(3000)); p.take_settings_save(); p.settings_saved(true);
+    p.handle(Action::Secondary, at(3100)); CHECK_EQ(p.screen(), Screen::Face); CHECK(p.device().guard == GuardCycle::Every30s);
+    CHECK(p.settings().plate == SavePlate::None);
+}
+
+GUARDIAN_CASE(g24_alert_first_a_new_red_alert_returns_to_the_face_amber_does_not) {
+    // On a details page, the network list or the settings screen: a NEW red ALERT goes to the face.
+    for (int where = 0; where < 3; ++where) {
+        Presenter p(display()); p.update(fresh(), at(1000));
+        if (where == 0) { p.handle(Action::Primary, at(1000)); p.handle(Action::Primary, at(1000)); CHECK_EQ(p.screen(), Screen::Details); }
+        if (where == 1) { p.handle(Action::SecondaryLong, at(1000)); CHECK_EQ(p.screen(), Screen::Picker); }
+        if (where == 2) { open_settings(p, at(1000)); p.handle(Action::Primary, at(1000)); CHECK_EQ(p.screen(), Screen::Settings); }
+        p.update(red_alert(1500), at(1500));
+        CHECK(p.view().alert); CHECK_EQ(p.screen(), Screen::Face); CHECK_EQ(p.view().screen, Screen::Face);
+        CHECK(!p.settings().open); CHECK(!p.has_settings_save()); CHECK(p.device() == DeviceChoices{});   // the draft is dropped, nothing saved
+        // While it lasts the owner may still look at the details (keys keep working) ...
+        p.handle(Action::Primary, at(1600)); CHECK_EQ(p.screen(), Screen::Details);
+        // ... and the same alert's next report (still on) does not pull the screen again.
+        auto again = red_alert(1700); again.evidence[0].count = 40; again.incident_seq = 2;
+        p.update(again, at(1700)); CHECK(p.view().alert); CHECK_EQ(p.screen(), Screen::Details);
+        // Once it ended, a new red ALERT returns to the face again.
+        p.handle(Action::Tick, at(1700 + Core::incident_ms)); CHECK(!p.view().alert); CHECK_EQ(p.screen(), Screen::Details);
+        auto later = red_alert(1800 + Core::incident_ms); later.incident_seq = 3;
+        p.update(later, at(1800 + Core::incident_ms)); CHECK(p.view().alert); CHECK_EQ(p.screen(), Screen::Face);
+    }
+    // Amber (a nearby observation) keeps today's behaviour: the open page stays.
+    Presenter a(display()); a.update(fresh(), at(1000)); a.handle(Action::Primary, at(1000)); a.handle(Action::Primary, at(1000));
+    auto amber = fresh(); amber.incident_seq = 4; amber.area_visible[0] = true; amber.area_visible_ms = 60000;
+    amber.area[0].scope = IncidentScope::Area; amber.area[0].family = DetectorFamily::Probe; amber.area[0].acquired = at(1500); amber.area[0].count = 9;
+    a.update(amber, at(1500)); CHECK(a.view().caution); CHECK(!a.view().alert); CHECK_EQ(a.screen(), Screen::Details);
+    // Idle on the face: an alert keeps the face (nothing else changes).
+    Presenter f(display()); f.update(fresh(), at(1000)); f.update(red_alert(1500), at(1500));
+    CHECK_EQ(f.screen(), Screen::Face); CHECK(f.view().alert);
 }

@@ -167,7 +167,7 @@ const char* incident_text(IncidentKind k) {
     return "";
 }
 const char* screen_text(Screen s) {
-    switch (s) { case Screen::Face: return "Face"; case Screen::Details: return "Details"; case Screen::Picker: return "Networks"; }
+    switch (s) { case Screen::Face: return "Face"; case Screen::Details: return "Details"; case Screen::Picker: return "Networks"; case Screen::Settings: return "Settings"; }
     return "";
 }
 const char* view_mode_text(ViewMode m) { return m == ViewMode::Demo ? "DEMO" : "LIVE"; }
@@ -414,12 +414,15 @@ void Presenter::update(const Snapshot& live, Instant now, const ApprovedScope* s
     // to a different selected network after an external selection update.
     if (!(live.selected == live_.selected) || !now.valid()
         || (have_now_ && now.epoch != now_.epoch)) request_ = {};
+    const bool was_alert = view_.alert;
     live_ = live; scope_ = scope; now_ = now; have_now_ = now.valid();
     expire(now);
-    if (mode_ == ViewMode::Demo && incident_banner(live_).visible) {
-        mode_ = ViewMode::Live; screen_ = Screen::Face; page_ = DetailsPage::Settings; explanation_page_ = 0; owner_page_ = 0;
-    }
+    if (mode_ == ViewMode::Demo && incident_banner(live_).visible) { mode_ = ViewMode::Live; to_face(); }
+    tick_plate();
     rebuild();
+    // G24 alert-first (owner, G23 run): a NEW red ALERT shows on the face, whatever page was open; it stays
+    // there unless the owner opens another page. Amber (caution) keeps the open page, as before.
+    if (view_.alert && !was_alert && screen_ != Screen::Face) { to_face(); rebuild(); }
 }
 void Presenter::expire(Instant now) {
     Network cursor_identity{}; const bool cursor_known = cursor_ < picker_.count;
@@ -603,7 +606,7 @@ void Presenter::rebuild_picker() {
     cursor_ = picker_.count == 0 ? 0 : std::min<std::uint8_t>(cursor_, picker_.count - 1);
     picker_.cursor = cursor_;
 }
-void Presenter::rebuild() { const auto& s = shown(); rebuild_face(s); rebuild_details(s); rebuild_picker(); }
+void Presenter::rebuild() { const auto& s = shown(); rebuild_face(s); rebuild_details(s); rebuild_picker(); rebuild_settings(); }
 bool Presenter::evictable(const Slot& slot) const {
     if (valid_identity(live_.selected) && slot.c.network == live_.selected) return false;
     if (scope_ && scope_->find(slot.c.network.bssid)) return false;
@@ -665,9 +668,12 @@ bool Presenter::offer(const Candidate& c) {
 bool Presenter::toggle_mode() {
     if (has_request() || (mode_ == ViewMode::Live && incident_banner(live_).visible)) return false;
     mode_ = mode_ == ViewMode::Live ? ViewMode::Demo : ViewMode::Live;
-    demo_step_ = 0; demo_ = demo_snapshot(0); screen_ = Screen::Face;
-    page_ = DetailsPage::Settings; explanation_page_ = 0; owner_page_ = 0;
+    demo_step_ = 0; demo_ = demo_snapshot(0); to_face();
     return true;
+}
+bool Presenter::set_demo(bool on) {
+    if (on == (mode_ == ViewMode::Demo) || !toggle_mode()) return false;
+    rebuild(); return true;
 }
 bool Presenter::handle(Action action, Instant now) {
     if (!now.valid() || !have_now_ || (now.epoch == now_.epoch && now.at < now_.at)) return false;
@@ -675,9 +681,10 @@ bool Presenter::handle(Action action, Instant now) {
     const Network highlighted = had_cursor ? picker_.entries[cursor_].network : Network{};
     const bool time_changed = now.epoch != now_.epoch || now.at != now_.at;
     if (now.epoch != now_.epoch) request_ = {};
-    now_ = now; expire(now); rebuild();
+    now_ = now; expire(now); tick_plate(); rebuild();
     bool changed = false;
-    if (screen_ == Screen::Picker) {
+    if (screen_ == Screen::Settings) changed = settings_key(action);   // G24: its own single-key rules
+    else if (screen_ == Screen::Picker) {
         if (action == Action::Back || action == Action::SecondaryLong) { screen_ = Screen::Face; changed = true; }
         else if (action == Action::Primary && picker_.count) { cursor_ = static_cast<std::uint8_t>((cursor_ + 1) % picker_.count); changed = true; }
         else if ((action == Action::Secondary || action == Action::PrimaryLong) && !has_request() && picker_.count
@@ -694,8 +701,12 @@ bool Presenter::handle(Action action, Instant now) {
                 }
             }
         }
-    } else if (action == Action::PrimaryLong) changed = toggle_mode();
-    else if (action == Action::SecondaryLong && mode_ == ViewMode::Live) { screen_ = Screen::Picker; order_strongest_first(); changed = true; }
+    } else if (action == Action::PrimaryLong) {
+        // G24 retry (owner 2026-11-21: "like side opens net list, blue opens settings"): hold FRONT on the face or a
+        // details page opens the Settings screen. No key enters DEMO; somehow in DEMO, hold FRONT returns to LIVE.
+        if (mode_ == ViewMode::Demo) changed = toggle_mode();
+        else { open_settings(); changed = true; }
+    } else if (action == Action::SecondaryLong && mode_ == ViewMode::Live) { screen_ = Screen::Picker; order_strongest_first(); changed = true; }
     else if (screen_ == Screen::Face) {
         if (action == Action::Primary) { screen_ = Screen::Details; page_ = DetailsPage::Settings; explanation_page_ = 0; owner_page_ = 0; changed = true; }
         else if (action == Action::Secondary && mode_ == ViewMode::Demo) {
@@ -771,5 +782,88 @@ void Presenter::plan_pages() {
     if (budget_.owner_rows)
         owner_planned_ = plan(owner_starts_, a.owner_checks.size(), budget_.owner_rows, 0,
             [&](std::size_t i) { return wrapped_rows(advice_text(a.owner_checks[i].id), cols); });
+}
+} // namespace guardian
+
+// ---- G24 device settings ------------------------------------------------------------------------
+namespace guardian {
+bool DeviceChoices::valid() const {
+    if (static_cast<std::uint8_t>(guard) >= guard_cycle_count) return false;
+    for (const auto pct : brightness_choices) if (pct == bright_pct) return true;
+    return false;
+}
+bool Presenter::set_device(const DeviceChoices& c) {
+    if (!c.valid()) return false;
+    device_ = c;
+    if (screen_ != Screen::Settings) draft_ = c;
+    rebuild();
+    return true;
+}
+DeviceChoices Presenter::merged() const {
+    DeviceChoices v = device_;
+    if (settings_page_ == SettingsPage::Guard) v.guard = draft_.guard; else v.bright_pct = draft_.bright_pct;
+    return v;
+}
+void Presenter::open_settings() {
+    screen_ = Screen::Settings; settings_page_ = SettingsPage::Guard; draft_ = device_;
+    save_pending_ = report_due_ = false; plate_ = SavePlate::None;
+}
+void Presenter::to_face() {
+    screen_ = Screen::Face; page_ = DetailsPage::Settings; explanation_page_ = 0; owner_page_ = 0;
+    settings_page_ = SettingsPage::Guard; draft_ = device_; save_pending_ = false; plate_ = SavePlate::None;
+}
+DeviceChoices Presenter::take_settings_save() {
+    const DeviceChoices v = pending_;
+    if (save_pending_) { save_pending_ = false; report_due_ = true; }
+    return v;
+}
+void Presenter::settings_saved(bool ok) {
+    if (!report_due_) return;   // nothing was taken: nothing to report
+    report_due_ = false;
+    if (ok) device_ = pending_;
+    if (screen_ == Screen::Settings) { plate_ = ok ? SavePlate::Saved : SavePlate::Failed; plate_at_ = now_.at; }
+    rebuild();
+}
+std::uint8_t Presenter::lit_brightness_pct() const {
+    return screen_ == Screen::Settings && settings_page_ == SettingsPage::Brightness ? draft_.bright_pct : device_.bright_pct;
+}
+void Presenter::rebuild_settings() {
+    settings_view_ = {};
+    settings_view_.open = screen_ == Screen::Settings;
+    settings_view_.page = settings_page_;
+    settings_view_.number = static_cast<std::uint8_t>(static_cast<unsigned>(settings_page_) + 1u);
+    settings_view_.shown = merged();
+    settings_view_.saved = device_;
+    settings_view_.plate = settings_view_.open ? plate_ : SavePlate::None;
+}
+void Presenter::tick_plate() {
+    if (screen_ == Screen::Settings && plate_ != SavePlate::None && have_now_ && now_.at >= plate_at_ + settings_plate_ms) settings_advance();
+}
+void Presenter::settings_advance() {
+    const bool saved = plate_ == SavePlate::Saved;
+    plate_ = SavePlate::None;
+    if (!saved) return;                                   // SAVE FAILED: stay on the page, the draft kept
+    if (settings_page_ == SettingsPage::Guard) { settings_page_ = SettingsPage::Brightness; draft_ = device_; }
+    else to_face();                                       // after the last page: the face
+}
+bool Presenter::settings_key(Action a) {
+    if (a == Action::Secondary || a == Action::SecondaryLong || a == Action::Back) { to_face(); return true; }
+    if (plate_ != SavePlate::None) return false;          // the plate shows: FRONT waits for it
+    if (a == Action::Primary) {
+        if (settings_page_ == SettingsPage::Guard)
+            draft_.guard = static_cast<GuardCycle>((static_cast<unsigned>(draft_.guard) + 1u) % guard_cycle_count);
+        else {
+            std::size_t i = 0;
+            while (i < brightness_choices.size() && brightness_choices[i] != draft_.bright_pct) ++i;
+            draft_.bright_pct = brightness_choices[i < brightness_choices.size() ? (i + 1) % brightness_choices.size() : 0];
+        }
+        return true;
+    }
+    if (a == Action::PrimaryLong) {
+        if (save_pending_ || report_due_) return false;   // one save at a time
+        pending_ = merged(); save_pending_ = true;
+        return true;
+    }
+    return false;
 }
 } // namespace guardian

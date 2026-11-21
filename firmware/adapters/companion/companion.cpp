@@ -194,6 +194,7 @@ StoreState Companion::boot() {
     // G16J: a selection saved before the same-name watch existed is upgraded once (and saved).
     if (store_ == StoreState::Restored && presenter_.impostor_watch() && !monitor_.scope().selected().watch_impostors
         && monitor_.set_watch(true) && !store_ref_.save(persist(monitor_.scope()))) store_ = StoreState::SaveFailed;
+    if (settings_) presenter_.set_device(settings_->load());   // G24: corrupt or absent = the defaults (said in STATUS)
     tick();
     return store_;
 }
@@ -236,6 +237,11 @@ bool Companion::input(Action action) {
     }
     const bool changed = presenter_.handle(action, now());
     if (presenter_.has_request()) { apply(presenter_.take_request()); tick(); return true; }
+    if (presenter_.has_settings_save()) {   // G24: a hold of FRONT on the Settings screen, written at once
+        const DeviceChoices v = presenter_.take_settings_save();
+        presenter_.settings_saved(settings_ && settings_->save(v));
+        return true;
+    }
     return changed;
 }
 

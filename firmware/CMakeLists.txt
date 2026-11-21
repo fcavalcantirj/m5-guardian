@@ -38,7 +38,8 @@ set(GUARDIAN_TEST_WARNINGS ${GUARDIAN_WARNINGS} -Wshadow -Wconversion -Wsign-con
 add_library(guardian_core STATIC components/guardian_core/core.cpp components/guardian_core/parser.cpp
   components/guardian_core/rating.cpp components/guardian_core/detectors.cpp components/guardian_core/advice.cpp
   components/guardian_core/threat.cpp components/guardian_core/threats.cpp components/guardian_core/datapath.cpp
-  components/guardian_core/shapes.cpp components/guardian_core/ble.cpp)
+  components/guardian_core/shapes.cpp components/guardian_core/ble.cpp
+  components/guardian_core/guard_cycle.cpp)
 target_include_directories(guardian_core PUBLIC components/guardian_core/include)
 
 add_library(guardian_presenter STATIC components/guardian_presenter/presenter.cpp)
@@ -62,6 +63,7 @@ set(GUARDIAN_PUBLIC_HEADERS
   components/guardian_core/include/guardian/core.hpp
   components/guardian_core/include/guardian/detector.hpp
   components/guardian_core/include/guardian/detectors.hpp
+  components/guardian_core/include/guardian/guard_cycle.hpp
   components/guardian_core/include/guardian/identity.hpp
   components/guardian_core/include/guardian/parser.hpp
   components/guardian_core/include/guardian/radio.hpp
@@ -108,7 +110,7 @@ add_test(NAME measurement_check COMMAND measurement_check)
 # Monitor scope, alert scoping, screen composition) over the same Monitor.
 add_library(guardian_companion STATIC adapters/companion/companion.cpp adapters/companion/screens.cpp adapters/companion/persona.cpp
   adapters/companion/motion.cpp adapters/companion/shake.cpp adapters/companion/burst.cpp
-  adapters/companion/inflate.cpp adapters/companion/head3d.cpp)
+  adapters/companion/inflate.cpp adapters/companion/head3d.cpp adapters/companion/device_settings.cpp)
 target_include_directories(guardian_companion PUBLIC adapters/companion)
 target_link_libraries(guardian_companion PUBLIC guardian_measurement guardian_canvas)
 target_compile_options(guardian_companion PRIVATE ${GUARDIAN_WARNINGS})
@@ -116,6 +118,12 @@ add_executable(companion_check tests/companion_check.cpp)
 target_link_libraries(companion_check PRIVATE guardian_companion guardian_test_support)
 target_compile_options(companion_check PRIVATE ${GUARDIAN_TEST_WARNINGS} -Wno-sign-conversion)
 add_test(NAME companion_check COMMAND companion_check)
+# G24: the device settings (guard on battery, brightness): versioned CRC-checked blob, measured-hours
+# table and its extremes, the STATUS fragments settings= / guard_cycle= / parts=.
+add_executable(device_settings_check tests/device_settings_check.cpp)
+target_link_libraries(device_settings_check PRIVATE guardian_companion guardian_test_support)
+target_compile_options(device_settings_check PRIVATE ${GUARDIAN_TEST_WARNINGS} -Wno-sign-conversion)
+add_test(NAME device_settings_check COMMAND device_settings_check)
 # G16: Very good portrait motion (tilt, breathing, ember glow, smoke) over the accepted G15 v2 art.
 add_executable(persona_check tests/persona_check.cpp)
 target_link_libraries(persona_check PRIVATE guardian_companion guardian_test_support)
@@ -394,6 +402,7 @@ guardian_add_test(parser_check guardian_core)            # G04 SecurityFramePars
 guardian_add_test(rating_check guardian_core)            # G05 rating policy over AdvertisedSettings and real-parser fixtures (TDD, red first)
 guardian_add_test(core_check guardian_core)              # G05 evidence freshness, epochs, isolation (TDD, red first)
 guardian_add_test(detector_check guardian_presenter)     # G06 disconnect-burst / baseline-change detectors over fixtures (TDD, red first)
+guardian_add_test(guard_cycle_check guardian_core)       # G24 guard listen cycle on battery: pure schedule of time, power source and screen (TDD, red first)
 guardian_add_test(advice_check guardian_presenter)       # G07 evidence-based advice, signal view, owner checks over fixtures (TDD, red first)
 # canvas.hpp:37 (pre-existing, inline size_bytes) has an int->size_t conversion;
 # the header is included by this test, so the strict flag is relaxed here only.

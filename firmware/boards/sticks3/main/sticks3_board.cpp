@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "driver/gpio.h"
+#include "soc/gpio_reg.h"   // G24: G46 output enable / output level read back for STATUS parts=
+#include "soc/soc.h"
 #include "driver/rtc_io.h"
 #include "driver/i2c_master.h"
 #include "driver/ledc.h"
@@ -38,6 +40,9 @@ constexpr std::uint8_t PM1_REG_PWR_SRC = 0x04;
 constexpr std::uint8_t PM1_REG_I2C_CFG = 0x09;
 constexpr std::uint8_t PM1_REG_GPIO_MODE = 0x10;
 constexpr std::uint8_t PM1_REG_GPIO_OUT = 0x11;
+constexpr std::uint8_t PM1_REG_PWR_CFG = 0x06;            // G24: bit 4 green status LED, bit 3 5 V boost (G24 spike S2: 0x17 at boot)
+constexpr std::uint8_t PM1_PWR_CFG_LED = 1u << 4;
+constexpr std::uint8_t PM1_PWR_CFG_BOOST5V = 1u << 3;
 constexpr std::uint8_t PM1_REG_GPIO_DRV = 0x13;
 constexpr std::uint8_t PM1_REG_GPIO_FUNC0 = 0x16;
 // G16B battery (M5Unified 0.2.21 M5PM1_Class.cpp register names; StickS3 charge
@@ -239,6 +244,62 @@ bool Board::setup_panel() {
     if (esp_lcd_panel_set_gap(panel, o::display.gap_x, o::display.gap_y) != ESP_OK) return false;
     if (esp_lcd_panel_disp_on_off(panel, true) != ESP_OK) return false;
     return true;
+}
+
+// ---- G24: unused parts off, their register reads, the LCD rail ------------------------------------
+bool Board::parts_off() {
+    auto* dev = static_cast<i2c_master_dev_handle_t>(pm1_dev_);
+    bool ok = dev != nullptr;
+    if (dev) {
+        ok &= pm1_update(dev, PM1_REG_PWR_CFG, static_cast<std::uint8_t>(PM1_PWR_CFG_LED | PM1_PWR_CFG_BOOST5V), false);
+        ok &= pm1_update(dev, PM1_REG_GPIO_OUT, PM1_GPIO3_PA_CONTROL, false);
+    }
+    // vpd holdIrTxLow: G46 (the IR TX gate) driven low and its pad held, so nothing can light the IR LED.
+    const auto ir = static_cast<gpio_num_t>(46);
+    gpio_hold_dis(ir);
+    ok &= gpio_set_pull_mode(ir, GPIO_PULLDOWN_ONLY) == ESP_OK;
+    ok &= gpio_set_level(ir, 0) == ESP_OK;
+    ok &= gpio_set_direction(ir, GPIO_MODE_OUTPUT) == ESP_OK;
+    ok &= gpio_hold_en(ir) == ESP_OK;
+    return ok;
+}
+
+void Board::read_parts(int& pwr_cfg, int& gpio_out, int& ir_oe, int& ir_level) const {
+    auto* dev = static_cast<i2c_master_dev_handle_t>(pm1_dev_);
+    std::uint8_t v{};
+    pwr_cfg = dev && pm1_read(dev, PM1_REG_PWR_CFG, v) ? v : -1;
+    gpio_out = dev && pm1_read(dev, PM1_REG_GPIO_OUT, v) ? v : -1;
+    const std::uint32_t bit46 = 1u << (46 - 32);
+    ir_oe = (REG_READ(GPIO_ENABLE1_REG) & bit46) ? 1 : 0;
+    ir_level = (REG_READ(GPIO_OUT1_REG) & bit46) ? 1 : 0;
+}
+
+bool Board::lcd_rail(bool on) {
+    auto* dev = static_cast<i2c_master_dev_handle_t>(pm1_dev_);
+    if (!dev) return false;
+    if (!on) {
+        set_backlight(0);
+        const bool ok = pm1_update(dev, PM1_REG_GPIO_OUT, PM1_GPIO2_LCD_POWER, false);
+        if (ok) rail_on_ = false;
+        return ok;
+    }
+    if (!pm1_update(dev, PM1_REG_GPIO_OUT, PM1_GPIO2_LCD_POWER, true)) return false;
+    rail_on_ = true;
+    vTaskDelay(pdMS_TO_TICKS(100));   // rail settle, as at boot
+    return setup_panel();
+}
+
+int Board::i2c_read(std::uint8_t addr, std::uint8_t reg) {
+    auto* bus = static_cast<i2c_master_bus_handle_t>(i2c_bus_);
+    if (!bus || addr == pm1_addr) return -1;
+    i2c_device_config_t cfg{};
+    cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7; cfg.device_address = addr; cfg.scl_speed_hz = pm1_hz;
+    i2c_master_dev_handle_t dev{};
+    if (i2c_master_bus_add_device(bus, &cfg, &dev) != ESP_OK) return -1;
+    std::uint8_t v{};
+    const esp_err_t r = i2c_master_transmit_receive(dev, &reg, 1, &v, 1, 50);
+    i2c_master_bus_rm_device(dev);
+    return r == ESP_OK ? v : -1;
 }
 
 #if CONFIG_GUARDIAN_ART_BENCH

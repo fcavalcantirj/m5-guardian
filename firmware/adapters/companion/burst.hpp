@@ -34,10 +34,10 @@
 //                 identity pose the band then equals the still portrait pixel for pixel.
 //    The reform is gated by STILLNESS, not by a timer. The stick is "moving" in a frame when the up
 //    vector turned faster than `still_dps` since the frame before, or the shove is above `still_g`
-//    (TUNE burst.still_dps 12, burst.still_g 0.10; MEASURED on the nine recorded traces at 25 fps:
+//    (TUNE burst.still_dps 10, burst.still_g 0.10; MEASURED on the nine recorded traces at 25 fps:
 //    hand-held still or lying = moving in 0..2 % of the frames, handling, FRONT x3 and the gentlest
 //    shake in 92..98 %). The reform starts once the stick has been still for `calm_s` (burst.calm_s,
-//    0.6 s), never earlier than explode + drift after the last shake (1.5 s: a shake on a stick that
+//    1.0 s), never earlier than explode + drift after the last shake (1.5 s: a shake on a stick that
 //    is then left alone is the 3.5 s show of G16I), and never later than `max_s` after the last shake
 //    (burst.max_s, 20 s: a stick carried about does not stay a pile forever). Once it started it runs
 //    to the end; only a new shake (kick) interrupts it. Lying flat (less than 0.2 of gravity across
@@ -66,9 +66,12 @@ constexpr int pile_w = grid_w, pile_h = persona::art_h / block;    // 45 x 53 wh
 constexpr Range still_dps_range{2.0f, 60.0f}, still_g_range{0.02f, 1.0f}, calm_s_range{0.2f, 5.0f}, max_s_range{5.0f, 120.0f};
 struct Params {
     float total_s{default_total_s};   // explode 1/7 of it, the shortest fall 2/7, the reform 4/7
-    float still_dps{12.0f};           // the up vector turning faster than this between two frames: the stick is moving
+    // G24 carry-over (G23 owner run, firmware/evidence/sticks3-G23-20261121.log step 11, still_trace on the slow-tilt
+    // recording and the recorded still / setdown / walk traces): 10 and 1.0 s (from 12 and 0.6 s): the slow tilt
+    // reaches calm 0 times (2 at the old values); hand-held 4, set down 1, lying still 1.
+    float still_dps{10.0f};           // the up vector turning faster than this between two frames: the stick is moving
     float still_g{0.10f};             // ... or a shove above this
-    float calm_s{0.6f};               // still for this long: the reform starts
+    float calm_s{1.0f};               // still for this long: the reform starts
     float max_s{20.0f};               // after the last shake the reform starts at the latest now
 };
 

@@ -8,6 +8,7 @@
 #include "guardian/capabilities.hpp"
 #include "guardian/core.hpp"
 #include "guardian/detectors.hpp"
+#include "guardian/guard_cycle.hpp"
 #include "guardian/identity.hpp"
 #include "guardian/parser.hpp"
 #include "guardian/radio.hpp"
@@ -52,18 +53,25 @@ namespace guardian {
 // ViewModel::incident so an incident and a coverage overlay coexist.
 enum class Overlay { None, Checking, NoFreshData, CoverageDegraded, Unsupported, Incident };
 
-enum class Screen : std::uint8_t { Face, Details, Picker };
+// G24: Settings = the device settings screen (one big option per page), opened by holding FRONT on the face or details.
+enum class Screen : std::uint8_t { Face, Details, Picker, Settings };
 enum class ViewMode : std::uint8_t { Live, Demo };
 
 // Abstract input. The board maps physical keys (StickS3: front key -> Primary,
 // side key -> Secondary; a long press is the board's debounce/hold decision).
 // Documented transitions (handle()):
-//   Face:    Primary -> Details; PrimaryLong -> toggle DEMO/Live;
+//   Face:    Primary -> Details; PrimaryLong -> Settings screen (G24 retry; in DEMO: back to Live);
 //            Secondary -> (DEMO) next expression, (Live) nothing;
 //            SecondaryLong -> Picker (Live only; ignored in DEMO)
-//   Details: Primary -> next page (Settings, Explanation, Signal, Owner checks, What it cannot
-//            see, then Nearby while something is nearby; after the last page: Face); Secondary/Back -> Face;
-//            PrimaryLong -> toggle DEMO/Live (returns to Face); SecondaryLong -> Picker (Live only)
+//   Details: Primary -> next page (Settings, Explanation, Signal, Owner checks, What it cannot see, then Nearby
+//            while something is nearby; after the last page: Face); Secondary/Back -> Face;
+//            PrimaryLong -> Settings screen (in DEMO: back to Live, Face); SecondaryLong -> Picker (Live only)
+//   No key enters DEMO (owner 2026-11-21, "is for development, ditch"): set_demo() is the direct method.
+//   Settings (G24, single-key, the owner is one-handed): Primary -> next value of this page (wraps);
+//            PrimaryLong -> save this page (SettingsSave request; the SAVED / SAVE FAILED plate shows for
+//            settings_plate_ms, then the next page, after the last page Face; a failed save stays on the
+//            page); Secondary / SecondaryLong / Back -> Face (nothing more saved; the draft is dropped)
+//   Any screen: a NEW red ALERT (view().alert turning on) returns to Face (alert-first, G24); amber does not.
 //   Picker:  Primary -> move the cursor (wraps); Secondary -> select the highlighted
 //            network (OwnerRequest::Select, then Face); PrimaryLong -> approve or revoke
 //            the highlighted network as a related AP of the selection (same SSID bytes,
@@ -232,6 +240,30 @@ std::size_t alert_sentence(const ViewModel&, char* out, std::size_t capacity, st
 // G16J: Limits ("What it cannot see") follows OwnerChecks, always; then Nearby when current.
 // (Appended so the earlier values stay stable.)
 enum class DetailsPage : std::uint8_t { Settings, Explanation, SignalAndEvidence, OwnerChecks, Nearby, Limits, Count };
+
+// ---- G24 device settings ------------------------------------------------------------------------
+// Two settings the owner sets on the stick: the guard listen cycle on battery (guard_cycle.hpp) and the
+// screen brightness while lit (backlight percent; the dim level stays its own TUNE key). The application
+// owns their storage (a versioned, CRC-checked blob on StickS3) and tells the Presenter what is in effect.
+constexpr std::uint8_t brightness_default_pct = 60;
+constexpr std::array<std::uint8_t, 5> brightness_choices{{10, 30, 60, 80, 100}};
+struct DeviceChoices {
+    GuardCycle guard{GuardCycle::Always};
+    std::uint8_t bright_pct{brightness_default_pct};
+    bool valid() const;               // a known guard choice and one of brightness_choices
+    bool operator==(const DeviceChoices& o) const { return guard == o.guard && bright_pct == o.bright_pct; }
+};
+enum class SettingsPage : std::uint8_t { Guard, Brightness };
+constexpr std::uint8_t settings_pages = 2;
+enum class SavePlate : std::uint8_t { None, Saved, Failed };
+struct SettingsView {
+    bool open{};                      // the Settings screen is shown
+    SettingsPage page{SettingsPage::Guard};
+    std::uint8_t number{1};           // 1-based page number of settings_pages
+    DeviceChoices shown{};            // the in-effect values with this page's draft applied
+    DeviceChoices saved{};            // the values in effect (set_device / a successful save)
+    SavePlate plate{SavePlate::None}; // shown after a save for settings_plate_ms
+};
 
 struct DetailsView {
     DetailsPage page{DetailsPage::Settings};
@@ -424,12 +456,32 @@ public:
     void set_impostor_watch(bool on) { impostor_watch_ = on; }
     bool impostor_watch() const { return impostor_watch_; }
     ViewMode mode() const { return mode_; }
+    // G24 retry (owner 2026-11-21: DEMO "is for development, ditch"): no key enters DEMO any more. The capability
+    // stays behind this direct method for tests and tools: true = the mode changed (refused, false, while an owner
+    // request is pending or, to enter, while a live incident shows; asking for the mode already in effect is false).
+    bool set_demo(bool on);
     Screen screen() const { return screen_; }
 
     // The pending owner request, cleared by take_request(), selection changes or
     // invalid/changed clock epochs. At most one request belongs to this selection.
     bool has_request() const { return request_.kind != RequestKind::None; }
     OwnerRequest take_request();
+
+    // G24 device settings. set_device: the values in effect (after the application loaded them); an invalid
+    // value is refused (false, nothing changes). A hold of FRONT on the Settings screen leaves ONE pending
+    // save: take_settings_save() hands the values to store (the in-effect values with this page's draft);
+    // the application stores them and reports the outcome with settings_saved() (at the instant of the last
+    // handle/update). Without a report no plate shows and the page stays.
+    static constexpr Millis settings_plate_ms = 1000;
+    bool set_device(const DeviceChoices&);
+    const DeviceChoices& device() const { return device_; }
+    const SettingsView& settings() const { return settings_view_; }
+    bool has_settings_save() const { return save_pending_; }
+    DeviceChoices take_settings_save();
+    void settings_saved(bool ok);
+    // The backlight percent while lit: the brightness page's draft while it is shown (a preview at once),
+    // otherwise the brightness in effect.
+    std::uint8_t lit_brightness_pct() const;
 
 private:
     struct Slot {
@@ -448,6 +500,13 @@ private:
     const Snapshot& shown() const;
     std::uint8_t explanation_pages() const;
     bool toggle_mode();
+    void rebuild_settings();
+    void settings_advance();          // after a plate: next page, or Face after the last
+    bool settings_key(Action);
+    void open_settings();
+    void to_face();                   // Face, details reset, any settings draft / plate dropped
+    void tick_plate();                // the plate's time over: settings_advance()
+    DeviceChoices merged() const;     // device_ with this page's draft
 
     DisplayCapabilities display_;
     Origin live_origin_;
@@ -477,6 +536,16 @@ private:
     std::uint32_t rejected_origin_{};
     std::uint32_t rejected_time_{};
     OwnerRequest request_{};
+    // G24
+    DeviceChoices device_{};
+    SettingsPage settings_page_{SettingsPage::Guard};
+    DeviceChoices draft_{};
+    bool save_pending_{};
+    bool report_due_{};               // a save was taken; settings_saved() reports its outcome
+    DeviceChoices pending_{};
+    SavePlate plate_{SavePlate::None};
+    Millis plate_at_{};
+    SettingsView settings_view_{};
     ViewModel view_{};
     DetailsView details_{};
     PickerView picker_{};

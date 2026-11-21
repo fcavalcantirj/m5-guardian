@@ -58,6 +58,7 @@ idf_component_register(
          "../../../adapters/companion/companion.cpp" "../../../adapters/companion/screens.cpp" "../../../adapters/companion/persona.cpp"
          "../../../adapters/companion/motion.cpp" "../../../adapters/companion/shake.cpp" "../../../adapters/companion/burst.cpp"
          "../../../adapters/companion/inflate.cpp" "../../../adapters/companion/head3d.cpp"
+         "../../../adapters/companion/device_settings.cpp"   # G24: the Settings blob, hours table, STATUS fragments
          "../../../adapters/imu/bmi270.cpp" "../../../adapters/imu/bmi270_config.cpp"
          "../../../adapters/tune/tune.cpp" "../../../adapters/tune/threat_tune.cpp" "../../../adapters/tune/session.cpp" "tune_link.cpp"
          "../../../adapters/tune/offer_rsa.cpp"   # G22A: the offer signature check (mbedtls, the image check's library)

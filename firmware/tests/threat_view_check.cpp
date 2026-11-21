@@ -166,7 +166,7 @@ GUARDIAN_CASE(amber_expires_with_the_area_visibility_and_never_breaks_demo) {
     p.handle(Action::Tick, at(clock, 1000 + s.area_visible_ms)); CHECK(!p.view().caution);
     Presenter demo(lcd());
     demo.update(scene(c_, clock, false, false), at(clock, 1000));
-    CHECK(demo.handle(Action::PrimaryLong, at(clock, 1001)));
+    CHECK(demo.set_demo(true));   // G24 retry: the direct method (no key enters DEMO)
     demo.update(scene(c_, clock, true, false), at(clock, 1002));
     CHECK_EQ(demo.mode(), ViewMode::Demo);              // a nearby observation is advisory: DEMO stays
     CHECK(!demo.view().caution);
@@ -281,7 +281,7 @@ GUARDIAN_CASE(radar_row_shows_registered_families_pulses_and_real_rates) {
     CHECK(!has(f, "P12"));
     // DEMO is not a reading: no radar there.
     Presenter demo(lcd()); demo.update(scene(c_, clock, false, false), at(clock, 1000));
-    demo.handle(Action::PrimaryLong, at(clock, 1001));
+    demo.set_demo(true);
     compose(demo, st, f);
     CHECK(!f.hud.radar);
 }

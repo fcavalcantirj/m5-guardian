@@ -54,3 +54,14 @@ CONFIG_PARTITION_TABLE_OFFSET=0x8000
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 # G16M credential vault: eFuse key block of the HMAC key (see main/Kconfig.projbuild; read only).
 CONFIG_GUARDIAN_CRED_HMAC_KEY_ID=0
+
+# G24 guard listen cycle on battery (Settings: GUARD ON BATTERY). Power management is compiled into every
+# image so a cycled choice can run the CPU at 80 MHz with automatic light sleep while the radio is off
+# (esp_pm_configure returns ESP_ERR_NOT_SUPPORTED without CONFIG_PM_ENABLE; ESP-IDF v5.4 components/esp_pm/pm_impl.c),
+# and tickless idle lets the idle task enter that light sleep. Frequency scaling at startup stays off
+# (CONFIG_PM_DFS_INIT_AUTO is not set): every image boots and runs at CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ (160) and
+# nothing changes until the guard cycle asks (Always, the default, never does). MEASURED in the G24 spike
+# image (sdkconfig.power-exp, the same two lines): 380 cycles, pm_fail=0. What it changes in the built
+# sdkconfig and in the bootloader: firmware/README.md, "Power management in every image (G24)".
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y

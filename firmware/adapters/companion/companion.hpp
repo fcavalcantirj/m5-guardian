@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "guardian/canvas.hpp"
 #include "blob.hpp"
+#include "device_settings.hpp"
 #include "persona.hpp"
 #include "motion.hpp"
 #include "burst.hpp"
@@ -113,6 +114,16 @@ public:
     bool impostor_watch() const { return presenter_.impostor_watch(); }
     StoreState store() const { return store_; }
     std::uint32_t pending_dropped() const { return pending_dropped_; }
+    // G24 device settings: the store is attached before boot(), which loads it (the defaults and
+    // SettingsStore::Default without one). A save from the Settings screen is written through it at once
+    // and its outcome shown (SAVED / SAVE FAILED); without a store every save fails.
+    void attach_settings(DeviceSettingsStore& store) { settings_ = &store; }
+    const DeviceChoices& device() const { return presenter_.device(); }
+    SettingsStore settings_store() const { return settings_ ? settings_->state() : SettingsStore::Default; }
+    // The backlight percent while lit (the brightness page's draft while it is shown).
+    std::uint8_t lit_brightness_pct() const { return presenter_.lit_brightness_pct(); }
+    // G24 retry: DEMO only through this direct method (tests, tools); no key enters it. See Presenter::set_demo.
+    bool set_demo(bool on) { return presenter_.set_demo(on); }
 private:
     Instant now() const;
     void apply(const OwnerRequest&);
@@ -127,6 +138,7 @@ private:
     std::uint32_t pending_dropped_{};
     BlobStorage* onboarding_seen_{};
     std::uint8_t onboarding_page_{onboarding_pages}; // == pages: not showing
+    DeviceSettingsStore* settings_{};                 // G24
 };
 
 // ---- screen composition (diagnostic visuals until art is accepted) ---------

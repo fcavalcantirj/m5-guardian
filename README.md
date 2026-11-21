@@ -23,11 +23,36 @@ is the first board, not a requirement of the library.
 | Red **ALERT** and one sentence | An incident on the picked network, for example "Disconnect burst on" and the network's name, with the count and the time window. The cause is stated as unknown. |
 | Amber edge and one sentence | Something nearby that is not aimed at the picked network, for example a probe flood. The rating does not change. |
 | **No fresh data** and an age | The network was not heard for 29 seconds or more. No rated face is shown without fresh evidence, and silence is never reported as "all clear". |
-| **DEMO n/5** | A labelled walk through the five faces. It is never shown as a reading. |
+| **DEMO n/5** | A labelled walk through the five faces, kept for development: no key opens it (since G24), and holding the front key leaves it. It is never shown as a reading. |
+| **SETTINGS n/2** | The device settings, one big option per page: how the guard listens on battery and the screen brightness. Each choice shows its battery hours **measured** on the stick from full to the 20 % floor, the highest and lowest measured marked, or "not measured yet". |
 
-Two keys: the front (blue) key switches face and details, holding the side key opens the network
-list. The details pages give the reason for the rating, the evidence counts and a page named "What
-it cannot see".
+Two keys, each used alone (one hand is enough):
+
+| Where | Front (blue) key | Hold front | Side key | Hold side |
+|---|---|---|---|---|
+| Face | details, first page | Settings screen | (nothing) | network list |
+| Details | next page; after the last, the face | Settings screen | the face | network list |
+| Settings screen | next choice (wraps) | save this page, then the next page; after the last, the face | the face, nothing more saved | the face |
+| Network list | next network | "this AP is mine too" on a same-name row | choose | back |
+
+The details pages give the reason for the rating, the evidence counts and a page named "What it
+cannot see". Pressing the front key three times fast asks for an update (or opens the phone setup
+when no Wi-Fi is stored); it counts only on the face, so stepping through details or settings never
+opens it.
+
+| Setting | Choices | Measured battery hours (full to the 20 % floor) | What it costs |
+|---|---|---|---|
+| Guard on battery | **Always** (default: today's behaviour) | 2 h 05 min (lowest, measured) | nothing: never blind |
+| | **Every 30 s**: listen 10 s, radio off 20 s | not measured yet | an alert can be up to 20 s late; a short burst inside an off period is missed |
+| | **Every minute**: listen 10 s, radio off 50 s | 7 h 14 min (highest, measured) | an alert can be up to 50 s late; a short burst inside an off period is missed |
+| Brightness | 10, 30, **60** (default), 80, 100 % | not measured yet | costs only while the screen is lit |
+
+The two cycled choices act only on battery while the screen is dark; a key, motion, USB power or a
+counted burst lights the screen and the radio listens at once. The hours come from the G24 battery
+spike ([firmware/evidence/sticks3-G24-spike-20261121.log](firmware/evidence/sticks3-G24-spike-20261121.log));
+nothing on the Settings screen is an estimate. In every choice the parts the Guardian does not use
+are off from boot: the green status LED, the 5 V boost, the speaker amplifier, the infrared LED's
+gate and the audio codec (STATUS `parts=` reads them back from the registers).
 
 ## What it detects
 
@@ -109,9 +134,9 @@ are in [firmware/README.md](firmware/README.md).
 
 ## Status
 
-Measured state on 2026-11-20, taken from the ledger ([guardian-tasks.json](guardian-tasks.json)): 43
-of 45 rows are accepted. The open rows are the delivery row G23 and G16U (Bluetooth guard, deferred
-to a second release). "Accepted" means the row's own verification was done by the supervising
+Measured state on 2026-11-21, taken from the ledger ([guardian-tasks.json](guardian-tasks.json)): 44
+of 46 rows are accepted. The open rows are G24 (the Settings screen, release 1) and G16U (Bluetooth
+guard, deferred to a second release). "Accepted" means the row's own verification was done by the supervising
 reviewer; what was measured is in the last column, with the row that records it.
 
 | Area | Rows | State | Measured |
@@ -129,7 +154,8 @@ reviewer; what was measured is in the last column, with the row that records it.
 | 3D head | G21 | accepted, off by default | one frame inflates in 14.8 ms on the stick; the approved look is the 2D portrait |
 | Bluetooth popup-spam rule | G16H | accepted, host only | no Bluetooth scan runs on the stick |
 | Integrated review | G22 | accepted | independent verdict "REVISE INTEGRATED"; findings and dispositions in docs/review-status.md |
-| Delivery | G23 | **open** | the device recordings and the carry-over proofs are listed in docs/G23-delivery.md |
+| Delivery | G23 | accepted | the owner's run of 2026-11-21 (firmware/evidence/sticks3-G23-20261121.log); the device recordings are listed in docs/G23-delivery.md |
+| Settings: guard on battery, brightness, unused parts off | G24 | **open**: implemented and host-tested, awaiting review and the device acceptance | the hours shown are the G24 spike's full drains (always listening 2 h 05 min; listen 10 s / off 50 s with every lever 7 h 14 min, 380 cycles with 0 radio, rail or power-management failures); the six Settings pages render pixel for pixel as the owner-approved look; nothing of G24 is measured on the stick yet (firmware/README.md, G24) |
 | Bluetooth guard | G16U | open, release 2 | not built |
 
 Router modes: the ratings were seen on the device for the owner's own router and, for all five faces,
