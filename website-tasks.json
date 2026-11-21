@@ -1,0 +1,116 @@
+[
+  {
+    "id": "W01",
+    "category": "integration",
+    "description": "Prepare an isolated website ledger and runner lane, then import only the supplied website into website/ without altering existing firmware work.",
+    "depends_on": [],
+    "steps": [
+      "OWNER (2026-11-21, confirmed to the Author): import the website from the owner's export, finish it, add 'See in 3D' (the StickS3 with the Guardian face on its screen ONLY; no 3D head), deploy on Vercel as project m5-guardian. Plan reviewed by Codex gpt-6-astra (high, read-only), verdict REVISE, all its changes adopted in these rows. The source folder path is given to the worker in the run prompt, never written into this public ledger.",
+      "Supervisor: verify that the firmware runner and its worker have exited; record the target revision and existing dirty-file list outside the public repository before editing the shared runner.",
+      "Supervisor: create website-tasks.json with exactly W01, W02, W03, W05 and W06 in this order, using this schema and passes=false; include no workstation paths, credentials or execution receipts.",
+      "Supervisor: add validated RALPH_LEDGER selection to tools/ralph_runner.py, defaulting to guardian-tasks.json; preserve the firmware data directory and assign website-tasks.json to a separate ralph-website directory.",
+      "Supervisor: bind receipt directories to the resolved ledger identity, reject mismatched reuse through RALPH_DATA_ROOT, add a common checkout execution lock, and detect changes to either acceptance ledger during a worker run.",
+      "Supervisor: add a website worker prompt naming the selected ledger and website task scope; retain reviewer-owned acceptance and prohibit worker commits, publication, firmware changes and harness edits. Document explicit one-task invocations and supervisor-owned deployment in docs/ralph.md.",
+      "Supervisor: add and pass focused runner tests for default and website selection, invalid paths, prompt rendering, receipt isolation, shared-lock exclusion, ledger mutation detection, retry handling and non-batch review boundaries; launch no real worker from these tests.",
+      "Copy only the supplied website directory into website/, excluding .git, .vercel, .env files, node_modules, .next, out, caches, logs, browser reports, tsconfig.tsbuildinfo and generated next-env.d.ts; verify that imported source and image bytes match the source before documented corrections.",
+      "Extend website/.gitignore for Vercel state and generated test/build artifacts; set Node engines to 24.x, retain pnpm 12.3.4, and make typecheck generate Next types before running tsc --noEmit.",
+      "Using Node 24.x and pnpm 12.3.4, complete a frozen-lockfile install, typecheck, the existing six tests and a production build; preserve the lockfile and record actual tool versions and command results outside the public tree.",
+      "Run the root public check with the owner's private map required; inspect the exact publication file list and confirm that every pre-existing firmware change is preserved. Limit W01 edits outside website/ to website-tasks.json, runner support, its prompt, focused tests and docs/ralph.md."
+    ],
+    "passes": true,
+    "existing_work": ""
+  },
+  {
+    "id": "W02",
+    "category": "content-accessibility",
+    "description": "Finish the English landing page with accurate product wording, complete metadata, clear licensing, readable responsive layouts and accessible controls.",
+    "depends_on": [
+      "W01"
+    ],
+    "steps": [
+      "Remove the optional-cigar claim; replace the claim covering every advertised security state with five rated outcomes plus unrated/stale handling; qualify receive-only as monitoring and disclose setup/update transmission and update listening gaps.",
+      "Replace traffic inspection with inspection of clients' application traffic; scope no-companion-computer and no-cloud claims to normal monitoring; state that this website is a simulation and does not connect to or protect a visitor's network.",
+      "Add a website claim-to-source record covering every factual device statement, with repository-relative source paths and quotations; distinguish current behavior, host-only validation and deferred features, and link the published coverage and limitations documents.",
+      "Preserve the reserved-artwork notice, correct its relocated references, record the owner's specified website/screen/social-card use without granting general reuse, and add separate working links for code and artwork licenses.",
+      "Make the repository-path row a real link; verify all local anchors and every GitHub file/fragment link against the published branch, retaining synthetic network names and explicitly labeled example counts.",
+      "Set metadataBase, canonical URL and Open Graph URL to https://m5-guardian.vercel.app; use a consistent title and description; add a 1200x630 social card with matching metadata while retaining the SVG favicon.",
+      "Add app/not-found.tsx with a home link, production robots and sitemap routes, and verify that an unknown URL returns HTTP 404 while the icon, social image, robots and sitemap return successful responses.",
+      "Increase essential mobile body text to at least 14px and controls/disclaimers to at least 12px; retain the interface-illustration disclaimer at all breakpoints; fix the identified low-contrast text colors and verify normal text at 4.5:1 or greater.",
+      "Add Escape handling and appropriate focus restoration to mobile navigation; forward ToggleGroup orientation to its primitive; retain visible keyboard focus and verify single-selection behavior in both selectors.",
+      "Synchronize motion controls with changes to prefers-reduced-motion, reset pointer tilt when motion stops, and suppress decorative hover motion when paused or reduced motion is requested.",
+      "Verify all controls and content at widths 320, 375, 390, 600, 768, 1024 and 1440 CSS pixels and at 200 percent zoom; require no horizontal page overflow, clipped controls, obscured text or inaccessible navigation.",
+      "Pass typecheck, presentation tests and a production build; record browser keyboard and screen-reader results, including announcements for mood, nearby, alert and stale changes."
+    ],
+    "passes": false,
+    "existing_work": ""
+  },
+  {
+    "id": "W03",
+    "category": "interactive-3d",
+    "description": "Add an on-demand rotatable StickS3 viewer with the current Guardian presentation confined to its screen, preserving a functional 2D fallback.",
+    "depends_on": [
+      "W02"
+    ],
+    "steps": [
+      "Pin three to 0.186.1, @react-three/fiber to 9.8.1, @react-three/drei to 10.7.9, @types/three to 0.186.0, and react/react-dom together to 19.3.1; retain Next 16.4.6, update the lockfile and verify declared peer compatibility.",
+      "Copy only sticks3-front.stl, sticks3-back.stl and sticks3-buttons.stl from the specified reference; verify their SHA-256 values against the inspected source files and record upstream CAD revision/path and conversion provenance.",
+      "Add the complete M5Stack MIT notice and model provenance to root THIRD_PARTY_NOTICES.md and a served public/models notice; record the permission and attribution basis for adapting the sibling viewer source.",
+      "Add See in 3D and Back to 2D controls to GuardianStage, using its existing Presentation and motion state; keep the 2D view visible until the 3D scene is ready and preserve the selection when switching modes.",
+      "Load the viewer through a conditionally mounted client-side dynamic import with SSR disabled; verify from a fresh browser network trace that no Three/Fiber/Drei viewer chunk or STL is requested before activation on desktop or mobile.",
+      "Render the Guardian artwork on a correctly oriented screen plane inside the StickS3 bezel; update normal, nearby and alert textures from the current presentation, and clear the previous face for stale data while displaying an explicit no-fresh-data screen.",
+      "Support pointer/touch rotation, keyboard arrow rotation and reset, a readable instruction label, visible focus and a 2D return control; keep the current demo status accessible outside the canvas.",
+      "Make the existing pause control and prefers-reduced-motion stop automatic rotation and inertial settling; respond to preference changes and suspend unnecessary rendering when the viewer is hidden.",
+      "Handle unavailable WebGL, renderer initialization failure, chunk failure, missing STL, failed face image and WebGL context loss with a visible explanation and usable 2D fallback; keep the rest of the page operational.",
+      "Clean up textures, derived geometries, environment resources and pointer listeners on replacement or unmount; test toggling back to 2D during an active drag and repeated activation without accumulating listeners or canvases.",
+      "Add tests for toggle state preservation, all twenty mood/scenario mappings, stale texture clearing and failure fallback; run production-browser checks with WebGL available and deliberately unavailable.",
+      "Verify that the 3D output contains only the StickS3 and its screen artwork, with no standalone Guardian head, Blender export, GLB head mode, Doutor VPD sticker or unrelated product behavior; pass typecheck, tests and production build."
+    ],
+    "passes": false,
+    "existing_work": ""
+  },
+  {
+    "id": "W05",
+    "category": "quality",
+    "description": "Create reproducible website quality gates and verify the complete site in production mode before deployment.",
+    "depends_on": [
+      "W03"
+    ],
+    "steps": [
+      "Add a website check script and root make website-check target that run Next type generation, TypeScript checking, all presentation/viewer tests and a production build, returning nonzero on any failure.",
+      "Add a website-checks GitHub Actions workflow using Node 24.x and pnpm 12.3.4 with frozen installation and a lockfile-keyed cache; trigger it for website files, the workflow, Makefile, check scripts and product-documentation inputs, plus manual dispatch.",
+      "Ensure the test command discovers the new test files rather than executing only lib/guardian.test.ts; run browser checks against the production server and retain failed-check logs and screenshots as CI artifacts.",
+      "Run three mobile Lighthouse audits with a pinned Lighthouse version and recorded configuration; require median performance at least 90, accessibility 100, SEO at least 95, LCP at most 2.5 seconds, CLS at most 0.1 and TBT at most 200 milliseconds.",
+      "Run automated accessibility checks in normal, nearby, alert, stale, mobile-navigation and active-3D states with no serious or critical findings; complete manual keyboard and screen-reader checks for focus, names, selection, status updates and fallback recovery.",
+      "Repeat responsive checks at 320, 375, 390, 600, 768, 1024 and 1440 pixels and 200 percent zoom; verify the disclaimer, license text, navigation and 3D controls remain visible and usable without horizontal page overflow.",
+      "Assert that initial loading and waiting without interaction request no 3D chunks or models; after activation, verify model and texture requests succeed and screenshot the screen alignment from front, side and rear views.",
+      "Verify response status, metadata, canonical links, social-image dimensions, favicon, robots, sitemap, custom 404 and configured headers from the production build; check browser logs for uncaught errors and hydration failures.",
+      "Run the root generic public check in CI and the full private-map check locally; review the exact publication diff and confirm that firmware source, captures, keys, local Vercel state and execution receipts are absent from the website change.",
+      "Record evidence against the final reviewed source revision and obtain independent supervisor acceptance of W01, W02, W03 and W05 before production deployment."
+    ],
+    "passes": false,
+    "existing_work": ""
+  },
+  {
+    "id": "W06",
+    "category": "deployment",
+    "description": "Deploy the accepted website through the intended Vercel project and verify production behavior and firmware-only build skipping.",
+    "depends_on": [
+      "W05"
+    ],
+    "steps": [
+      "Supervisor: verify the intended Vercel account/scope, access to fcavalcantirj/m5-guardian, project-name availability and assignability of m5-guardian.vercel.app; create or select project m5-guardian without inferring availability from an HTTP 404.",
+      "Set the Git repository to fcavalcantirj/m5-guardian, production branch to main, framework to Next.js, Root Directory to website and Node version to 24.x; verify these values from project settings.",
+      "Configure installation to execute pnpm 12.3.4 with a frozen lockfile and build from website/ using the website quality script; retain Next's framework output handling and verify the actual package-manager version in build logs.",
+      "Use the repository root as the source root for any CLI link/deployment, with project Root Directory website; keep .vercel state ignored and verify that the uploaded source resolves website/package.json exactly once.",
+      "Add website/scripts/vercel-ignore-build.sh and configure it as the ignored-build command; compare the current deployment commit with the previous deployed commit from the Git root, restricting the diff to website/.",
+      "Test the ignore script: return 0 for firmware-only changes; return 1 for website additions, modifications, deletions and renames, first deployment, missing commits, comparison errors and explicit forced builds; include a website change followed by a firmware-only commit.",
+      "Create a preview deployment of the exact accepted revision and run the production-browser smoke suite there, including metadata, assets, 404, all presentation states, delayed 3D loading, rotation, screen mapping and WebGL fallback.",
+      "Supervisor: promote or deploy the accepted revision to production only after preview checks pass; verify the ready production deployment and alias https://m5-guardian.vercel.app.",
+      "Verify production HTTP responses and browser behavior: correct document title and canonical URL, working GitHub links, successful favicon/social/model/image requests, usable mobile navigation, no pre-activation 3D requests, and functional rotation and fallback.",
+      "Confirm the firmware-only case is skipped by the configured ignored-build mechanism and document that Vercel records it as a canceled deployment; record the project settings, accepted revision, deployment identity and rollback procedure without credentials.",
+      "Supervisor: mark W06 accepted only after live evidence is reviewed; preserve all firmware work and keep W04 absent from the ledger and shipped site."
+    ],
+    "passes": false,
+    "existing_work": ""
+  }
+]

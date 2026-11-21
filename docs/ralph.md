@@ -63,6 +63,29 @@ The shared prompt is `tools/prompts/guardian-worker.md`. The complete selected
 entry remains visible to each worker. Batching changes scheduling, not the
 product's defensive scope or an external provider's safeguards.
 
+## Website lane
+
+`website-tasks.json` (W01, W02, W03, W05, W06) is a second acceptance ledger for
+the landing page under `website/`. `RALPH_LEDGER` selects it; unset means
+`guardian-tasks.json`, and any other value or a missing file is refused by name.
+
+```sh
+RALPH_LEDGER=website-tasks.json ./ralph.sh --status
+RALPH_LEDGER=website-tasks.json ./ralph.sh --dry-run
+RALPH_LEDGER=website-tasks.json ./ralph-continuous.sh claude 1
+```
+
+The website lane has no host batch: one task per invocation, reviewed before the
+next. Its receipts live in `<GUARDIAN_STORE>/ralph-website` (firmware keeps
+`<GUARDIAN_STORE>/ralph`); each receipts folder records its ledger in
+`ledger-identity.json` and the runner refuses a folder that belongs to the other
+ledger, including through `RALPH_DATA_ROOT`. A checkout lock in the git directory
+keeps the two lanes from running at once in one checkout, and a change to either
+ledger during a worker run stops it as `ledger_changed`. The prompt is
+`tools/prompts/website-worker.md`; the owner's source export reaches it only
+through `RALPH_WEBSITE_SOURCE`, never a tracked file. Workers never commit, push
+or deploy: the Vercel deployment is the supervisor's, after review.
+
 Execution style adapted from
 [sticks3-ai-usage](https://github.com/fcavalcantirj/sticks3-ai-usage/tree/f2e03c2aad5014d2797776b1a2c7acaef263f3bb).
 See [source license](ralph-source-LICENSE.txt).

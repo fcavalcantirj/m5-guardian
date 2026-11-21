@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""One Guardian ledger task per agent session. Acceptance belongs to the reviewer."""
+"""One Guardian ledger task per agent session. Acceptance belongs to the reviewer.
+
+RALPH_LEDGER selects the ledger at the repository root: guardian-tasks.json (firmware, the
+default) or website-tasks.json (website lane: no batch, one reviewed task per invocation)."""
 import argparse
+import contextlib
+from dataclasses import dataclass
 import datetime as dt
 import fcntl
 import hashlib
@@ -17,19 +22,104 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import guardian_local  # noqa: E402  owner-local settings (lab/local.conf.example)
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / 'guardian-tasks.json'
+DEFAULT_LEDGER = 'guardian-tasks.json'
+# Allowed ledgers (file names at the repository root): receipts folder under the store, worker prompt,
+# and whether the firmware host batch applies.
+LANES = {
+    'guardian-tasks.json': ('ralph', 'guardian-worker.md', True),
+    'website-tasks.json': ('ralph-website', 'website-worker.md', False),
+}
+IDENTITY = 'ledger-identity.json'          # binds a receipts folder to one ledger
+CHECKOUT_LOCK = 'ralph-checkout.lock'      # inside the checkout's git directory: one runner per checkout
 # Tasks that run back to back, each handed off for later supervisor review (owner, 2026-11-17:
 # "remove the Ralph gate; you can validate all tomorrow"). A changed earlier task still
 # invalidates every later handoff (input tokens), so a fix upstream re-runs the chain.
 HOST_BATCH = frozenset(('G04', 'G05', 'G06', 'G07', 'G08', 'G16D', 'G16E', 'G16F', 'G16G', 'G16H', 'G16I', 'G16J', 'G21', 'G16M', 'G16N', 'G16O', 'G16P', 'G16R', 'G16S', 'G16T', 'G16Q', 'G22', 'G22A', 'G23'))
 FOUNDATION = ('G01', 'G02', 'G03')
 
+@dataclass(frozen=True)
+class Lane:
+    name: str            # the ledger's file name
+    path: Path           # the ledger
+    data_dir: str        # receipts folder name under the store
+    prompt: Path         # worker prompt template
+    batch: frozenset     # task ids allowed to run back to back (firmware only)
+
+def ledger_name(env=None):
+    """The RALPH_LEDGER file name, default guardian-tasks.json; anything not allowed is refused."""
+    env = os.environ if env is None else env
+    name = env.get('RALPH_LEDGER') or DEFAULT_LEDGER
+    if name not in LANES:
+        raise ValueError(f'RALPH_LEDGER={name} is not an allowed ledger; use one of: ' + ', '.join(LANES))
+    return name
+
+def select_lane(env=None, root=None):
+    """The selected ledger's lane; refuses a missing ledger file by name."""
+    root = ROOT if root is None else root
+    name = ledger_name(env)
+    path = root / name
+    if not path.is_file():
+        raise ValueError(f'Selected ledger {name} does not exist at the repository root ({path})')
+    data_dir, prompt, batch = LANES[name]
+    return Lane(name, path, data_dir, root / 'tools/prompts' / prompt, HOST_BATCH if batch else frozenset())
+
 def data_root(env=None, check=False):
-    """RALPH_DATA_ROOT, else <GUARDIAN_STORE>/ralph (local.conf); check = the store's fail-closed check."""
+    """RALPH_DATA_ROOT, else <GUARDIAN_STORE>/ralph (firmware) or <GUARDIAN_STORE>/ralph-website
+    (local.conf); check = the store's fail-closed check."""
     env = os.environ if env is None else env
     if env.get('RALPH_DATA_ROOT'):
         return Path(env['RALPH_DATA_ROOT']).expanduser().resolve()
-    return guardian_local.store(env=env, check=check) / 'ralph'
+    return guardian_local.store(env=env, check=check) / LANES[ledger_name(env)][0]
+
+def data_identity(data):
+    """The ledger a receipts folder belongs to: its identity file; a legacy folder that already holds
+    receipts but no identity predates the website lane and belongs to the firmware ledger."""
+    path = data / IDENTITY
+    if path.is_file():
+        value = json.loads(path.read_text())
+        if not isinstance(value, dict) or value.get('ledger') not in LANES:
+            raise ValueError(f'Invalid ledger identity in {path}; inspect it')
+        return value['ledger']
+    if any((data / name).exists() for name in ('handoffs.json', 'state.json', 'progress.txt')):
+        return DEFAULT_LEDGER
+    return None
+
+def bind_data(data, lane, write=False):
+    """Refuse a receipts folder that belongs to another ledger; with write, record the identity on first use."""
+    owner = data_identity(data)
+    if owner is not None and owner != lane.name:
+        raise ValueError(f'{data} holds receipts of {owner}, not of the selected ledger {lane.name}; '
+                         'refusing to mix them (check RALPH_LEDGER and RALPH_DATA_ROOT)')
+    if write and not (data / IDENTITY).is_file():
+        save(data / IDENTITY, {'ledger': lane.name})
+
+def checkout_lock_path(root=None):
+    """The checkout lock file inside the checkout's git directory (a worktree's own git directory)."""
+    root = ROOT if root is None else root
+    dot = root / '.git'
+    if dot.is_dir():
+        return dot / CHECKOUT_LOCK
+    if dot.is_file():
+        text = dot.read_text().strip()
+        if text.startswith('gitdir:'):
+            gitdir = Path(text[len('gitdir:'):].strip())
+            return (gitdir if gitdir.is_absolute() else root / gitdir).resolve() / CHECKOUT_LOCK
+    raise ValueError(f'{root} is not a git checkout; the Ralph checkout lock lives in its git directory')
+
+@contextlib.contextmanager
+def exclusive(path, busy):
+    """Hold a non-blocking flock on path for the block; busy is the refusal when another holder has it."""
+    with path.open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError(busy) from None
+        yield
+
+def snapshot_ledgers(root=None):
+    """Bytes of every allowed ledger (None when absent): a worker may change neither."""
+    root = ROOT if root is None else root
+    return {name: (root / name).read_bytes() if (root / name).is_file() else None for name in LANES}
 
 def forbidden_profile(env=None):
     """True when CLAUDE_CONFIG_DIR contains the owner's GUARDIAN_FORBIDDEN_CLAUDE_CONFIG pattern."""
@@ -40,10 +130,10 @@ def forbidden_profile(env=None):
 def say(text):
     print(text, flush=True)
 
-def read_ledger():
-    tasks = json.loads(LEDGER.read_text())
+def read_ledger(lane):
+    tasks = json.loads(lane.path.read_text())
     if not isinstance(tasks, list):
-        raise ValueError('guardian-tasks.json must be an array')
+        raise ValueError(f'{lane.name} must be an array')
     ids = set()
     for n, task in enumerate(tasks, 1):
         if not isinstance(task, dict) or type(task.get('passes')) is not bool:
@@ -91,34 +181,37 @@ def input_tokens(task, tasks, work):
     return {dep: {'key': key(by_id[dep]), 'attempt': work.get(dep, {}).get('attempt')}
             for dep in task['depends_on']}
 
-def ready(task, tasks, work):
-    """Implementation handoff only. Never independent validation/acceptance."""
+def ready(task, tasks, work, batch=None):
+    """Implementation handoff only. Never independent validation/acceptance.
+    batch: the lane's batch ids (default the firmware HOST_BATCH; the website lane passes none)."""
+    batch = HOST_BATCH if batch is None else batch
     if task['passes']:
         return True
-    if task['id'] not in HOST_BATCH:
+    if task['id'] not in batch:
         return False
     record = work.get(task['id'], {})
     if (record.get('key') != key(task) or record.get('status') != 'awaiting_review'
             or not record.get('attempt') or record.get('inputs') != input_tokens(task, tasks, work)):
         return False
     by_id = {t['id']: t for t in tasks}
-    return all(ready(by_id[dep], tasks, work) for dep in task['depends_on'])
+    return all(ready(by_id[dep], tasks, work, batch) for dep in task['depends_on'])
 
-def select_next(tasks, work):
+def select_next(tasks, work, batch=None):
+    batch = HOST_BATCH if batch is None else batch
     for i, task in enumerate(tasks):
-        if task['passes'] or ready(task, tasks, work):
+        if task['passes'] or ready(task, tasks, work, batch):
             continue
         earlier = [t['id'] for t in tasks[:i] if not t['passes']]
-        if task['id'] not in HOST_BATCH and earlier:
+        if task['id'] not in batch and earlier:
             return None, 'Batch implementation handed off; review needed: ' + ', '.join(earlier)
         by_id = {t['id']: t for t in tasks}
         required = list(task['depends_on'])
-        if task['id'] in HOST_BATCH:
+        if task['id'] in batch:
             missing = [dep for dep in FOUNDATION if dep not in by_id or not by_id[dep]['passes']]
             if missing:
                 return None, 'Foundation acceptance required: ' + ', '.join(missing)
-        missing = [dep for dep in required if not (ready(by_id[dep], tasks, work)
-                   if task['id'] in HOST_BATCH else by_id[dep]['passes'])]
+        missing = [dep for dep in required if not (ready(by_id[dep], tasks, work, batch)
+                   if task['id'] in batch else by_id[dep]['passes'])]
         if missing:
             return None, 'Dependency acceptance/handoff required: ' + ', '.join(missing)
         return (i, task), None
@@ -126,8 +219,9 @@ def select_next(tasks, work):
     return None, ('Batch implementation handed off; review needed: ' + ', '.join(pending)
                   if pending else 'All ledger tasks accepted by reviewer.')
 
-def select_retry(tasks, work, state):
+def select_retry(tasks, work, state, batch=None):
     # A retry is deliberate, not evidence of successful implementation.
+    batch = HOST_BATCH if batch is None else batch
     failed_index = state.get('task', 0) - 1 if state else -1
     if (state and state.get('status') != 'awaiting_review' and
             0 <= failed_index < len(tasks) and not tasks[failed_index]['passes']):
@@ -136,12 +230,12 @@ def select_retry(tasks, work, state):
         pending = next(((i,t) for i,t in enumerate(tasks) if not t['passes']), None)
     if pending:
         i, task = pending
-        if any(not ready(x, tasks, work) for x in tasks[:i]):
+        if any(not ready(x, tasks, work, batch) for x in tasks[:i]):
             raise ValueError('Earlier task must be implemented/reviewed before this retry')
-        if task['id'] not in HOST_BATCH and any(not x['passes'] for x in tasks[:i]):
+        if task['id'] not in batch and any(not x['passes'] for x in tasks[:i]):
             raise ValueError('Review the preceding batch before retrying a later phase')
         by_id = {x['id']: x for x in tasks}
-        if task['id'] in HOST_BATCH and any(dep not in by_id or not by_id[dep]['passes'] for dep in FOUNDATION):
+        if task['id'] in batch and any(dep not in by_id or not by_id[dep]['passes'] for dep in FOUNDATION):
             raise ValueError('Foundation acceptance is required before the host batch')
     return pending, None
 
@@ -162,8 +256,8 @@ def final_marker(path):
                     last = line.strip()
     return last if last in ('READY FOR REVIEW', 'BLOCKED') else None
 
-def report_pending(tasks, work):
-    ids = [t['id'] for t in tasks if not t['passes'] and ready(t, tasks, work)]
+def report_pending(tasks, work, batch=None):
+    ids = [t['id'] for t in tasks if not t['passes'] and ready(t, tasks, work, batch)]
     if ids:
         say('Implementation handed off, NOT independently accepted: ' + ', '.join(ids))
 
@@ -183,8 +277,11 @@ def command(engine, data):
         args += ['-c', 'model_reasoning_effort=' + json.dumps(os.environ['CODEX_EFFORT'])]
     return args + ['-']
 
-def prompt_for(index, task, data, run):
-    template_path = ROOT / 'tools/prompts/guardian-worker.md'
+def prompt_for(index, task, data, run, lane=None):
+    """The worker prompt from the lane's template (default the firmware lane). RALPH_WEBSITE_SOURCE,
+    the owner's website export, reaches the prompt only (website template), never a tracked file."""
+    lane = select_lane({}) if lane is None else lane
+    template_path = lane.prompt
     task_id = task.get('id', str(index + 1))
     if task_id == 'G02':
         task_brief = (
@@ -207,7 +304,8 @@ def prompt_for(index, task, data, run):
         project_root=str(ROOT), task_number=index + 1, task_id=task_id,
         task_brief=task_brief, selected_task=json.dumps(task, indent=2),
         journal_path=str(data / 'progress.txt'), run_path=str(run),
-        GUARDIAN_STORE=str(worker_store(data)),
+        GUARDIAN_STORE=str(worker_store(data)), ledger=lane.name,
+        website_source=os.environ.get('RALPH_WEBSITE_SOURCE', ''),
     )
 
 def worker_store(data):
@@ -223,12 +321,13 @@ def worker_env(data):
     $GUARDIAN_STORE/... and an unset variable in the worker's shell would expand to nothing."""
     return dict(os.environ, GUARDIAN_STORE=str(worker_store(data)))
 
-def run_task(engine, index, task, data, tasks, work):
+def run_task(engine, index, task, data, tasks, work, lane=None):
+    lane = select_lane({}) if lane is None else lane
     run = data / (dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f') + f'-task-{index+1}')
     run.mkdir()
-    before = LEDGER.read_bytes()
-    (run / 'ledger-before.json').write_bytes(before)
-    prompt = prompt_for(index, task, data, run)
+    before = snapshot_ledgers(lane.path.parent)
+    (run / 'ledger-before.json').write_bytes(before[lane.name])
+    prompt = prompt_for(index, task, data, run, lane)
     (run / 'prompt.txt').write_text(prompt)
     args = command(engine, data)
     state = dict(task=index+1, task_id=task['id'], key=key(task), engine=engine,
@@ -264,11 +363,14 @@ def run_task(engine, index, task, data, tasks, work):
     except OSError as error:
         say(str(error))
         journal(data, f'ERROR task {index+1}: {error}')
-    # This checks ledger ownership only; it does not validate the implementation.
-    if not LEDGER.exists() or LEDGER.read_bytes() != before:
+    # This checks ledger ownership only (both ledgers); it does not validate the implementation.
+    after = snapshot_ledgers(lane.path.parent)
+    changed = [name for name in before if after[name] != before[name]]
+    if changed:
         state['status'] = 'ledger_changed'
         code = code or 2
-        say('Ledger changed during the worker run. Stopping for reviewer inspection; no automatic restore.')
+        say('Ledger changed during the worker run (' + ', '.join(changed) + '). '
+            'Stopping for reviewer inspection; no automatic restore.')
     else:
         marker = final_marker(run / 'engine.log')
         if code == 0 and marker != 'READY FOR REVIEW':
@@ -299,20 +401,23 @@ def main():
     args = parser.parse_args()
     if args.iterations < 1 or not 0 < args.interval < float('inf'):
         parser.error('iterations and interval must be finite positive values')
+    lane = select_lane()
     data = data_root()
-    tasks = read_ledger()
+    bind_data(data, lane)
+    tasks = read_ledger(lane)
     work, state = read_work(data), read_state(data)
     if args.status or args.dry_run:
-        say(f'Ledger: {LEDGER}\nIndependently accepted: {sum(t["passes"] for t in tasks)}/{len(tasks)}')
-        report_pending(tasks, work)
-        pending, reason = select_retry(tasks, work, state) if args.retry else select_next(tasks, work)
+        say(f'Ledger: {lane.path}\nIndependently accepted: {sum(t["passes"] for t in tasks)}/{len(tasks)}')
+        report_pending(tasks, work, lane.batch)
+        pending, reason = (select_retry(tasks, work, state, lane.batch) if args.retry
+                           else select_next(tasks, work, lane.batch))
         if pending:
             i, task = pending
             record = last_record(i, task, work, state)
             if record and not args.retry:
                 reason = ('Awaiting review: ' if record.get('status') == 'awaiting_review' else 'Previous attempt requires inspection: ') + task['id']
                 # A stale downstream success must be reimplemented after its input changed.
-                if (task['id'] in HOST_BATCH and record.get('status') == 'awaiting_review'
+                if (task['id'] in lane.batch and record.get('status') == 'awaiting_review'
                         and record.get('inputs') is not None and record.get('key') == key(task)):
                     reason = None
                 if record.get('key') != key(task):
@@ -335,19 +440,18 @@ def main():
         data_root(check=True)   # the store's fail-closed check; no local-storage fallback
     command(args.engine, data)
     data.mkdir(parents=True, exist_ok=True)
-    with (data/'runner.lock').open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise ValueError('Another Guardian Ralph runner holds this queue')
+    # One runner per checkout (either ledger), then one per receipts folder; both held for the whole run.
+    with exclusive(checkout_lock_path(), 'Another Ralph runner (either ledger) holds this checkout'), \
+            exclusive(data/'runner.lock', 'Another Guardian Ralph runner holds this queue'):
+        bind_data(data, lane, write=True)
         completed, notice = 0, None
         while completed < args.iterations:
-            tasks = read_ledger()
+            tasks = read_ledger(lane)
             work, state = read_work(data), read_state(data)
-            pending, reason = select_next(tasks, work)
+            pending, reason = select_next(tasks, work, lane.batch)
             retrying = args.retry
             if retrying:
-                pending, reason = select_retry(tasks, work, state)
+                pending, reason = select_retry(tasks, work, state, lane.batch)
             if not pending:
                 if reason != notice:
                     say(reason or 'Nothing to execute.'); notice = reason
@@ -357,7 +461,7 @@ def main():
                 time.sleep(args.interval)
                 continue
             index, task = pending
-            if completed and task['id'] not in HOST_BATCH:
+            if completed and task['id'] not in lane.batch:
                 say('Phase boundary before ' + task['id'] + '. Start it explicitly after review.')
                 break
             record = last_record(index, task, work, state)
@@ -366,7 +470,7 @@ def main():
                     raise ValueError('Task content changed since its attempt. Inspect it, then use --retry.')
                 if record.get('status') != 'awaiting_review':
                     raise ValueError('Previous attempt is ' + str(record.get('status')) + '; inspect the log before --retry.')
-                if task['id'] not in HOST_BATCH or record.get('inputs') is None:
+                if task['id'] not in lane.batch or record.get('inputs') is None:
                     message = 'Awaiting supervising review: ' + task['id']
                     if message != notice:
                         say(message); notice = message
@@ -375,13 +479,16 @@ def main():
                     time.sleep(args.interval)
                     continue
             args.retry = False
-            code = run_task(args.engine, index, task, data, tasks, work)
+            code = run_task(args.engine, index, task, data, tasks, work, lane)
             completed += 1
             if code:
-                report_pending(read_ledger(), read_work(data))
+                report_pending(read_ledger(lane), read_work(data), lane.batch)
                 return code
+            if not lane.batch:
+                say(f'{lane.name}: one reviewed task per invocation; {task["id"]} awaits review.')
+                break
         say(f'Worker sessions this invocation: {completed}/{args.iterations}. No acceptance flags changed by Ralph.')
-        report_pending(read_ledger(), read_work(data))
+        report_pending(read_ledger(lane), read_work(data), lane.batch)
     return 0
 
 if __name__ == '__main__':
