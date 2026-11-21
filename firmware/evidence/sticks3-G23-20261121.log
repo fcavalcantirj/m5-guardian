@@ -1,0 +1,48 @@
+G23 owner run (docs/G23-delivery.md section 8), 2026-11-21, LAB-STICK-1
+=========================================================================
+Image: guardian-20261121-103138 (main tree e5bc893 minus the G24 ledger row; installed over USB 10:33,
+4 regions hash-verified, MAC checked). Reads: signed TUNE sessions (tools/tune_session.py) by the supervisor.
+Owner ran every RF step himself from his own test kit, against his own network. Raw files (videos, photo,
+reads, IMU trace) are private: $GUARDIAN_STORE/evidence-raw/G23-owner-run-20261121/
+  SHA256SUMS sha256 fecd78a260f80df62314fa0ffed17cdb1b47b78eb1671c6fb68144e4101c4bee (13 files, all OK)
+They show the owner's network name and radio addresses, so they never enter this repository.
+
+Step                         Result    Evidence
+1 Install                    PASS      R1 11:43 app_version=guardian-20261121-103138, lock_loss_by sums to
+                                       lock_losses (24+0+1+37=62), silence_log present
+2 Battery boot               PASS      stick ran on battery through steps 7-8 (R3, R4), no computer needed
+3 Five faces + transitions   PASS      owner "perfect" (DEMO walk on the glass)
+4 Live observation           PASS      V1 11:37 (27 s): live face rated Medium, every Details page
+                                       (settings, explanation 1/2-2/2, signal, owner checks, limits)
+  No-data                    BY REF    owner deferred the shield step; the same freshness path was proven on
+                                       the device in G13 (docs/G13-validation.md: No fresh data at 29-30 s)
+5 Live incident, red         PASS      V2 11:39: red ALERT "Nearby burst also on <network>", counts and age on
+                                       the glass; R1: last_burst_network rule:deauth_broadcast total:77 own:5
+  Alert-first poll deferral  HOST      three owner runs (11:38, 12:13 on battery, and the dim-view run) never
+                                       had a poll fall due inside the red window (R1-R3 ota_auto_deferred=0);
+                                       host proof firmware/tests/ota_check.cpp
+                                       auto_poll_is_deferred_while_an_alert_is_active (G22A). Not asked again.
+6 Unrelated-network negative NOT RUN   no second network of the owner's on the locked channel; host tests only
+7 Dim view from Details      PASS      owner observation 12:1x on battery: the new alert lit the dimmed screen
+                                       on Details (red), then dimmed again to the ALERT face (before: NO DATA).
+                                       R3 12:19: network burst total:36 own:3, area total:48, alert ended.
+                                       Observed: each new burst re-lights on the current page, the dim view
+                                       shows the face, so the screen alternates Details/face during a long run
+                                       (by design, idle.hpp:151-162); carried to G24 as an owner request.
+8 Dark guard by incident     PASS x1   R4 12:35: darks=3 dark_wakes=0/2/1 dark_last_wake=incident (one wake by
+                                       a burst; the second burst came while still dim, so it was not a dark wake)
+9 Setup password screen      PASS      P1 12:32 photo: SETUP, join Guardian-<tail>, 10-character password,
+                                       page address, "Monitoring is paused", "Any key = cancel", countdown
+10 Lock losses               PASS      R1 lock_loss_by=silence:24,followed:0,held:1,stopped:37 (sum = 62)
+11 Slow tilt                 PASS      IMU 10 over USB 12:45: 1990 samples, 0 drops (first capture at 12:36
+                                       failed: opening the port reset the stick, the command arrived during
+                                       boot; IMU running@0x68 on that boot, R5). still_trace on the tilt and
+                                       on the recorded still/setdown/walk traces:
+                                         still_dps=12 calm_s=0.6 (defaults): tilt reaches calm 2 times
+                                         still_dps=10 calm_s=1.0: tilt 0; still 4, setdown 1, walk 1
+                                       Set live over TUNE (T1, TUNE 1.49); owner look "not bad". The firmware
+                                       defaults move to these values in G24.
+
+Ruling (supervisor, 2026-11-21): G23 accepted. Open items carried, not hidden: unrelated-network negative
+on the device, alert-first deferral on the device, a second dark-guard incident wake, silence lock losses
+(cause unknown, G23-delivery section 12), one brownout on the power-experiment image (G24 spike log).
