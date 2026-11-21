@@ -2,7 +2,8 @@
 
 Worker handoff of 2026-11-20 (attempt `20261120-003149-572201-task-44`), pending supervisor
 validation. **G23 is open.** The second attempt of 2026-11-20 (`20261120-085148-005036-task-44`) added only the
-ledger's battery-life step: section 11. This record separates what was measured from what is prepared and what
+ledger's battery-life step: section 11. The third (`20261120-132112-646237-task-44`) added only the
+silence-log step: section 12. This record separates what was measured from what is prepared and what
 only the owner can run.
 
 Labels used below: **[DEVICE]** = recorded on the real StickS3 (the file is named); **[LIVE-HOST]** =
@@ -171,6 +172,7 @@ not a reading.
 | READMEs against the ledger | **Done** (root README rewritten; firmware/README.md headings and the stale lines corrected) | none |
 | G22A alert-first | Host proof exists; device proof prepared (section 8, step 5) | `ota_auto_deferred` +1 with the ALERT on the glass, then the poll after the alert |
 | Lock losses per reason | **Implemented** (host TDD) and in the delivery image | one STATUS read of `lock_loss_by=` after 30 minutes or more; then the Author rules on a fix |
+| Silence log (Author 2026-11-20) | **Implemented** (host TDD; section 12): the last 8 silence losses with their context, the last 4 in STATUS `silence_log=`. No behaviour change | the supervisor installs it after the battery sheet ends and reads `silence_log=` once after 60 minutes on USB; the Author rules on the cause |
 | Battery life in dark guard (Author 2026-11-20) | **Means delivered** (host TDD; section 11): two TUNE keys, BATTRUN drain segments per setting, a default-off dark-cpu image, the inventory, the duty-cycle note. No default changed | the measurement sheet of section 11.5, run by the owner; the Author rules on any default |
 
 ## 5. Stills, video, live observation
@@ -312,6 +314,11 @@ not 7 and 10. Which reason makes the rest is not known:
 STATUS printed only the last one. The delivery image prints all four counts. No behaviour was
 changed; the fix is the Author's ruling after the first read.
 
+Read since then (quoted from the ledger, MEASURED A/B on image `guardian-20261120-101151`, evidence
+`$GUARDIAN_STORE/evidence-raw/G23-ab-auto-s-20261120/`): `silence` 26.4/h at `ota.auto_s=600` and 24.3/h
+at 120; `stopped` one per poll. The silence losses are independent of the update poll; their cause is not
+known. Section 12 adds the record that lets the Author rule on it.
+
 ## 10. Limits of this record
 
 - Nothing in this attempt ran on the device. Every [HOST] line is a host check.
@@ -428,11 +435,11 @@ rate exists only after 300 s measured in Dark (the screen goes dark about 90 s a
 
 ```sh
 python3 tools/tune_session.py --port 8070 --seconds 900 --no-prompt \
-  --command BATTRUN --command STATUS --command 'TUNE <key>=<value>' --command 'TUNE save'
+  --command BATTRUN --command STATUS --command 'TUNE <key>=<value>'
 ```
 
-(`TUNE save` keeps the value across a reboot or a floor sleep; without it a reboot would start a new segment with the
-saved values.) A TUNE session lights the screen (the TUNE WI-FI screen holds it active); that time counts in the
+(`TUNE <key>=<value>` saves the value itself (the reply ends `saved`); there is no `TUNE save` verb. Corrected by the
+Author 2026-11-20 after sheet A.) A TUNE session lights the screen (the TUNE WI-FI screen holds it active); that time counts in the
 segment's `active` drain, not in its dark rate.
 
 **A. Update poll on battery** (normal delivery image):
@@ -441,12 +448,12 @@ segment's `active` drain, not in its dark rate.
 |---|---|---|
 | A0 | On USB, read `STATUS` | `ota_auto_batt_s=-1 poll_s=120 cpu_mhz=160 dark_cpu_mhz=160 dark_cpu=unbuilt cpu_set_fail=0 cpu_switches=0` |
 | A1 | Unplug; 20 min | segment 1 = today's behaviour |
-| A2 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=600`, `TUNE save` | BATTRUN `segs=1 seg1=poll_s:120,dark_mhz:160,dim_pct:10,start_mv:<mV>,active:<r>/<s>,dim:<r>/<s>,dark:<r>/<s>` with dark seconds near 1000; STATUS then `ota_auto_batt_s=600 poll_s=600` |
+| A2 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=600` | BATTRUN `segs=1 seg1=poll_s:120,dark_mhz:160,dim_pct:10,start_mv:<mV>,active:<r>/<s>,dim:<r>/<s>,dark:<r>/<s>` with dark seconds near 1000; STATUS then `ota_auto_batt_s=600 poll_s=600` |
 | A3 | 20 min (the next session can take up to 600 s to arrive) | segment 2 `poll_s:600` |
-| A4 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=-1`, `TUNE save` | `segs=2 ... seg2=poll_s:600,...`; STATUS `ota_auto_batt_s=-1 poll_s=120` |
+| A4 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=-1` | `segs=2 ... seg2=poll_s:600,...`; STATUS `ota_auto_batt_s=-1 poll_s=120` |
 | A5 | 20 min | segment 3 `poll_s:120` (A again) |
-| A6 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=0`, `TUNE save` | `segs=3`; from now no session reaches the stick on battery |
-| A7 | 20 min, then plug USB (ends the run, keeps the record); session at the next USB poll: `BATTRUN`, `TUNE ota.auto_batt_s=-1`, `TUNE save` | `end=usb_returned segs=4 seg1=poll_s:120 ... seg2=poll_s:600 ... seg3=poll_s:120 ... seg4=poll_s:0,...` |
+| A6 | Session: `BATTRUN`, `TUNE ota.auto_batt_s=0` | `segs=3`; from now no session reaches the stick on battery |
+| A7 | 20 min, then plug USB (ends the run, keeps the record); session at the next USB poll: `BATTRUN`, `TUNE ota.auto_batt_s=-1` | `end=usb_returned segs=4 seg1=poll_s:120 ... seg2=poll_s:600 ... seg3=poll_s:120 ... seg4=poll_s:0,...` |
 
 The poll's cost is the difference of `dark:<r>` between seg2/seg4 and the seg1/seg3 around them.
 
@@ -458,9 +465,9 @@ after it):
 |---|---|---|
 | B0 | On USB, read `STATUS` | `dark_cpu=built cpu_mhz=160 dark_cpu_mhz=160 cpu_set_fail=0 cpu_switches=0` |
 | B1 | Unplug; 20 min | segment 1 `dark_mhz:160` (the baseline of THIS image) |
-| B2 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=80`, `TUNE save` | `segs=1 seg1=...,dark_mhz:160,...`; STATUS `dark_cpu_mhz=80` (`cpu_mhz=160` while the session holds the screen lit) |
+| B2 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=80` | `segs=1 seg1=...,dark_mhz:160,...`; STATUS `dark_cpu_mhz=80` (`cpu_mhz=160` while the session holds the screen lit) |
 | B3 | 20 min | segment 2 `dark_mhz:80` |
-| B4 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=160`, `TUNE save` | `seg2=...,dark_mhz:80,...`; `cpu_set_fail=0` (a refusal of 80 MHz would show here) and `cpu_switches` 2 or more higher than at B2 (80 applied going dark, 160 going lit: the proof the frequency changed) |
+| B4 | Session: `BATTRUN`, `TUNE power.dark_cpu_mhz=160` | `seg2=...,dark_mhz:80,...`; `cpu_set_fail=0` (a refusal of 80 MHz would show here) and `cpu_switches` 2 or more higher than at B2 (80 applied going dark, 160 going lit: the proof the frequency changed) |
 | B5 | 20 min, then plug USB; session: `BATTRUN` | `segs=3 ... seg3=...,dark_mhz:160,...` |
 
 The CPU's share is seg2's dark rate against seg1 and seg3. The dark-cpu image is compared only with itself:
@@ -468,3 +475,75 @@ power management compiled in may change the drain on its own.
 
 Results go to `firmware/evidence/sticks3-G23-battery-<date>.log` with the image version and the read times. No
 default changes until the Author rules on the numbers.
+
+## 12. Silence log (Author 2026-11-20, third attempt)
+
+Ledger step "CARRY-OVER for the worker (Author 2026-11-20, silence log)": a diagnostic record of the silence
+losses, no behaviour change, no glass change, no TUNE key. The cause of the losses is **not known** and no fix
+is proposed here.
+
+### 12.1 What is recorded [HOST]
+
+`Survey` (firmware/adapters/measurement) keeps a ring of the last 8 silence losses (`silence_kept`). Each
+record holds, at the moment the 5 s silence ends the lock:
+
+| Field | Meaning [SOURCE: `Survey::log_silence`] |
+|---|---|
+| `<t>` | the clock at the loss, in seconds (the stick's clock is `esp_timer` since boot, so this is `uptime_s`) |
+| `ch<c>` | the locked channel |
+| `gap<ms>` | now minus the newest accepted frame's time. Time away on an area-sweep excursion is inside the gap (the silence timer itself does not count it, unchanged) |
+| `age<s>` | how long the lock had lasted (since the frame that claimed it) |
+| `other<n>` | frames drained from the receive queue whose channel tag is the locked channel since the last accepted frame, of any kind (`Survey::heard()` is called for every drained packet in the companion and the console drains). `0` = nothing at all reached the drain from that channel during the gap; frames lost to a full queue are not seen here (`rx_queue_full` counts those) |
+| `rssi<dBm>` | the RSSI of the last accepted frame |
+| `sweep<n>` | area-sweep excursions started during the gap (`detect.sweep_ms`, off by default, so normally 0) |
+| `awake`/`dim`/`dark` | the power state of the loop before the loss (idle state Active / Dim / Dark) |
+
+"Accepted" means a verified advertisement of the picked network that the survey took for the lock
+(`Survey::observed()` on the locked channel); every such frame starts a new gap (`other` and `sweep` back to 0).
+Followed, held and stopped losses are counted in `lock_loss_by=` only, not logged. The log survives a survey
+restart (since boot), like the counts.
+
+STATUS prints the last 4, oldest first, right after `lock_loss_by=`:
+
+```
+silence_log=<t>:ch<c>:gap<ms>:age<s>:other<n>:rssi<dBm>:sweep<n>:<pwr>;...
+silence_log=none                                   (no silence loss since boot)
+silence_log=65:ch6:gap5000:age5:other0:rssi-56:sweep0:awake;75:ch6:gap5000:age5:other0:rssi-57:sweep0:awake
+```
+
+(the last line is a host-test value, not a device read). One STATUS token: no space, one `=`. It is never
+cut: when it does not fit its buffer the field reads `silence_log=status_overflow`.
+
+Size: the widest record (every number at 2^32-1, channel 255, RSSI -128, `awake`) is 91 characters; four of them
+with the key are 379 (measured by `silence_log_worst_case_line_fits_its_buffer_as_one_status_token`), the buffer
+is 384. The board's `status_line` grew by the same amount plus the space (7,456 to 7,848 bytes), and a
+`static_assert` keeps it at or under the TUNE reply limit of 8,192.
+
+### 12.2 Host TDD
+
+Logs under `$GUARDIAN_STORE/builds/20261120-g23-silence-tdd/`.
+
+| Run | Result |
+|---|---|
+| Red: tests first, the API stubbed with no behaviour (`measurement_check`, plain and ASan/UBSan) | 4 failed cases, 21 failed assertions, in each build; the 13 older cases passed |
+| Green: the same target, plain and ASan/UBSan | 17 cases, 339 assertions, 0 failed |
+| `coverage_check`, `coex_spike_check` (other `Survey` users), plain | pass |
+| The existing lock-loss and survey cases | unchanged in the test file and passing |
+| `firmware/tools/host-check.sh` (fresh plain and ASan/UBSan trees, `builds/20261120-135117-host-Kbhk5U/`) | plain 54 of 54, ASan/UBSan 54 of 54 |
+| Portability rule; `tools/public_check.py --require-map` | pass (33 portable sources); 0 findings |
+| Board build (a first one, before this table; the delivery image is rebuilt last and named in the handoff) | green on the first try with `-Werror=format-truncation` and the `static_assert`; signed image 2,887,680 B, 258,048 B of the slot free; `silence_log=%s` and the record format string present in the signed image |
+
+### 12.3 The supervisor's read (prepared, not run)
+
+After the running battery sheet (section 11.5) ends, the supervisor installs the image of this attempt (named in
+the handoff), leaves the stick on USB guarding the home network for 60 minutes, then reads once:
+`python3 tools/tune_session.py --port 8070 --seconds 60 --command STATUS --no-prompt`. Expect `silence_log=` right
+after `lock_loss_by=`, with up to 4 records, and the `silence:<n>` count of `lock_loss_by=` at least the number of
+records shown. The record goes to `firmware/evidence/sticks3-G23-silence-<date>.log`; the Author rules on the
+cause from it.
+
+### 12.4 Limits
+
+- Nothing here ran on the device; every line above is [HOST] or [SOURCE].
+- `other` is counted at the drain, after the 24-deep receive queue: a full queue hides frames from it.
+- The power state is the one of the last loop iteration before the loss (the survey is stepped once a loop).

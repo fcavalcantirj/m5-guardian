@@ -66,7 +66,8 @@ class Survey {
 public:
     bool begin(std::uint8_t first, std::uint8_t count, std::uint8_t initial, Millis now, bool fixed = false);
     std::uint8_t next(Millis now);
-    void observed(std::uint8_t channel, Millis acquired, std::uint8_t advertised_channel = 0);
+    // rssi_dbm (G23 silence log): the accepted frame's RSSI, recorded for a later silence loss only.
+    void observed(std::uint8_t channel, Millis acquired, std::uint8_t advertised_channel = 0, std::int8_t rssi_dbm = 0);
     void stop() { lose(Loss::Stopped); active_ = false; hold_ = false; }
     // G14: while held (picker open / nothing selected) the survey keeps hopping
     // and never claims a lock, so coverage stays honestly unknown/degraded.
@@ -93,6 +94,35 @@ public:
     static constexpr std::size_t lock_loss_text_max = 96;   // four ten-digit counts: 86 characters and the terminator
     std::uint32_t losses(Loss why) const { return loss_by_[static_cast<std::size_t>(why)]; }
     std::size_t lock_loss_text(char* out, std::size_t capacity) const;
+    // G23 silence log: a diagnostic record of the last silence_kept silence losses (cause not
+    // known), so a deaf radio and a quiet network can be told apart. Diagnostics only: nothing
+    // here changes when a lock is claimed or lost.
+    // `other`: frames heard on the locked channel since the last accepted one (heard() is called
+    // for every drained packet, observed() for an accepted advertisement, which starts a new gap).
+    // `gap_ms`: now - the last accepted frame's time (time away on a sweep excursion included);
+    // `age_s`: how long the lock had lasted; `sweeps`: excursions started during the gap;
+    // `rssi_dbm`: of the last accepted frame (0 = the caller gave none); `power`: set by power().
+    enum class Power : std::uint8_t { Awake, Dim, Dark };
+    static const char* power_text(Power);   // "awake", "dim", "dark"
+    struct SilenceLoss {
+        std::uint32_t uptime_s{};   // the clock at the loss, in s (saturates)
+        std::uint32_t gap_ms{}, age_s{}, other{}, sweeps{};   // saturate
+        std::int8_t rssi_dbm{};
+        std::uint8_t channel{};
+        Power power{Power::Awake};
+    };
+    static constexpr std::size_t silence_kept = 8, silence_shown = 4;
+    void power(Power p) { power_ = p; }
+    void heard(std::uint8_t channel);
+    std::size_t silence_count() const { return silence_n_; }
+    const SilenceLoss& silence(std::size_t i) const;   // 0 = the oldest kept; out of range: an empty record
+    // STATUS token "silence_log=<t>:ch<c>:gap<ms>:age<s>:other<n>:rssi<dBm>:sweep<n>:<pwr>;..." with the
+    // last silence_shown losses, oldest first ("silence_log=none" before the first). Returns the length
+    // written; 0 with an empty string when it does not fit (never cut). silence_log_format() prints
+    // `n` given records the same way (the worst-case line is measured in measurement_check).
+    static constexpr std::size_t silence_log_text_max = 384;   // four records with every field at its widest: 379 characters and the terminator
+    std::size_t silence_log_text(char* out, std::size_t capacity) const;
+    static std::size_t silence_log_format(const SilenceLoss* records, std::size_t n, char* out, std::size_t capacity);
     bool holding() const { return hold_; }
     bool active() const { return active_; }
     bool fixed() const { return active_ && fixed_; }
@@ -110,6 +140,14 @@ private:
     std::uint32_t lock_losses_{};
     std::array<std::uint32_t, 5> loss_by_{};   // index = Loss (None stays 0)
     Loss last_loss_{Loss::None};
+    // G23 silence log
+    void log_silence(Millis now);
+    Millis locked_since_{}, last_accept_{};
+    std::uint32_t other_{}, sweeps_{};
+    std::int8_t last_rssi_{};
+    Power power_{Power::Awake};
+    std::array<SilenceLoss, silence_kept> silence_{};
+    std::size_t silence_head_{}, silence_n_{};   // head = the next slot to write
 };
 
 // G16E: the live threat radar's input, one slot per detector family. A slot is

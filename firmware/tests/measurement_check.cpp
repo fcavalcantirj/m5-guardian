@@ -1,5 +1,6 @@
 #include "check.hpp"
 #include "measurement.hpp"
+#include <algorithm>
 #include <cstring>
 #include <string>
 using namespace guardian;
@@ -182,6 +183,105 @@ GUARDIAN_CASE(survey_counts_lock_losses_per_reason_and_prints_them) {
     char exact[64];CHECK_EQ(s.lock_loss_text(exact,std::strlen(want)+1),std::strlen(want));
     // four ten-digit counts and the terminator fit the documented size
     CHECK(Survey::lock_loss_text_max>=std::strlen("lock_loss_by=silence:4294967295,followed:4294967295,held:4294967295,stopped:4294967295")+1);
+}
+// G23 silence log (the silence lock losses are independent of the update poll; cause not known):
+// a diagnostic record of the last 8 silence losses, so a deaf radio and a quiet network can be
+// told apart. Diagnostics only: the lock behaviour is unchanged (the cases above are untouched).
+GUARDIAN_CASE(survey_logs_a_silence_loss_with_its_context) {
+    Survey s;char t[Survey::silence_log_text_max];
+    const char* none="silence_log=none";
+    CHECK_EQ(s.silence_count(),0u);
+    CHECK_EQ(s.silence_log_text(t,sizeof t),std::strlen(none));CHECK_EQ(std::string(t),std::string(none));
+    CHECK(s.begin(1,13,6,0));
+    s.heard(6);s.observed(6,100,0,-61);CHECK(s.locked());          // the lock begins at 100 ms (a frame heard before it is not counted)
+    s.heard(6);s.observed(6,1000,0,-58);                            // the last accepted frame: 1000 ms, -58 dBm
+    s.heard(6);s.heard(6);s.heard(6);s.heard(7);                    // three other frames on the locked channel; one elsewhere is not counted
+    CHECK_EQ(s.next(5999),6);CHECK(s.locked());
+    CHECK_EQ(s.next(6000),7);CHECK(!s.locked());                    // silence: unchanged behaviour
+    CHECK_EQ(s.silence_count(),1u);
+    if(s.silence_count()==1u) {
+        const auto& e=s.silence(0);
+        CHECK_EQ(e.uptime_s,6u);CHECK_EQ(e.channel,6);CHECK_EQ(e.gap_ms,5000u);CHECK_EQ(e.age_s,5u);
+        CHECK_EQ(e.other,3u);CHECK_EQ(e.rssi_dbm,-58);CHECK_EQ(e.sweeps,0u);CHECK(e.power==Survey::Power::Awake);
+    }
+    const char* one="silence_log=6:ch6:gap5000:age5:other3:rssi-58:sweep0:awake";
+    CHECK_EQ(s.silence_log_text(t,sizeof t),std::strlen(one));CHECK_EQ(std::string(t),std::string(one));
+    // the other reasons are counted (lock_loss_by) but not logged here
+    s.heard(7);s.observed(7,6200,0,-75);CHECK(s.locked());
+    s.observed(7,6300,9);CHECK(!s.locked());                        // followed
+    s.observed(9,6400,0,-66);s.hold_discovery(true);                 // held
+    s.hold_discovery(false);s.observed(9,6500,0,-66);s.stop();       // stopped
+    CHECK(s.begin(1,13,6,7000));s.observed(6,7100);CHECK(s.begin(1,13,6,8000));   // restart while locked
+    CHECK_EQ(s.losses(Survey::Loss::Silence),1u);CHECK_EQ(s.lock_losses(),5u);
+    CHECK_EQ(s.silence_count(),1u);                                  // and the log survives a restart (since boot)
+    CHECK_EQ(s.silence_log_text(t,sizeof t),std::strlen(one));CHECK_EQ(std::string(t),std::string(one));
+}
+GUARDIAN_CASE(silence_log_counts_sweep_excursions_and_the_power_state) {
+    Survey s;CHECK(s.begin(1,13,6,10000));s.set_sweep(200,2000);
+    s.power(Survey::Power::Dark);
+    s.observed(6,10000,0,-70);CHECK(s.locked());
+    CHECK_EQ(s.next(10000),6);                                       // the first excursion is due at 11800
+    CHECK_EQ(s.next(11800),7);CHECK(s.away());                       // excursion 1
+    s.heard(7);s.heard(6);                                           // a late frame of the locked channel counts; channel 7 does not
+    CHECK_EQ(s.next(12000),6);
+    CHECK_EQ(s.next(13800),8);CHECK_EQ(s.next(14000),6);             // excursion 2
+    CHECK_EQ(s.next(15399),6);CHECK(s.locked());                     // time away is not silence (unchanged)
+    CHECK_EQ(s.next(15400),7);CHECK(!s.locked());
+    const char* want="silence_log=15:ch6:gap5400:age5:other1:rssi-70:sweep2:dark";   // gap: since the last accepted frame, time away included
+    char t[Survey::silence_log_text_max];
+    CHECK_EQ(s.silence_log_text(t,sizeof t),std::strlen(want));CHECK_EQ(std::string(t),std::string(want));
+    CHECK(std::strcmp(Survey::power_text(Survey::Power::Awake),"awake")==0);
+    CHECK(std::strcmp(Survey::power_text(Survey::Power::Dim),"dim")==0);
+    CHECK(std::strcmp(Survey::power_text(Survey::Power::Dark),"dark")==0);
+    // a new accepted frame starts a new gap: the counts are per gap, not per lock
+    s.power(Survey::Power::Dim);s.observed(7,15500,0,-50);s.heard(7);s.observed(7,16000,0,-52);s.heard(7);s.heard(7);
+    CHECK_EQ(s.next(21000),8);CHECK_EQ(s.silence_count(),2u);
+    if(s.silence_count()==2u) {
+        const auto& e=s.silence(1);
+        CHECK_EQ(e.uptime_s,21u);CHECK_EQ(e.channel,7);CHECK_EQ(e.gap_ms,5000u);CHECK_EQ(e.age_s,5u);
+        CHECK_EQ(e.other,2u);CHECK_EQ(e.rssi_dbm,-52);CHECK_EQ(e.sweeps,0u);CHECK(e.power==Survey::Power::Dim);
+    }
+}
+GUARDIAN_CASE(silence_log_keeps_eight_and_prints_the_last_four_oldest_first) {
+    Survey s;CHECK(s.begin(1,13,6,0,true));                          // fixed channel: no hop between the losses
+    for(unsigned i=0;i<10;++i) {
+        const Millis base=Millis{i}*10000;
+        s.observed(6,base+100,0,static_cast<std::int8_t>(-50-int(i)));CHECK(s.locked());
+        CHECK_EQ(s.next(base+5100),6);CHECK(!s.locked());
+    }
+    CHECK_EQ(s.losses(Survey::Loss::Silence),10u);
+    CHECK_EQ(s.silence_count(),Survey::silence_kept);CHECK_EQ(Survey::silence_kept,8u);
+    if(s.silence_count()==8u){CHECK_EQ(s.silence(0).uptime_s,25u);CHECK_EQ(s.silence(7).uptime_s,95u);CHECK_EQ(s.silence(7).rssi_dbm,-59);}
+    const char* want="silence_log=65:ch6:gap5000:age5:other0:rssi-56:sweep0:awake;75:ch6:gap5000:age5:other0:rssi-57:sweep0:awake;"
+                     "85:ch6:gap5000:age5:other0:rssi-58:sweep0:awake;95:ch6:gap5000:age5:other0:rssi-59:sweep0:awake";
+    char t[Survey::silence_log_text_max];
+    CHECK_EQ(s.silence_log_text(t,sizeof t),std::strlen(want));CHECK_EQ(std::string(t),std::string(want));
+    // never cut: one byte short of the text gives an empty string, nothing past the stated capacity
+    char cut[512];std::memset(cut,'x',sizeof cut);CHECK(std::strlen(want)<sizeof cut);
+    CHECK_EQ(s.silence_log_text(cut,std::strlen(want)),0u);CHECK_EQ(cut[0],0);CHECK_EQ(cut[std::strlen(want)],'x');
+    CHECK_EQ(s.silence_log_text(nullptr,0),0u);
+    CHECK_EQ(s.silence_log_text(cut,std::strlen(want)+1),std::strlen(want));
+}
+GUARDIAN_CASE(silence_log_worst_case_line_fits_its_buffer_as_one_status_token) {
+    Survey::SilenceLoss w{};
+    w.uptime_s=4294967295u;w.gap_ms=4294967295u;w.age_s=4294967295u;w.other=4294967295u;w.sweeps=4294967295u;
+    w.rssi_dbm=-128;w.channel=255;w.power=Survey::Power::Awake;   // every field at its widest
+    const Survey::SilenceLoss four[4]={w,w,w,w};
+    const std::string entry="4294967295:ch255:gap4294967295:age4294967295:other4294967295:rssi-128:sweep4294967295:awake";
+    const std::string want="silence_log="+entry+";"+entry+";"+entry+";"+entry;
+    char big[1024];
+    const auto n=Survey::silence_log_format(four,4,big,sizeof big);
+    CHECK_EQ(n,want.size());CHECK_EQ(std::string(big),want);
+    CHECK(want.size()+1<=Survey::silence_log_text_max);              // the measured worst case fits the documented size
+    CHECK(want.find(' ')==std::string::npos);                        // one STATUS token: no space, one '='
+    CHECK_EQ(std::count(want.begin(),want.end(),'='),1);
+    CHECK_EQ(Survey::silence_log_format(four,4,big,want.size()),0u);CHECK_EQ(big[0],0);   // never cut
+    // the line is wider than any real one: uptime saturates rather than wraps
+    Survey s;CHECK(s.begin(1,13,6,0,true));
+    const Millis late=Millis{5000000000ull}*1000;                    // 5e9 s of uptime
+    s.observed(6,late,0,-60);CHECK_EQ(s.next(late+5000),6);
+    CHECK_EQ(s.silence_count(),1u);
+    if(s.silence_count()==1u)CHECK_EQ(s.silence(0).uptime_s,4294967295u);
 }
 GUARDIAN_CASE(out_of_order_advertisement_does_not_regress_survey_freshness) {
     Survey s;CHECK(s.begin(1,13,6,0));

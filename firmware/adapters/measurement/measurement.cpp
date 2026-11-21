@@ -151,6 +151,51 @@ std::size_t Survey::lock_loss_text(char* out, std::size_t capacity) const {
     if(n<0 || static_cast<std::size_t>(n)>=capacity){out[0]=0;return 0;}   // never cut
     return static_cast<std::size_t>(n);
 }
+// ---- G23 silence log (diagnostics only: the lock behaviour does not read any of it) ----
+namespace {
+std::uint32_t saturate32(Millis v) { return v>0xffffffffull?0xffffffffu:static_cast<std::uint32_t>(v); }
+}
+const char* Survey::power_text(Power p) {
+    switch(p){case Power::Awake:return "awake";case Power::Dim:return "dim";case Power::Dark:return "dark";}
+    return "?";
+}
+void Survey::heard(std::uint8_t channel) {
+    if(locked_ && channel==channel_ && other_!=0xffffffffu)++other_;   // the accepted frame itself is cleared by observed()
+}
+const Survey::SilenceLoss& Survey::silence(std::size_t i) const {
+    static const SilenceLoss empty{};
+    if(i>=silence_n_)return empty;
+    return silence_[(silence_head_+silence_kept-silence_n_+i)%silence_kept];
+}
+void Survey::log_silence(Millis now) {
+    SilenceLoss& e=silence_[silence_head_];
+    e.uptime_s=saturate32(now/1000);e.channel=channel_;
+    e.gap_ms=saturate32(now>=last_accept_?now-last_accept_:0);
+    e.age_s=saturate32(now>=locked_since_?(now-locked_since_)/1000:0);
+    e.other=other_;e.sweeps=sweeps_;e.rssi_dbm=last_rssi_;e.power=power_;
+    silence_head_=(silence_head_+1)%silence_kept;
+    if(silence_n_<silence_kept)++silence_n_;
+}
+std::size_t Survey::silence_log_format(const SilenceLoss* r, std::size_t n, char* out, std::size_t capacity) {
+    if(!out || !capacity)return 0;
+    if(!r)n=0;
+    std::size_t used=0;
+    const auto fits=[&](int k){ if(k<0 || used+static_cast<std::size_t>(k)>=capacity)return false; used+=static_cast<std::size_t>(k); return true; };
+    if(!fits(std::snprintf(out,capacity,"silence_log=%s",n?"":"none"))){out[0]=0;return 0;}   // never cut
+    for(std::size_t i=0;i<n;++i) {
+        const auto& e=r[i];
+        if(!fits(std::snprintf(out+used,capacity-used,"%s%u:ch%u:gap%u:age%u:other%u:rssi%d:sweep%u:%s",i?";":"",
+               unsigned(e.uptime_s),unsigned(e.channel),unsigned(e.gap_ms),unsigned(e.age_s),unsigned(e.other),int(e.rssi_dbm),
+               unsigned(e.sweeps),power_text(e.power)))){out[0]=0;return 0;}
+    }
+    return used;
+}
+std::size_t Survey::silence_log_text(char* out, std::size_t capacity) const {
+    std::array<SilenceLoss, silence_shown> last{};
+    const std::size_t n=std::min(silence_n_,silence_shown);
+    for(std::size_t i=0;i<n;++i)last[i]=silence(silence_n_-n+i);
+    return silence_log_format(last.data(),n,out,capacity);
+}
 std::uint8_t Survey::next(Millis now) {
     if(!active_)return 0;
     // G16J area sweep: a bounded excursion off the locked channel. Time away is not silence.
@@ -159,7 +204,7 @@ std::uint8_t Survey::next(Millis now) {
         away_=false;
         if(now>away_since_)last_seen_+=now-away_since_;
     }
-    if(locked_ && now-last_seen_>=5000){lose(Loss::Silence);changed_=now-300;}
+    if(locked_ && now-last_seen_>=5000){log_silence(now);lose(Loss::Silence);changed_=now-300;}
     if(!fixed_ && !locked_ && now-changed_>=300){channel_=static_cast<std::uint8_t>(first_+(channel_-first_+1)%count_);changed_=now;}
     if(locked_ && !fixed_ && !hold_ && sweep_dwell_ && count_>1) {
         if(!sweep_next_)sweep_next_=now+sweep_period_-sweep_dwell_;
@@ -167,12 +212,13 @@ std::uint8_t Survey::next(Millis now) {
             std::uint8_t c=sweep_channel_?sweep_channel_:channel_;
             do { c=static_cast<std::uint8_t>(first_+(c-first_+1)%count_); } while(c==channel_);
             sweep_channel_=c;away_=true;away_since_=now;sweep_next_=now+sweep_period_;
+            if(sweeps_!=0xffffffffu)++sweeps_;   // G23 silence log: excursions in the current gap
             return sweep_channel_;
         }
     } else if(!locked_)sweep_next_=0;
     return channel_;
 }
-void Survey::observed(std::uint8_t channel, Millis acquired, std::uint8_t advertised_channel) {
+void Survey::observed(std::uint8_t channel, Millis acquired, std::uint8_t advertised_channel, std::int8_t rssi_dbm) {
     if(!active_ || hold_ || channel!=channel_ || acquired<changed_)return;
     // Strong adjacent-channel advertisements can be decoded while tuned away
     // from the AP. Follow its bounded advertised channel, then require a new
@@ -181,6 +227,9 @@ void Survey::observed(std::uint8_t channel, Millis acquired, std::uint8_t advert
        && advertised_channel!=channel_) {
         channel_=advertised_channel;changed_=acquired;lose(Loss::Followed);return;
     }
+    if(!locked_){locked_since_=acquired;last_accept_=acquired;}   // G23 silence log: a new lock
+    else last_accept_=std::max(last_accept_,acquired);
+    other_=0;sweeps_=0;last_rssi_=rssi_dbm;                       // an accepted frame starts a new gap
     locked_=true;last_seen_=std::max(last_seen_,acquired);
 }
 Monitor::Monitor(const MonotonicClock& clock, ChannelSet channels, Origin origin)

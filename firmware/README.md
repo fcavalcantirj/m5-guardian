@@ -375,6 +375,11 @@ Archive `builds/20261116-230644-36448-sticks3` (version `guardian-20261116-23064
    - since G23: `lock_loss_by=silence:<n>,followed:<n>,held:<n>,stopped:<n>`, the count of each reason since boot
      (the four sum to `lock_losses`). `stopped` rises once for every update poll, setup or sleep that found the
      channel locked. Host-tested; not yet read on the stick;
+   - since G23 (silence log): `silence_log=<t>:ch<c>:gap<ms>:age<s>:other<n>:rssi<dBm>:sweep<n>:<pwr>;...`, the last
+     4 of the last 8 silence losses, oldest first (`none` before the first): uptime at the loss, channel, time since the
+     last accepted frame, lock age, frames heard on that channel since then, RSSI of the last accepted frame, sweep
+     excursions in the gap, power state (`awake`/`dim`/`dark`). Diagnostics only; docs/G23-delivery.md section 12.
+     Host-tested; not yet read on the stick;
    - `console_writes`, `console_drops`, `console_stall_ms=total/max`, `log_lines`, `log_drops`;
    - `degraded_transitions`, `nodata_transitions`.
 

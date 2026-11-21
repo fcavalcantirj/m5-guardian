@@ -1,0 +1,75 @@
+G24 spike: battery levers and the Settings look (Author, 2026-11-20 to 2026-11-21)
+=====================================================================================
+
+Purpose: measure every doubt before the G24 ledger row is written (owner: "spike all doubts b4").
+Device: LAB-STICK-1 (StickS3). Raw files: $GUARDIAN_STORE/evidence-raw/<dir>/ (sha256 below).
+
+Images (throwaway diagnostic build, branch spike/power-exp, never merged; TUNE key pexp.mode, letters act
+only on battery while the screen is Dark; the BATTRUN segment's dim_pct carries the mode as 200+mode):
+  guardian-20261120-150740-pexp   modes A..F, P, I, S2 probe, S3 restart cycles
+  guardian-20261120-222754-pexp   adds mode 8 = G (every lever at once, see below)
+  guardian-20261121-103138        delivery image put back afterwards (main tree with the G23 silence log)
+All installed over USB with esptool after a MAC check; every region hash-verified; same partition table.
+
+1. Unused parts (S2, one probe read, MEASURED, 2026-11-20 16:00)
+   PM1 PWR_CFG 0x06 = 0x17: green status LED lit, 5 V boost (Grove/Hat/IR supply) off, LDO, DCDC, charging on.
+   PM1 GPIO_OUT 0x11 = 0x04: LCD/audio rail on, speaker amp off.
+   G46 (IR TX gate): output disabled, low. Codec ES8311 answers and is powered down (its rail is shared with
+   the LCD, so the microphone loses power only when the LCD rail is cut).
+
+2. Radio stop/restart (S3, on USB, 100 cycles of 10 s listen / 5 s off, MEASURED)
+   radio_offs=100 radio_ons=100 radio_fail=0; 4 cycles without frame plus lock inside the 10 s listen.
+   Resume to first accepted frame: avg 3469 ms, max 8837 ms. Relock: avg 3567 ms over 96.
+   On the G image overnight (380 cycles of 10 s / 50 s): radio_fail=0, rail_fail=0, pm_fail=0;
+   resume avg 2893 ms, relock avg 2985 ms at the +10 min check.
+
+3. Lever segments (charge 1, 20 min each, dark phase only, MEASURED; mV/h = mV/10min x 6)
+   seg  mode                 start mV   mV/h
+   1    A today              4171       444
+   2    P unused parts off   3843       354
+   3    A today              3658       168
+   4    B P + radio off      3572        66
+   5    A today              3551       282   then the 20 % floor (deep sleep)
+   Reading: the discharge curve swamps 20-minute slope segments (A alone: 444, 168, 282). Radio off is the
+   only lever clearly above that noise; P shows no separable saving. Modes C and D never ran (the floor came
+   first). Decision: battery hours come from full drains only.
+
+4. Full drains (MEASURED, from full to the 20 % floor, awake minutes from BATTRUN)
+   Always listening, today's image (G23 soak and sheet A, 2026-11-20): 2 h 05 min to 2 h 08 min.
+   G = listen 10 s / off 50 s + status LED off + IR TX held low + LCD rail cut while dark + IMU low-power
+       + 80 MHz light sleep while the radio is off (2026-11-20 23:29 to 2026-11-21 06:4x):
+       BATTRUN minutes=434 (awake), start 4163 mV, floor 3447 mV, sleeps=2, asleep_s=10577,
+       seg1 A 474 s (the first poll set the mode), seg2 G 24208 s, dark 10 mV/10min over 23622 s.
+       Result: about 7 h 14 min, a little more for G alone (its first 8 minutes ran A).
+   Ratio G / always: about 3.4.
+
+5. Detection cost of listening 10 s in every 60 s (worked, docs/G23-delivery.md section 11.4)
+   An alert can be up to about 50 s late; a short burst entirely inside an off period is missed;
+   "No fresh data" (29 s) must not show for the planned off periods.
+
+6. Open
+   One brownout reset on USB at about 3600 mV while charging (2026-11-21 09:51, G image, 10 min after a
+   floor wake). Cause UNKNOWN. No earlier reset=brownout in any record (G16 to G24). Watched on the
+   delivery image.
+   Silence lock losses (G23 section 12): cause UNKNOWN; next step is a count of the lock network's frames by
+   subtype during a gap.
+   Not measured: listen 10 s / off 20 s with every lever; backlight levels while lit.
+
+7. Settings look (S6, host preview with the real renderer, owner approved 2026-11-21: "perfect")
+   firmware/evidence/sticks3-G24-settings-look-20261121.png
+   sha256 e534359e8b89cfd3963a16b3ccc3d0231b64f7624ff42a4a3ba63dedc4be1117
+
+Raw evidence (sha256)
+   b527cb9597726fbc5430ef0c556de055cc0bef4b9f88f2b7c5bb4ca5a751498f  G24-pexp-battery-charge1-20261120/SHA256SUMS
+   9ba42780737e1026a285d07ae645edc7330db553678ddf8d720bf6c4c4d32516  G24-pexp-battery-charge2G-20261120/SHA256SUMS
+   81bf4e0f30739459ec990590d991912a9f244e20a20563f6984d53454b90c4ea  G24-pexp-usb-20261120/P1-1559.txt
+   f092ef13b7d5927b593eef69e3a4eeac86efedfb990782af4b6f00f7a4200ed2  G24-pexp-usb-20261120/S3-1601.txt
+   a8c70085da61c8a1bd1224e9cffc16644779329e002577a64a7bb5db248365c3  G24-pexp-usb-20261120/S3R-1629.txt
+   10020f8338c7b6abd509e499a432769e6d4b674d32f362c7d0a27c2394852019  G24-pexp-usb-20261120/SIL-1705.txt
+   42cb73acf01060f564ffc882e6e0e7bb3f6eef824b95ddb60aecb642477bf563  G24-pexp-usb-20261120/run.sh
+   4ae2acf2863035cca3d4d220824435dfcc8bbfd631623349e2b7df9fd0e5bfa0  G24-pexp-usb-20261120/charge/R1-1728.txt
+   2516a480f20b19d09867743e5e6d69533ce6efc201d608114666f7811cf65650  G24-pexp-usb-20261120/charge/R2-1748.txt
+   3938f36eefe9fb71e99aa2f89a5447729d5caddc8a19a83045135d05a479087a  G24-pexp-usb-20261120/charge/run.sh
+   3c82412d7fb48c2e532429e88078f9c09b720fadf348f030968d9bf5558837ca  G24-pexp-usb-20261120/topoff/T1-1751.txt
+   5c3974aac2ba9720ea702fc1d50e4767c9f3679d6de8283fd8750a57ed4ece75  G24-pexp-usb-20261120/topoff/T2-1757.txt
+   2b58c73e41517ed41fa9a452841ca73c2490cd4222bc2835a1f0911137de047a  G24-pexp-usb-20261120/topoff/run.sh

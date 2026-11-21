@@ -173,13 +173,14 @@ struct TextBuffers {
     char wire_line[grx::max_packet*2+7];
     char state_line[8192];      // G16F: 14 detector records in the G13 JSON
     char snapshot_line[8256];   // one USB write keeps state prefix/body together
-    char status_line[7456];     // G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160)
+    char status_line[7848];     // G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
     char detect[2048];          // G16E/G16F: per-detector counters (14), air meter, area observations
     char bursts[measurement::Monitor::burst_text_max];   // G16S: last_burst_network= / last_burst_area= (its own buffer: never lost with `detect`)
     char frames_reply[1024];
     char tune_reply[4096];      // G16E: up to tune::max_params lines (longer listings end "TUNE MORE")
 };
 TextBuffers* bufs{};
+static_assert(sizeof(TextBuffers::status_line)<=guardian::tune::wifi::kMaxReply,"a STATUS line must fit one TUNE reply");
 const char* text_ram="none";const char* app_ram="none";const char* tune_ram="none";   // STATUS: psram / internal
 // Review 2026-11-17: why this boot happened (esp_reset_reason), so "did it deep-sleep or
 // restart?" is read from STATUS (reset= and uptime_s=), never guessed.
@@ -471,6 +472,16 @@ guardian::battery::Phase battery_phase() {   // BATTRUN per-state drain: which s
     }
     return guardian::battery::Phase::Active;
 }
+// G23 silence log: the power state recorded beside each silence loss (the same mapping as battery_phase;
+// Sleep never lasts a loop: sleep_now() does not return, or the sleep was cancelled by a key).
+measurement::Survey::Power survey_power(gp::State state) {
+    switch(state) {
+    case gp::State::Dim: return measurement::Survey::Power::Dim;
+    case gp::State::Dark: return measurement::Survey::Power::Dark;
+    case gp::State::Active: case gp::State::Sleep: break;
+    }
+    return measurement::Survey::Power::Awake;
+}
 bool g_front{},g_side{};   // this loop's key levels after the wake-press guard
 gp::WakeCause wake_cause_now() {
     switch(esp_sleep_get_wakeup_cause()) {
@@ -746,6 +757,8 @@ void companion_status() {
     char link[240];health.status_text(link,sizeof link);
     char lock_by[measurement::Survey::lock_loss_text_max];   // G23: lock_loss_by=silence:<n>,followed:<n>,held:<n>,stopped:<n>
     if(!survey.lock_loss_text(lock_by,sizeof lock_by))std::snprintf(lock_by,sizeof lock_by,"lock_loss_by=status_overflow");
+    char silence_log[measurement::Survey::silence_log_text_max];   // G23: the last 4 silence losses with their context
+    if(!survey.silence_log_text(silence_log,sizeof silence_log))std::snprintf(silence_log,sizeof silence_log,"silence_log=status_overflow");
     char energy[160];   // G23: the battery-life settings in effect (the poll period now, the CPU now and while dark)
     {   const float batt_s=tuning && tune_ota_auto_batt>=0?tuning->get(tune_ota_auto_batt):guardian::ota::follow_auto_s;
         std::snprintf(energy,sizeof energy," ota_auto_batt_s=%d poll_s=%u cpu_mhz=%u dark_cpu_mhz=%u dark_cpu=%s cpu_set_fail=%u cpu_switches=%u",
@@ -787,7 +800,7 @@ void companion_status() {
         " art_ram=%s art_ram_bytes=%u monitor_ram=%s radio_ram=%s text_ram=%s app_ram=%s tune_ram=%s reset=%s uptime_s=%u codec_boot=%s warps=%u warp_reuses=%u art_copies=%u push_rows_avg=%u full_pushes=%u"
         " shakes=%u bursts=%u burst_ram=%s burst_ram_bytes=%u"
         " head=%s head_sets=%u/%u head_frames=%u head_refused=%s head_at=%d:%d,%d head_inflates=%u head_reuses=%u head_fail=%u:%s head_ms=%u.%u/%u.%u head_ram=%s head_ram_bytes=%u"
-        " rx_received=%u rx_queue_full=%u rx_discarded=%u rx_bad=%u lock_losses=%u last_lock_loss=%s %s %s"
+        " rx_received=%u rx_queue_full=%u rx_discarded=%u rx_bad=%u lock_losses=%u last_lock_loss=%s %s %s %s"
         " tune_wifi=%s tune_wifi_last_end=%s tune_wifi_commands=%u tune_wifi_refused=%u %s tune_key=%s%s%s%s%s%s%s\n",
         control==Control::Console?"console":"companion",unsigned(app->onboarding()?app->onboarding_page()+1:0),screen_text(v.screen),view_mode_text(v.mode),v.has_selection?v.selected_bssid.c_str():"none",
         int(radio_state()),int(app->store()),int(v.alert),int(v.face),int(v.overlay),unsigned(app->presenter().picker().count),unsigned(app->presenter().picker().dropped),
@@ -808,7 +821,7 @@ void companion_status() {
         head_changes?unsigned(head_change_us_total/head_changes/1000):0u,head_changes?unsigned(head_change_us_total/head_changes%1000/100):0u,
         unsigned(head_change_us_max/1000),unsigned(head_change_us_max%1000/100),head_ram,unsigned(head_ram_bytes),
         unsigned(radio.received()),unsigned(radio.queue_full()),unsigned(radio.discarded()),unsigned(radio.bad()),
-        unsigned(survey.lock_losses()),measurement::Survey::loss_text(survey.last_loss()),lock_by,link,
+        unsigned(survey.lock_losses()),measurement::Survey::loss_text(survey.last_loss()),lock_by,silence_log,link,
         tune_wifi,guardian::tune::wifi::end_text(tune_session.end()),unsigned(tune_session.commands()),unsigned(tune_session.refused()),
         offers,tune_key.loaded()?"ota":tune_key_read?"none":"unread",power,energy,detect,bursts,datapath,setup_text);
 #if CONFIG_GUARDIAN_ART_BENCH
@@ -1206,13 +1219,14 @@ void setup_request(guardian::setup::Entry how,const guardian::setup::Target& tar
 }
 void companion_drain() {
     for(unsigned i=0;i<24 && next_packet();++i) {
+        survey.heard(packet.meta.channel);   // G23 silence log: every drained frame (a deaf radio versus a quiet network)
 #if CONFIG_GUARDIAN_BLE_SPIKE
         spike.frame(packet.bytes.data(),packet.size,packet.meta.acquired.at);   // G16H: selected-AP beacon count
 #endif
         if(app->receive(packet)) {
             const auto* observation=monitor->last_security();   // no Snapshot copy on the main stack
             const auto advertised=observation && observation->settings.ds_channel_present?observation->settings.ds_channel:0;
-            const bool locked=survey.locked();survey.observed(packet.meta.channel,packet.meta.acquired.at,advertised);
+            const bool locked=survey.locked();survey.observed(packet.meta.channel,packet.meta.acquired.at,advertised,packet.meta.rssi_dbm);
             if(!locked && survey.locked())stable_since=clock_ptr->now();
         }
     }
@@ -1893,6 +1907,7 @@ extern "C" void app_main() {
             pin.source=power_source.source();
             const auto before=idle.state();
             auto after=idle.step(pin,now32);
+            survey.power(survey_power(after));   // G23 silence log: the power state beside each silence loss
             bool sleep_cancelled=false;
             if(after==gp::State::Sleep && !sleep_now()) {   // cancelled by a key during the message
                 pin.key=true;after=idle.step(pin,now32);front=board.key_front_down();side=board.key_side_down();
@@ -1930,6 +1945,7 @@ extern "C" void app_main() {
         if(deadline && now>=deadline)stop();
         // Bound work per loop so no traffic rate can starve expiry/stop/display.
         for(unsigned i=0;i<24 && next_packet();++i) {
+            survey.heard(packet.meta.channel);   // G23 silence log: every drained frame
             record={};record.kind=1;record.flags=1|(packet.truncated?2:0);record.channel=packet.meta.channel;
             record.acquired_us=packet.meta.acquired.at*1000;record.radio_us=packet.meta.radio_timestamp_us;
             record.reported=packet.meta.reported_length;record.size=packet.size;record.rssi=packet.meta.rssi_dbm;record.noise=packet.meta.noise_floor_dbm;
@@ -1938,7 +1954,7 @@ extern "C" void app_main() {
             else if(monitor->receive(packet)) {
                 const auto* observation=monitor->last_security();
                 const auto advertised=observation && observation->settings.ds_channel_present?observation->settings.ds_channel:0;
-                const bool locked=survey.locked();survey.observed(packet.meta.channel,packet.meta.acquired.at,advertised);
+                const bool locked=survey.locked();survey.observed(packet.meta.channel,packet.meta.acquired.at,advertised,packet.meta.rssi_dbm);
                 if(!locked && survey.locked())stable_since=clock.now();
             }
             send_record();
