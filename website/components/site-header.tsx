@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Menu, ShieldCheck, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { repositoryUrl } from "@/lib/guardian";
@@ -15,7 +15,7 @@ const links = [
 
 export function Brand() {
   return (
-    <a href="#" className="brand" aria-label="M5 Guardian home">
+    <a href="/" className="brand" aria-label="M5 Guardian home">
       <span className="brand-mark">
         <ShieldCheck strokeWidth={1.7} aria-hidden="true" />
       </span>
@@ -29,6 +29,20 @@ export function Brand() {
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+
+  // Escape closes the open menu from anywhere and returns focus to its button.
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      menuButton.current?.focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   return (
     <header className="site-header">
       <div className="container header-inner">
@@ -53,6 +67,7 @@ export function SiteHeader() {
           <ArrowUpRight data-icon="inline-end" aria-hidden="true" />
         </a>
         <Button
+          ref={menuButton}
           variant="outline"
           size="icon-lg"
           className="mobile-menu-button"
@@ -61,7 +76,7 @@ export function SiteHeader() {
           aria-controls="mobile-nav"
           onClick={() => setOpen(!open)}
         >
-          {open ? <X /> : <Menu />}
+          {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
         </Button>
       </div>
       {open && (

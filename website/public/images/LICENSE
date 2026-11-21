@@ -1,24 +1,39 @@
 Guardian persona artwork
 Copyright (c) 2026 Felipe Cavalcanti. All rights reserved.
 
+This notice repeats firmware/art/LICENSE beside the website copies of the
+artwork, with paths given from the repository root and the website use
+recorded below. Where the two differ, firmware/art/LICENSE governs, and the
+website record grants nothing beyond it.
+
 What this covers
   The artwork of the Guardian persona, wherever a copy sits in this
   repository: the portraits and masters, the sheets and previews, the 3D
   source file, the frame packs and the packed portraits generated from them
   (image, model and packed-art files under firmware/art/, and any generated
-  copy of them elsewhere in the tree).
+  copy of them elsewhere in the tree, including the portraits in
+  website/public/images/ and the social card the website draws from them).
 
 Provenance
   The accepted portraits are an AI-rendered illustration pack supplied by the
-  repository owner and post-processed by the scripts in this directory; the
+  repository owner and post-processed by the scripts in firmware/art/; the
   earlier procedural version was generated with Blender (see
   docs/G15-persona.md). The persona is inspired by Guy Fawkes mask
   iconography. No claim is made here over any third-party design or mark, and
   nothing in this file grants a right in one.
 
 What this does not cover
-  The scripts in this directory (the .py files that build, check and pack the
-  art) are source code under the repository's MIT license (../../LICENSE).
+  The scripts in firmware/art/ (the .py files that build, check and pack the
+  art) and the website's source code are under the repository's MIT license
+  (LICENSE at the repository root).
+
+Use specified by the copyright holder for this website
+  The copyright holder has specified that the artwork is shown on the M5
+  Guardian website built from website/: on its pages, on the simulated
+  StickS3 screen, and in the website's social-sharing card. That is the
+  copyright holder's own use; it grants nobody else any right, and it does
+  not extend to copies of the website, its deployment by anyone else, or the
+  artwork outside it.
 
 What you may do
   View the artwork, and use it unmodified to build this firmware for your own

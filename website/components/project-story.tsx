@@ -18,7 +18,11 @@ import {
   Wifi,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { repositoryUrl } from "@/lib/guardian";
+import {
+  artworkLicenseUrl,
+  codeLicenseUrl,
+  repositoryUrl,
+} from "@/lib/guardian";
 
 const steps = [
   {
@@ -89,7 +93,7 @@ export function HowItWorks() {
               <span>
                 <Terminal aria-hidden="true" /> THE OBSERVATION LAYER
               </span>
-              <span>EXAMPLE</span>
+              <span>EXAMPLE: SYNTHETIC NAME AND COUNTS</span>
             </div>
             <div className="observation-network">
               <div className="network-symbol">
@@ -99,7 +103,7 @@ export function HowItWorks() {
                 <span className="micro-label">SELECTED NETWORK</span>
                 <strong>YOUR-NETWORK</strong>
                 <span className="network-meta">
-                  2.4 GHz <i /> Channel 06 <i /> Receive only
+                  2.4 GHz <i /> Channel 06 <i /> Receive-only monitoring
                 </span>
               </div>
               <span className="status-dot" />
@@ -143,17 +147,53 @@ export function HowItWorks() {
         </div>
         <div className="limits-note">
           <span>KNOW THE LIMITS</span>
-          <p>
-            2.4 GHz only. One selected channel. No password-strength testing,
-            traffic inspection, or promise of absolute safety.
-          </p>
-          <a
-            href={`${repositoryUrl}#what-it-cannot-see`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Full transparency <ArrowUpRight aria-hidden="true" />
-          </a>
+          <div className="limits-copy">
+            <p>
+              2.4 GHz only. One selected channel. No password-strength testing,
+              no inspection of clients’ application traffic, and no promise of
+              absolute safety.
+            </p>
+            <p>
+              Receive-only monitoring: the stick transmits only for its phone
+              setup access point and, as an ordinary Wi-Fi client, for its
+              signed update check. It stops listening for the seconds each
+              check takes, every 120 s by default.
+            </p>
+            <p>
+              Disconnect bursts on your network and nearby activity are proven
+              on the device; several other detector families are host-tested
+              only.
+            </p>
+          </div>
+          <ul className="limits-links" aria-label="Published limits and coverage">
+            <li>
+              <a
+                href={`${repositoryUrl}#what-it-cannot-see`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                What it cannot see <ArrowUpRight aria-hidden="true" />
+              </a>
+            </li>
+            <li>
+              <a
+                href={`${repositoryUrl}/blob/main/docs/attack-coverage.md`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Detection coverage <ArrowUpRight aria-hidden="true" />
+              </a>
+            </li>
+            <li>
+              <a
+                href={`${repositoryUrl}/blob/main/docs/G23-delivery.md`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Delivery record and limits <ArrowUpRight aria-hidden="true" />
+              </a>
+            </li>
+          </ul>
         </div>
       </div>
     </section>
@@ -225,7 +265,9 @@ export function Hardware() {
         </h2>
         <p>
           A screen, a radio, two buttons, and a whole lot of personality. Your
-          first Guardian lives on an M5 StickS3. No companion computer required.
+          first Guardian lives on an M5 StickS3. No companion computer for
+          normal monitoring: a computer does the first USB install and serves
+          the signed updates.
         </p>
         <div className="hardware-specs">
           <div>
@@ -263,8 +305,8 @@ export function Hardware() {
           <ArrowUpRight data-icon="inline-end" aria-hidden="true" />
         </a>
         <span className="hardware-future">
-          <Radio aria-hidden="true" /> Wi-Fi first. A portable core for what
-          comes next.
+          <Radio aria-hidden="true" /> Wi-Fi first. A Bluetooth guard is
+          deferred to a second release.
         </span>
       </div>
     </section>
@@ -313,9 +355,12 @@ export function OpenSource() {
           </a>
         </div>
         <div className="source-facts">
-          <span>
-            <Check aria-hidden="true" /> MIT-licensed code
-          </span>
+          <a href={codeLicenseUrl} target="_blank" rel="noreferrer">
+            <Check aria-hidden="true" /> Code license: MIT
+          </a>
+          <a href={artworkLicenseUrl} target="_blank" rel="noreferrer">
+            <Check aria-hidden="true" /> Artwork: all rights reserved
+          </a>
           <span>
             <Check aria-hidden="true" /> Portable C++17 core
           </span>
@@ -323,13 +368,19 @@ export function OpenSource() {
             <Check aria-hidden="true" /> Defensive by design
           </span>
         </div>
-        <div className="repository-path">
+        <a
+          href={repositoryUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="repository-path"
+          aria-label="fcavalcantirj/m5-guardian on GitHub"
+        >
           <Code2 aria-hidden="true" />
           <span>fcavalcantirj</span>
           <ChevronRight aria-hidden="true" />
           <strong>m5-guardian</strong>
           <ArrowUpRight aria-hidden="true" />
-        </div>
+        </a>
       </div>
     </section>
   );

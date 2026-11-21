@@ -37,15 +37,20 @@ const scenarios = [
 export function GuardianExperience() {
   const [selectedMood, setSelectedMood] = useState("very-good");
   const [scenario, setScenario] = useState<Scenario>("normal");
-  const [motion, setMotion] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [ready, setReady] = useState(false);
   const mood = moods.find((item) => item.id === selectedMood) ?? moods[0];
   const view = getPresentation(mood, scenario);
+  const motion = !paused && !reducedMotion;
 
   useEffect(() => {
     setReady(true);
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-      setMotion(false);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
   }, []);
 
   return (
@@ -67,6 +72,13 @@ export function GuardianExperience() {
           <p className="hero-description">
             Meet your pocket-sized radio guardian. It listens to the invisible,
             spots the unusual, and wears your Wi-Fi&apos;s state on its face.
+          </p>
+          <p className="simulation-note">
+            <Info aria-hidden="true" />
+            <span>
+              This website is a simulation. It does not connect to or protect
+              your network.
+            </span>
           </p>
           <div className="hero-actions">
             <a href="#guardian" className={buttonVariants({ size: "hero" })}>
@@ -117,17 +129,28 @@ export function GuardianExperience() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setMotion(!motion)}
-            aria-pressed={!motion}
-            aria-label={motion ? "Pause animations" : "Resume animations"}
+            className="motion-toggle"
+            onClick={() => setPaused(!paused)}
+            disabled={reducedMotion}
+            aria-label={
+              reducedMotion
+                ? "Motion off: reduced motion is requested by your system"
+                : paused
+                  ? "Resume motion"
+                  : "Pause motion"
+            }
           >
             {motion ? (
-              <Pause data-icon="inline-start" />
+              <Pause data-icon="inline-start" aria-hidden="true" />
             ) : (
-              <Play data-icon="inline-start" />
+              <Play data-icon="inline-start" aria-hidden="true" />
             )}
             <span className="motion-label">
-              {motion ? "Pause motion" : "Resume motion"}
+              {reducedMotion
+                ? "Motion off (system)"
+                : paused
+                  ? "Resume motion"
+                  : "Pause motion"}
             </span>
           </Button>
         </div>
@@ -169,13 +192,16 @@ export function GuardianExperience() {
           <span className="scenario-description" role="status">
             {view.description}
           </span>
-          <span>SIMULATED DATA · NOT A LIVE READING</span>
+          <span className="console-disclaimer">
+            Simulated data, not a live reading. This website is a simulation. It
+            does not connect to or protect your network.
+          </span>
         </div>
       </section>
 
       <div className="principles-strip container">
         <span>
-          <Radio aria-hidden="true" /> Passive listening
+          <Radio aria-hidden="true" /> Receive-only monitoring
         </span>
         <span>
           <ShieldCheck aria-hidden="true" /> Your network. Your control.
@@ -183,9 +209,7 @@ export function GuardianExperience() {
         <span>
           <Eye aria-hidden="true" /> Awareness, not interference
         </span>
-        <span className="strip-end">
-          NO CLOUD REQUIRED <ArrowUpRight aria-hidden="true" />
-        </span>
+        <span className="strip-end">No cloud for normal monitoring</span>
       </div>
 
       <section
@@ -206,7 +230,10 @@ export function GuardianExperience() {
           </div>
           <p>
             No wall of numbers. No guessing games.
-            <br />A personality for every advertised security state.
+            <br />
+            Five rated faces for the settings your network advertises. Settings
+            outside those five rows read Not rated, and stale evidence shows No
+            fresh data instead of a face.
             <br />
             <span className="text-bright">Pick a face. Get the message.</span>
           </p>
@@ -260,7 +287,7 @@ export function GuardianExperience() {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <div className="mood-explanation" aria-live="polite">
+        <div className="mood-explanation">
           <div>
             <span className="status-dot" />
             <strong>{mood.name}</strong>

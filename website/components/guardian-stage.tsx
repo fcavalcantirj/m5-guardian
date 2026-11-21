@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, type PointerEvent } from "react";
+import { useEffect, useRef, type PointerEvent } from "react";
 import { Radio, ShieldCheck, WifiOff } from "lucide-react";
 import type { Presentation } from "@/lib/guardian";
 
@@ -13,6 +13,11 @@ export function GuardianStage({
   motion: boolean;
 }) {
   const portrait = useRef<HTMLDivElement>(null);
+
+  // Pausing motion or a reduced-motion request returns the portrait to rest.
+  useEffect(() => {
+    if (!motion && portrait.current) portrait.current.style.transform = "";
+  }, [motion]);
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     if (
@@ -49,7 +54,7 @@ export function GuardianStage({
         <span className="status-dot" /> GUARDIAN / DEMO
       </div>
       <div className="stage-coordinate coordinate-right">
-        RX ONLY
+        RX-ONLY MONITOR
         <br />
         <span>2.4 GHz</span>
       </div>
@@ -87,7 +92,7 @@ export function GuardianStage({
           <i key={i} style={{ "--i": i } as React.CSSProperties} />
         ))}
       </div>
-      <div className="guardian-state" aria-live="polite" aria-atomic="true">
+      <div className="guardian-state">
         <span className="state-icon">
           {view.image ? (
             <ShieldCheck aria-hidden="true" />
@@ -96,7 +101,7 @@ export function GuardianStage({
           )}
         </span>
         <div>
-          <span className="micro-label">DEMO NETWORK STATE</span>
+          <span className="micro-label">DEMO STATE</span>
           <strong>{view.label}</strong>
         </div>
         <div className="signal-bars" aria-hidden="true">

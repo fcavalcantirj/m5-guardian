@@ -41,7 +41,7 @@
       "Verify all controls and content at widths 320, 375, 390, 600, 768, 1024 and 1440 CSS pixels and at 200 percent zoom; require no horizontal page overflow, clipped controls, obscured text or inaccessible navigation.",
       "Pass typecheck, presentation tests and a production build; record browser keyboard and screen-reader results, including announcements for mood, nearby, alert and stale changes."
     ],
-    "passes": false,
+    "passes": true,
     "existing_work": ""
   },
   {
