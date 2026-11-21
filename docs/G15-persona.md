@@ -97,7 +97,7 @@ third-party clearance (see the amendment above and `firmware/art/LICENSE`).
 ## v1 history (superseded, retained)
 
 The rejected v1 (procedural Blender 5.2.2 generator, porcelain mask + gold
-signal-crest, no stock-mask reuse) remains at `firmware/art/persona/`
-(`guardian_persona.py`, `guardian_persona.blend` sha256 `ac3d0a3b…`, `sheets/`)
-and `$GUARDIAN_STORE/art-exports/G15/20261116-v1/`. It is not the
-accepted face and is not consumed by firmware; kept for reference/rollback.
+signal-crest, no stock-mask reuse) was removed from the tree on 2026-11-21 (owner: outdated art out of
+the public repo). Its sources (`guardian_persona.py`, `guardian_persona.blend` sha256 `ac3d0a3b…`,
+`make_sheets.py`) and sheets are kept in `$GUARDIAN_STORE/art-exports/G15/20261116-v1/` (sources in
+`sources/`). It is not the accepted face and was never consumed by firmware.

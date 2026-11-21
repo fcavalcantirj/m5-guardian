@@ -2,7 +2,7 @@
 
 The Guardian persona with exactly five rated moods: **Very good, Good, Medium, Bad, Horrible**. The top mood carries the large grin and cigar.
 
-State from the ledger (re-read 2026-11-20): the faces accepted by the owner are 2D portraits. G15 was accepted on 2026-11-16 with the owner-supplied sprite pack as a deliberate change of the original editable-3D contract (`docs/G15-persona.md`); the v4 pack was accepted for Good, Medium, Bad and Horrible on 2026-11-17 (G17 to G20); the pipeline from master to glass is the owner's pick of 2026-11-18 (G16Q, candidate D). The image carries 16 portraits of 135x160 pixels (`persona/v2/portrait/`, pinned in `persona/v2/manifest.json`). The first 3D source (`persona/guardian_persona.blend`, `guardian_persona.py`) and the 3D head of G21 remain in the tree; the head is optional and off by default.
+State from the ledger (re-read 2026-11-20): the faces accepted by the owner are 2D portraits. G15 was accepted on 2026-11-16 with the owner-supplied sprite pack as a deliberate change of the original editable-3D contract (`docs/G15-persona.md`); the v4 pack was accepted for Good, Medium, Bad and Horrible on 2026-11-17 (G17 to G20); the pipeline from master to glass is the owner's pick of 2026-11-18 (G16Q, candidate D). The image carries 16 portraits of 135x160 pixels (`persona/v2/portrait/`, pinned in `persona/v2/manifest.json`). The rejected first 3D source (v1: `guardian_persona.blend`, `guardian_persona.py`, its sheets) left the tree on 2026-11-21 and is kept in the store (`docs/G15-persona.md`); the 3D head of G21 remains, optional and off by default.
 
 Rules for this directory:
 
