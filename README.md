@@ -1,4 +1,23 @@
-# M5 Guardian
+<p align="center">
+  <img src="docs/img/guardian-faces.webp" width="270" alt="The Guardian face cycling through its five moods, the red ALERT and No fresh data">
+</p>
+
+<h1 align="center">M5 Guardian</h1>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="License: MIT"></a>
+  <a href="firmware/art/LICENSE"><img src="https://img.shields.io/badge/art-all%20rights%20reserved-lightgrey" alt="Art: all rights reserved"></a>
+  <img src="https://img.shields.io/badge/M5Stack-StickS3%20(ESP32--S3)-orange" alt="M5Stack StickS3 (ESP32-S3)">
+  <img src="https://img.shields.io/badge/ESP--IDF-v5.4-red" alt="ESP-IDF v5.4">
+  <img src="https://img.shields.io/badge/C%2B%2B-17-00599C" alt="C++17">
+  <img src="https://img.shields.io/badge/radio-receive--only-2ea44f" alt="Radio: receive-only">
+</p>
+
+<p align="center">
+  <img src="docs/img/guardian-moods.png" alt="Very good, Good, Medium, Bad, Horrible, ALERT and No fresh data">
+  <br>
+  <sub>Persona art © 2026 Felipe Cavalcanti, all rights reserved (<a href="firmware/art/LICENSE">firmware/art/LICENSE</a>); published with the repository, not under its MIT license.</sub>
+</p>
 
 A pocket radio guard for your own Wi-Fi. It runs on an M5 StickS3, listens to the 2.4 GHz air around
 one network that you pick, and shows on its screen how that network advertises itself and whether
