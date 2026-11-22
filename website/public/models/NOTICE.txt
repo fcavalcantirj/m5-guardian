@@ -1,0 +1,58 @@
+M5 Guardian website: StickS3 3D model notice
+============================================
+
+Files in this folder
+  sticks3-front.stl    100,184 B  sha256 ab580dd167d2733a15da2b0f99127d100ce955e289f674f442a67366599fc2db
+  sticks3-back.stl     240,484 B  sha256 ccbb5dee263066fad875840f831da1ed8b875b27e388a4157f4b4f1376bf3559
+  sticks3-buttons.stl   26,984 B  sha256 ceb3ac28979fa80fedb51dc7ae82fc8364b41955d65afba606b0d3437b76db82
+
+Upstream source
+  M5Stack, M5_Hardware repository, https://github.com/m5stack/M5_Hardware
+  File: Products/K150_StickS3/Structures/StickS3.stl
+  Inspected at repository commit 8231e759560ce63d864c8987b8ca12f9c09c825b
+  (file last changed by commit 48baa75a9476f4070dd5f107c1c28e2c9f383a96,
+  2026-07-15; git blob 5da93e9c27ee78cfc8a3586a8125d2bf2698cfef,
+  734,884 B, sha256 cadfa88716cb74a85d0d76dc866d83dbd627d6f5c310b528d43e588dab37ecec).
+  The upstream file is one binary STL ("STICKS3_ASM", 14,696 triangles)
+  holding the StickS3 parts twice: once assembled and once laid out side by
+  side.
+
+Conversion
+  The three files are the assembled copy split into its three connected
+  parts (front shell 2,002 triangles, back shell 4,808, key mat 538) and
+  moved by (-12, -24.08, +6.6) mm so the device is centred on the origin;
+  units stay millimetres. The facet normals are written as zero (the viewer
+  computes its own) and the 80-byte headers are blank. Nothing else changes:
+  every triangle of each file equals an upstream triangle after that move,
+  within 1e-6 mm (single-precision rounding).
+  The split files were made for the owner's Doutor VPD website and copied
+  unchanged from it; the comparison above was measured against the upstream
+  file on 2026-11-22.
+
+License of the model (MIT, from the M5_Hardware repository's LICENSE)
+
+MIT License
+
+Copyright (c) 2021 M5Stack
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+M5Stack and StickS3 are names of their owner. The simulated screen artwork
+the website draws on this model is not covered by this notice: see
+https://github.com/fcavalcantirj/m5-guardian/blob/main/website/public/images/LICENSE

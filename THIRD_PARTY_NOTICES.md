@@ -191,3 +191,58 @@ from the historical RF-lab reference.
 bit-by-bit decode of long codes follow the method of `contrib/puff/puff.c` in zlib (Mark Adler, zlib license,
 https://github.com/madler/zlib); no source text is copied and zlib is not linked into the firmware. The host
 checks and `tools/face3d/pack_frames.py` use the system zlib only to produce and compare streams.
+
+## StickS3 3D model and viewer (website, W03)
+
+`website/public/models/sticks3-front.stl`, `sticks3-back.stl` and
+`sticks3-buttons.stl` are derived from M5Stack's StickS3 CAD,
+`Products/K150_StickS3/Structures/StickS3.stl` in
+https://github.com/m5stack/M5_Hardware (inspected at commit
+`8231e759560ce63d864c8987b8ca12f9c09c825b`; the file last changed in
+`48baa75a9476f4070dd5f107c1c28e2c9f383a96`, 2026-07-15; sha256
+`cadfa88716cb74a85d0d76dc866d83dbd627d6f5c310b528d43e588dab37ecec`). The upstream
+file holds the parts twice (assembled and laid out); the three files are the
+assembled copy split into its connected parts and moved by (-12, -24.08, +6.6)
+mm, with zeroed facet normals and blank headers. Every triangle matches an
+upstream triangle after that move within 1e-6 mm (measured 2026-11-22). They were
+copied byte for byte from the owner's Doutor VPD website, which made the split.
+Their sha256 values, the conversion and the full notice are also served with the
+site at `/models/NOTICE.txt` (`website/public/models/NOTICE.txt`). The
+M5_Hardware repository is MIT-licensed:
+
+```text
+MIT License
+
+Copyright (c) 2021 M5Stack
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+**Adapted viewer source.** `website/components/stick-viewer.tsx` adapts parts of
+`components/device/stick-3d.tsx` from the Doutor VPD website (private repository
+`fcavalcantirj/doutor-vpd`, commit `80dbced1106284e83ec71d84ec983827ba374f9a`): the
+model scale and screen placement constants, the crease-normal preparation and key
+colouring, the materials and studio lighting, and the drag, throw and idle-sway
+rotation. Basis: that repository belongs to the same owner as this one, has no
+licence file and no third-party contributor (its history is the owner's commits
+and an initial commit generated under the owner's Vercel v0 account); the owner
+publishes the adapted portions here under this repository's MIT license. Nothing
+else is taken: no back sticker, Doutor VPD branding, product screens or button
+hotspots. The 3D view draws only the StickS3 and the simulated Guardian screen,
+whose artwork stays under `website/public/images/LICENSE`.

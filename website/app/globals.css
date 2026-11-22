@@ -2935,3 +2935,127 @@ a.repository-path:hover {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* W03: on-demand 3D StickS3 viewer inside the Guardian stage.          */
+/* ------------------------------------------------------------------ */
+.view-controls {
+  position: absolute;
+  top: 12px;
+  left: 8%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: min(300px, 84%);
+}
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--state-color) 45%, transparent);
+  border-radius: 7px;
+  background: #0d1511e6;
+  color: #edf0ee;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.view-toggle:hover {
+  background: #152019;
+  border-color: var(--state-color);
+}
+.view-toggle:focus-visible,
+.stick-viewer:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.view-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+.view-status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c3cbc6;
+}
+.view-status:empty {
+  display: none;
+}
+.view-status:not(:empty) {
+  padding: 7px 10px;
+  border: 1px solid #ffffff14;
+  border-radius: 7px;
+  background: #0d1511f0;
+}
+.stick-viewer-layer {
+  position: absolute;
+  top: 54px;
+  bottom: 142px;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s;
+}
+.stick-viewer-layer[data-ready="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guardian-stage .guardian-state {
+  z-index: 2;
+}
+.stick-viewer {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  border-radius: 12px;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.stick-viewer[data-grabbing="true"] {
+  cursor: grabbing;
+}
+.stick-viewer-canvas {
+  min-height: 0;
+}
+.stick-viewer-hint {
+  margin: 0;
+  padding: 4px 8px 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c3cbc6;
+}
+@media (max-width: 1100px) {
+  .stick-viewer-layer {
+    top: 60px;
+    bottom: 126px;
+  }
+}
+@media (max-width: 600px) {
+  .view-controls {
+    top: 10px;
+    left: 12px;
+  }
+  .stick-viewer-layer {
+    top: 52px;
+    bottom: 114px;
+  }
+}
+@media (max-width: 370px) {
+  .stick-viewer-layer {
+    bottom: 100px;
+  }
+}
