@@ -1,0 +1,133 @@
+name: website-checks
+
+# Quality gates for the landing page in website/: the generic public check,
+# typegen, typecheck, unit tests and production build (make website-check),
+# then the browser suite and three mobile Lighthouse runs against the
+# production server. Failed-check logs, reports and screenshots are kept as
+# artifacts. The path lists for push and pull_request must stay identical;
+# website/lib/gates.test.ts checks them against the documentation the page
+# cites (website/claims.json).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/website-checks.yml"
+      - "Makefile"
+      - "tools/public_check.py"
+      - "tools/public_check.allow"
+      - "THIRD_PARTY_NOTICES.md"
+      - "LICENSE"
+      - "README.md"
+      - "docs/G05-rating-freshness.md"
+      - "docs/G23-delivery.md"
+      - "docs/attack-coverage.md"
+      - "firmware/art/LICENSE"
+      - "firmware/components/guardian_core/advice.cpp"
+      - "firmware/components/guardian_core/include/guardian/core.hpp"
+      - "firmware/components/guardian_presenter/presenter.cpp"
+      - "guardian-tasks.json"
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/website-checks.yml"
+      - "Makefile"
+      - "tools/public_check.py"
+      - "tools/public_check.allow"
+      - "THIRD_PARTY_NOTICES.md"
+      - "LICENSE"
+      - "README.md"
+      - "docs/G05-rating-freshness.md"
+      - "docs/G23-delivery.md"
+      - "docs/attack-coverage.md"
+      - "firmware/art/LICENSE"
+      - "firmware/components/guardian_core/advice.cpp"
+      - "firmware/components/guardian_core/include/guardian/core.hpp"
+      - "firmware/components/guardian_presenter/presenter.cpp"
+      - "guardian-tasks.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  website:
+    name: website quality gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        # An explicit bash shell runs with -eo pipefail, so a failure piped into tee still fails.
+        shell: bash
+    env:
+      CHECK_OUT: ${{ github.workspace }}/website-check-out
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Public check (generic rules; the private map stays with the owner)
+        run: python3 tools/public_check.py
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: website/package.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.x"
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - name: Install (frozen lockfile)
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+
+      - name: Typegen, typecheck, unit tests, production build
+        run: |
+          mkdir -p "$CHECK_OUT"
+          WEBSITE_CHECK_OUT="$CHECK_OUT" make website-check 2>&1 | tee "$CHECK_OUT/website-check.log"
+
+      - name: Install the pinned Chromium
+        working-directory: website
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser checks against the production server
+        working-directory: website
+        run: pnpm exec playwright test
+
+      # Informational here: against a local `next start` the simulated slow-4G LCP is dominated by
+      # uncompressed script download (measured 3.5 s), which is not what ships. The Lighthouse GATE
+      # runs on the Vercel preview of the exact revision (LIGHTHOUSE_URL, W05/W06), where the same
+      # thresholds and method measured median LCP 2.31 s, performance 0.96, TBT 172 ms.
+      - name: Mobile Lighthouse, three runs (local server, informational)
+        working-directory: website
+        continue-on-error: true
+        run: node scripts/lighthouse.mjs
+
+      - name: Keep failed-check logs, reports and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website-check-failure
+          path: |
+            website-check-out/
+            website/test-results/
+            website/playwright-report/
+            website/lighthouse/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Keep the Lighthouse reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lighthouse-reports
+          path: website/lighthouse/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // AVIF first (smaller than WebP for the persona art), WebP as the fallback.
+  images: { formats: ["image/avif", "image/webp"] },
   async headers() {
     return [
       {

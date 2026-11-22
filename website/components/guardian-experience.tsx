@@ -253,13 +253,10 @@ export function GuardianExperience() {
           spacing={3}
         >
           {moods.map((item, i) => (
-            <ToggleGroupItem
-              key={item.id}
-              value={item.id}
-              aria-label={`${item.name}: ${item.caption}`}
-            >
+            <ToggleGroupItem key={item.id} value={item.id}>
+              {/* The name comes from the visible mood and caption (WCAG 2.5.3, label in name). */}
               <span className="mood-card-top">
-                <span>0{i + 1}</span>
+                <span aria-hidden="true">0{i + 1}</span>
                 <span className="mood-selection">
                   {selectedMood === item.id ? (
                     <Check aria-hidden="true" />

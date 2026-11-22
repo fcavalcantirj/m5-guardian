@@ -373,12 +373,12 @@ export function OpenSource() {
           target="_blank"
           rel="noreferrer"
           className="repository-path"
-          aria-label="fcavalcantirj/m5-guardian on GitHub"
         >
           <Code2 aria-hidden="true" />
           <span>fcavalcantirj</span>
           <ChevronRight aria-hidden="true" />
           <strong>m5-guardian</strong>
+          <span className="sr-only"> on GitHub</span>
           <ArrowUpRight aria-hidden="true" />
         </a>
       </div>

@@ -159,6 +159,7 @@ export function GuardianStage({
                 width={512}
                 height={512}
                 priority
+                fetchPriority="high"
                 sizes="(max-width: 700px) 90vw, 550px"
                 className="guardian-portrait"
               />
