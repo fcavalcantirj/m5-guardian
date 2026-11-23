@@ -65,7 +65,7 @@ product's defensive scope or an external provider's safeguards.
 
 ## Website lane
 
-`website-tasks.json` (W01, W02, W03, W05, W06) is a second acceptance ledger for
+`website-tasks.json` (W01-W03, W05-W07) is a second acceptance ledger for
 the landing page under `website/`. `RALPH_LEDGER` selects it; unset means
 `guardian-tasks.json`, and any other value or a missing file is refused by name.
 
@@ -74,6 +74,10 @@ RALPH_LEDGER=website-tasks.json ./ralph.sh --status
 RALPH_LEDGER=website-tasks.json ./ralph.sh --dry-run
 RALPH_LEDGER=website-tasks.json ./ralph-continuous.sh claude 1
 ```
+
+The website worker builds with Node 24 and pnpm 12.3.4 (`package.json` engines and packageManager): put a
+Node 24 first on `PATH` when the shell's default is another major, and set `CLAUDE_MODEL` (the runner's
+default model is not the one used for this repository's workers).
 
 The website lane has no host batch: one task per invocation, reviewed before the
 next. Its receipts live in `<GUARDIAN_STORE>/ralph-website` (firmware keeps
