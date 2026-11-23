@@ -136,7 +136,7 @@ Filled by the supervisor after the live checks (W06):
 | Item | Value |
 | --- | --- |
 | Accepted revision | _pending (set at acceptance)_ |
-| Preview deployment (unique URL / id) | _pending_ |
+| Preview deployment (unique URL / id) | m5-guardian-jp3n2f3ak (Git push of branch w06-preview-check, 94f9ecf): Ready; the first Git preview (j974sntxc) failed on the claim check after G26 changed the README, which is the check working |
 | Production deployment (id) | m5-guardian-juh1pewek (CLI, clean export of 07a480f, 2026-11-23) |
 | Production alias verified | https://m5-guardian.vercel.app: page 200, robots/sitemap/icon/OG/models/images 200, unknown path 404, no x-robots-tag, canonical correct; Lighthouse SEO/accessibility/best practices 1.0, LCP 2.28-2.47 s (TBT varies with host load) |
 | Firmware-only commit, deployment state | _pending_ (expected: CANCELED by the ignored build step) |
