@@ -301,6 +301,24 @@ bool Monitor::restore(const PersistedSelection& record) {
     for(std::size_t i=0;i<record.approved_count;++i)if(!approve(record.approved[i]))return false;
     return true;
 }
+// ---- G25: the router's own changes ------------------------------------------------------------
+// Store `updated` (same identity, new baseline facts) for the selected or the approved AP `bssid` without
+// resetting any detector: the baseline detector already compares with the new facts.
+bool Monitor::rebaseline(const Mac& bssid, const ApprovedAp& updated) {
+    const bool selected=scope_.has_selection() && scope_.selected().network.bssid==bssid;
+    if(selected){ if(!scope_.select(updated))return false; selected_=updated; }
+    else if(!scope_.find(bssid) || !scope_.approve(updated))return false;
+    ++scope_revision_;return true;
+}
+bool Monitor::accept_router_change(const Mac& bssid) {
+    const ApprovedAp* ap=scope_.find(bssid);
+    if(!ap)return false;
+    ApprovedAp updated=*ap;
+    SettingsFingerprint seen{};
+    if(!baseline_.accept(bssid,seen))return false;
+    updated.settings_known=true;updated.settings=seen;
+    return rebaseline(bssid,updated);
+}
 bool Monitor::approve_baseline() {
     const auto s=core_.snapshot();
     if(!s.has_security || s.security_historical || s.age_ms>=Core::fresh_ms
@@ -342,6 +360,13 @@ bool Monitor::receive(const Packet& packet, Candidate* candidate, bool* offered)
     core_.security(observe_security(p,meta));core_.signal(observe_signal(p,meta));
     scope_.hear(meta,p);                       // G16R: which addresses advertise the picked name (before the detectors)
     registry_.on_frame(frame,meta,p,core_);   // G16E: every registered detector, same parse
+    ChannelMove move{};                        // G25: a confirmed channel move becomes the scope's baseline
+    while(baseline_.take_move(move)) {
+        const ApprovedAp* ap=scope_.find(move.bssid);
+        if(!ap)continue;
+        ApprovedAp updated=*ap;updated.channel_known=true;updated.channel=move.to;updated.band=move.band;
+        rebaseline(move.bssid,updated);
+    }
     air_.on_frame(p,meta);
     return selected;
 }
@@ -511,6 +536,28 @@ std::size_t Monitor::status_text(char* out, std::size_t cap) const {
     ok=ok && put(" area_visible=%u",unsigned(visible));
     // G16R: addresses heard advertising the picked name besides the selected / approved ones (bounded set).
     ok=ok && put(" same_name=%u same_name_evicted=%u",unsigned(scope_.same_name_count()),unsigned(scope_.same_name_evictions()));
+    // G25: the last baseline record and the router's channel moves (never guesswork in a later report).
+    const BaselineLast& last=baseline_.last();
+    Millis age{};
+    if(!last.known)ok=ok && put("%s"," baseline_last=none");
+    else {
+        char changes[48]{};std::size_t n=0;
+        const struct { std::uint8_t bit; const char* name; } names[]={{change::Bssid,"bssid"},{change::Channel,"channel"},{change::Privacy,"privacy"},
+            {change::Wpa,"wpa"},{change::Rsn,"rsn"},{change::Pmf,"pmf"},{change::OweTransition,"owe"}};
+        for(const auto& c:names)if(last.changes & c.bit) {
+            const int w=std::snprintf(changes+n,sizeof changes-n,"%s%s",n?"+":"",c.name);
+            if(w>0 && std::size_t(w)<sizeof changes-n)n+=std::size_t(w);
+        }
+        if(!n)std::snprintf(changes,sizeof changes,"none");
+        const bool aged=last.at.valid() && last.at.epoch==now.epoch && now.at>=last.at.at;
+        char age_text[16];
+        if(aged){age=now.at-last.at.at;std::snprintf(age_text,sizeof age_text,"%u",unsigned(age/1000));}
+        else std::snprintf(age_text,sizeof age_text,"?");   // another timebase: not comparable
+        ok=ok && put(" baseline_last=bssid:%02x%02x,changes:%s,count:%u,age_s:%s",last.bssid[4],last.bssid[5],changes,unsigned(last.count),age_text);
+    }
+    const RouterState router=baseline_.router();
+    if(router.last_move.known)ok=ok && put(" channel_moves=%u,last:%u->%u",unsigned(router.moves),unsigned(router.last_move.from),unsigned(router.last_move.to));
+    else ok=ok && put(" channel_moves=%u,last:none",unsigned(router.moves));
     if(!ok){out[0]=0;return 0;}
     return used;
 }

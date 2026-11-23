@@ -231,6 +231,7 @@ namespace {
 // G16T: a nearby disconnect burst that also named the picked network (IncidentBanner::own_frames).
 constexpr char kNearbyAlsoReason[] = "Disconnect burst nearby also on your network";
 constexpr char kNearbyAlsoLead[] = "Nearby burst also on ";   // one 22-glyph glass row, then the network's name
+constexpr char kRouterAlertReason[] = "Your router changed its security settings";   // G25 STRICT
 // The red reason of a current NetworkPattern incident (G16F wording, G16T for the nearby burst).
 const char* pattern_reason(const IncidentBanner& b) {
     return b.own_frames ? kNearbyAlsoReason : network_pattern_text(b.pattern);
@@ -407,9 +408,17 @@ Presenter::Presenter(DisplayCapabilities display, Origin live_origin) : display_
     live_.origin = live_origin_; demo_ = demo_snapshot(0); rebuild();
 }
 const Snapshot& Presenter::shown() const { return mode_ == ViewMode::Demo ? demo_ : live_; }
-void Presenter::update(const Snapshot& live, Instant now, const ApprovedScope* scope) {
+void Presenter::update(const Snapshot& live, Instant now, const ApprovedScope* scope, const RouterState* router) {
     if (live.origin != live_origin_ || live.origin == Origin::Demo) return;
     if (have_now_ && now.valid() && now.epoch == now_.epoch && now.at < now_.at) return;
+    if (router) {   // G25: new router events count as dark-screen wakes when the setting colours them
+        if (router->change_seq >= router_seen_seq_ && router->moves >= router_seen_moves_) {
+            if (device_.router != RouterPolicy::DetailsOnly) router_wakes_ += router->change_seq - router_seen_seq_;
+            if (device_.router == RouterPolicy::Strict) router_wakes_ += router->moves - router_seen_moves_;
+        }
+        router_seen_seq_ = router->change_seq; router_seen_moves_ = router->moves;   // a reset detector starts again from 0
+        router_ = *router;
+    }
     // A request was made in the previous selection context. Do not apply it
     // to a different selected network after an external selection update.
     if (!(live.selected == live_.selected) || !now.valid()
@@ -492,7 +501,11 @@ std::size_t alert_sentence(const ViewModel& v, char* out, std::size_t capacity, 
         else if (name.length <= name_glyphs) put(name.c_str(), all);
         else { put(name.c_str(), name_glyphs ? name_glyphs - 1 : 0); put("~", all); }
     };
-    if (v.incident.kind == IncidentKind::DisconnectBurst) {
+    if (v.router_alert) {   // G25: the router's own security change (STRICT), never "on <name>"
+        char router[96];
+        if (!router_sentence(v.router, RouterWording::Short, router, sizeof router)) router_sentence(v.router, RouterWording::Minimal, router, sizeof router);
+        put(router, all);
+    } else if (v.incident.kind == IncidentKind::DisconnectBurst) {
         put("Disconnect burst on ", all);
         network();
     } else if (v.incident.kind == IncidentKind::NetworkPattern && v.incident.own_frames > 0) {   // G16T
@@ -514,10 +527,19 @@ void Presenter::rebuild_face(const Snapshot& s) {
     view_.alert = view_.incident_visible; view_.alert_reason = view_.alert ? alert_text(view_.incident.kind) : "";
     if (view_.alert && view_.incident.kind == IncidentKind::NetworkPattern && view_.incident.pattern != Pattern::None)   // G16F
         view_.alert_reason = pattern_reason(view_.incident);
-    view_.celebrate = view_.celebrate && !view_.alert && !view_.caution;
+    // G25: the router's own changes, coloured by the owner's ROUTER CHANGES setting. A Core incident keeps the
+    // red ALERT and its words; STRICT makes a security change the ALERT when none is shown; amber otherwise.
+    rebuild_router();
+    if (mode_ == ViewMode::Live && !view_.alert && view_.router.change_tone == Tone::Red) {
+        view_.alert = true; view_.router_alert = true; view_.alert_reason = kRouterAlertReason;
+    }
+    view_.router_amber = mode_ == ViewMode::Live && !view_.alert
+        && (view_.router.change_tone == Tone::Amber || view_.router.move_tone == Tone::Amber);
+    view_.incident_seq = live_.incident_seq + router_wakes_;
+    view_.celebrate = view_.celebrate && !view_.alert && !view_.caution && !view_.router_amber;
     if (view_.caution) view_.caution_age_known = age_of(view_.caution_evidence.acquired, now_, view_.caution_age_ms);
     view_.animate = display_.present == Support::Supported && display_.animation == Support::Supported
-        && !view_.muted && !view_.incident_visible;
+        && !view_.muted && !view_.incident_visible && !view_.router_alert;
     view_.last_seen_known = s.has_security && !s.security_historical
         && age_of(s.last_security.acquired, now_, view_.last_seen_ms);
 }
@@ -527,6 +549,7 @@ std::uint8_t Presenter::explanation_pages() const {
     return per_page == 0 ? 1 : static_cast<std::uint8_t>(std::max(1, (count + per_page - 1) / per_page));
 }
 void Presenter::rebuild_details(const Snapshot& s) {
+    if (page_ == DetailsPage::Router && !view_.router.page) page_ = DetailsPage::Settings;   // G25: nothing to show there now
     details_ = {}; details_.advice = advise(s); details_.page = page_;
     details_.mood_label = mood_text(view_.face); details_.mode_label = mode_text(s.settings.mode);
     details_.pairwise_label = cipher_text(s.settings.pairwise); details_.group_label = cipher_text(s.settings.group);
@@ -566,6 +589,7 @@ void Presenter::rebuild_details(const Snapshot& s) {
     case DetailsPage::OwnerChecks: details_.title = "Owner checks: unverified"; break;
     case DetailsPage::Nearby: details_.title = "Nearby observations"; break;
     case DetailsPage::Limits: details_.title = "What it cannot see"; break;
+    case DetailsPage::Router: details_.title = "Your router changed"; break;   // G25
     case DetailsPage::Count: break;
     }
     // G16E Nearby page: every current area observation, newest first.
@@ -706,9 +730,14 @@ bool Presenter::handle(Action action, Instant now) {
         // details page opens the Settings screen. No key enters DEMO; somehow in DEMO, hold FRONT returns to LIVE.
         if (mode_ == ViewMode::Demo) changed = toggle_mode();
         else { open_settings(); changed = true; }
+    } else if (action == Action::SecondaryLong && screen_ == Screen::Details && page_ == DetailsPage::Router && mode_ == ViewMode::Live) {
+        changed = router_key(action);   // G25: hold SIDE on the Router page = accept the new settings
     } else if (action == Action::SecondaryLong && mode_ == ViewMode::Live) { screen_ = Screen::Picker; order_strongest_first(); changed = true; }
     else if (screen_ == Screen::Face) {
-        if (action == Action::Primary) { screen_ = Screen::Details; page_ = DetailsPage::Settings; explanation_page_ = 0; owner_page_ = 0; changed = true; }
+        if (action == Action::Primary) {
+            screen_ = Screen::Details; explanation_page_ = 0; owner_page_ = 0; changed = true;
+            page_ = view_.router.page ? DetailsPage::Router : DetailsPage::Settings;   // G25: the router's change first
+        }
         else if (action == Action::Secondary && mode_ == ViewMode::Demo) {
             demo_step_ = static_cast<std::uint8_t>((demo_step_ + 1) % demo_steps); demo_ = demo_snapshot(demo_step_); changed = true;
         }
@@ -720,6 +749,7 @@ bool Presenter::handle(Action action, Instant now) {
             else if (page_ == DetailsPage::OwnerChecks) { page_ = DetailsPage::Limits; owner_page_ = 0; }                    // G16J
             else if (page_ == DetailsPage::Limits && view_.caution) page_ = DetailsPage::Nearby;                               // G16E
             else if (page_ == DetailsPage::Limits || page_ == DetailsPage::Nearby) { screen_ = Screen::Face; page_ = DetailsPage::Settings; owner_page_ = 0; }
+            else if (page_ == DetailsPage::Router) page_ = DetailsPage::Settings;                                               // G25
             else { page_ = static_cast<DetailsPage>(static_cast<unsigned>(page_) + 1); explanation_page_ = 0; owner_page_ = 0; }
             changed = true;
         }
@@ -789,6 +819,7 @@ void Presenter::plan_pages() {
 namespace guardian {
 bool DeviceChoices::valid() const {
     if (static_cast<std::uint8_t>(guard) >= guard_cycle_count) return false;
+    if (static_cast<std::uint8_t>(router) >= router_policy_count) return false;   // G25
     for (const auto pct : brightness_choices) if (pct == bright_pct) return true;
     return false;
 }
@@ -801,7 +832,11 @@ bool Presenter::set_device(const DeviceChoices& c) {
 }
 DeviceChoices Presenter::merged() const {
     DeviceChoices v = device_;
-    if (settings_page_ == SettingsPage::Guard) v.guard = draft_.guard; else v.bright_pct = draft_.bright_pct;
+    switch (settings_page_) {
+    case SettingsPage::Guard: v.guard = draft_.guard; break;
+    case SettingsPage::Brightness: v.bright_pct = draft_.bright_pct; break;
+    case SettingsPage::Router: v.router = draft_.router; break;   // G25
+    }
     return v;
 }
 void Presenter::open_settings() {
@@ -844,26 +879,142 @@ void Presenter::settings_advance() {
     plate_ = SavePlate::None;
     if (!saved) return;                                   // SAVE FAILED: stay on the page, the draft kept
     if (settings_page_ == SettingsPage::Guard) { settings_page_ = SettingsPage::Brightness; draft_ = device_; }
+    else if (settings_page_ == SettingsPage::Brightness) { settings_page_ = SettingsPage::Router; draft_ = device_; }   // G25
     else to_face();                                       // after the last page: the face
 }
+// G25 keys (owner 2026-11-23: "SIDE changes, BLUE saves" then "or hold side to save"): SIDE = next value,
+// hold SIDE = save, BLUE (or a hold of BLUE, or Back) = leave without saving.
 bool Presenter::settings_key(Action a) {
-    if (a == Action::Secondary || a == Action::SecondaryLong || a == Action::Back) { to_face(); return true; }
-    if (plate_ != SavePlate::None) return false;          // the plate shows: FRONT waits for it
-    if (a == Action::Primary) {
-        if (settings_page_ == SettingsPage::Guard)
+    if (a == Action::Primary || a == Action::PrimaryLong || a == Action::Back) { to_face(); return true; }
+    if (plate_ != SavePlate::None) return false;          // the plate shows: SIDE waits for it
+    if (a == Action::Secondary) {
+        switch (settings_page_) {
+        case SettingsPage::Guard:
             draft_.guard = static_cast<GuardCycle>((static_cast<unsigned>(draft_.guard) + 1u) % guard_cycle_count);
-        else {
+            break;
+        case SettingsPage::Brightness: {
             std::size_t i = 0;
             while (i < brightness_choices.size() && brightness_choices[i] != draft_.bright_pct) ++i;
             draft_.bright_pct = brightness_choices[i < brightness_choices.size() ? (i + 1) % brightness_choices.size() : 0];
+            break;
+        }
+        case SettingsPage::Router:
+            draft_.router = static_cast<RouterPolicy>((static_cast<unsigned>(draft_.router) + 1u) % router_policy_count);
+            break;
         }
         return true;
     }
-    if (a == Action::PrimaryLong) {
+    if (a == Action::SecondaryLong) {
         if (save_pending_ || report_due_) return false;   // one save at a time
         pending_ = merged(); save_pending_ = true;
         return true;
     }
     return false;
+}
+} // namespace guardian
+
+
+// ---- G25: the router's own changes ---------------------------------------------------------------
+namespace guardian {
+const char* router_policy_text(RouterPolicy p) {
+    switch (p) { case RouterPolicy::DetailsOnly: return "details"; case RouterPolicy::Amber: return "amber"; case RouterPolicy::Strict: return "strict"; }
+    return "?";
+}
+const char* router_mode_text(Mode m) {
+    switch (m) {
+    case Mode::Wpa3Personal: return "WPA3"; case Mode::Transition: return "WPA2/WPA3"; case Mode::Wpa2Personal: return "WPA2";
+    case Mode::Wpa1: return "WPA"; case Mode::Wep: return "WEP"; case Mode::Open: return "open"; case Mode::Owe: return "OWE";
+    case Mode::Enterprise: return "Enterprise"; case Mode::Unknown: return "unknown";
+    }
+    return "unknown";
+}
+const char* router_cipher_text(Cipher c) {
+    switch (c) {
+    case Cipher::Gcmp: return "GCMP"; case Cipher::Ccmp: return "CCMP"; case Cipher::Tkip: return "TKIP"; case Cipher::Wep: return "WEP";
+    case Cipher::None: return "none"; case Cipher::Unknown: return "unknown";
+    }
+    return "unknown";
+}
+const char* router_pmf_text(Pmf p) {
+    switch (p) { case Pmf::Required: return "required"; case Pmf::Optional: return "optional"; case Pmf::Disabled: return "off"; case Pmf::Unknown: return "unknown"; }
+    return "unknown";
+}
+namespace {
+// Plain character copies (the portable presenter has no formatted output).
+struct Text {
+    char* out; std::size_t capacity; std::size_t used{}; bool fits{true};
+    void put(const char* t) { for (std::size_t i = 0; fits && t[i]; ++i) { if (used + 1 >= capacity) fits = false; else out[used++] = t[i]; } }
+    void number(std::uint32_t n) {
+        char digits[11]; std::size_t k = 0;
+        do { digits[k++] = static_cast<char>('0' + n % 10); n /= 10; } while (n && k < sizeof digits);
+        char t[12]; for (std::size_t i = 0; i < k; ++i) t[i] = digits[k - 1 - i];
+        t[k] = 0; put(t);
+    }
+    std::size_t end() { if (!fits || !used) { if (capacity) out[0] = 0; return 0; } out[used] = 0; return used; }
+};
+} // namespace
+std::size_t router_sentence(const RouterView& v, RouterWording w, char* out, std::size_t capacity) {
+    if (!out || !capacity) return 0;
+    Text t{out, capacity};
+    if (v.change.pending) {
+        if (w == RouterWording::Minimal) { t.put("Router changed its security settings"); return t.end(); }
+        t.put(w == RouterWording::Full ? "Your router changed its security settings: " : "Router changed security: ");
+        const SecuritySummary a = summarize(v.change.from), b = summarize(v.change.to);
+        bool any = false;
+        const auto item = [&](const char* name, const char* from, const char* to) {
+            if (any) t.put(", ");
+            any = true; t.put(name);
+            if (w == RouterWording::Full) { t.put(" ("); t.put(from); t.put(" -> "); t.put(to); t.put(")"); }
+        };
+        if (a.mode != b.mode) item("mode", router_mode_text(a.mode), router_mode_text(b.mode));
+        if (a.pairwise != b.pairwise) item("cipher", router_cipher_text(a.pairwise), router_cipher_text(b.pairwise));
+        if (a.pmf != b.pmf) item("PMF", router_pmf_text(a.pmf), router_pmf_text(b.pmf));
+        if (!any) t.put("other options");
+        if (v.change.downgrade) t.put(", a downgrade");
+        return t.end();
+    }
+    if (v.move_unacked && v.last_move.known) {
+        if (w == RouterWording::Full) { t.put("Your router moved to channel "); t.number(v.last_move.to); t.put(" (from "); t.number(v.last_move.from); t.put(")"); }
+        else { t.put("Router moved to ch "); t.number(v.last_move.to); }
+        return t.end();
+    }
+    return t.end();
+}
+std::size_t move_line(const RouterView& v, char* out, std::size_t capacity) {
+    if (!out || !capacity) return 0;
+    Text t{out, capacity};
+    if (!v.moves || !v.last_move.known) return t.end();
+    if (v.moves == 1) t.put("Router moved ch ");
+    else { t.put("Router moved "); t.number(v.moves); t.put("x, "); }
+    t.number(v.last_move.from); t.put("->"); t.number(v.last_move.to);
+    return t.end();
+}
+void Presenter::rebuild_router() {
+    // Moves seen while the setting was not STRICT are not turned amber later; a reset detector starts again.
+    if (device_.router != RouterPolicy::Strict || router_.moves < moves_acked_) moves_acked_ = router_.moves;
+    RouterView r{};
+    r.policy = device_.router;
+    if (mode_ == ViewMode::Live) {
+        r.change = router_.change; r.pending = router_.pending; r.moves = router_.moves; r.last_move = router_.last_move;
+        if (r.change.pending)
+            r.change_tone = r.policy == RouterPolicy::DetailsOnly ? Tone::Grey : r.policy == RouterPolicy::Amber ? Tone::Amber : Tone::Red;
+        r.move_unacked = r.policy == RouterPolicy::Strict && r.moves > moves_acked_;
+        if (r.moves) r.move_tone = r.move_unacked ? Tone::Amber : Tone::Grey;
+        r.page = r.change.pending || r.move_unacked;
+        if (r.change.pending) r.age_known = age_of(r.change.first, now_, r.age_ms);
+    }
+    view_.router = r;
+    view_.router_alert = false; view_.router_amber = false;
+}
+bool Presenter::router_key(Action) {
+    if (has_request() || !view_.router.page) return false;
+    if (view_.router.change.pending) {
+        request_ = {}; request_.kind = RequestKind::AcceptChange;
+        request_.ap.network = live_.selected; request_.ap.network.bssid = view_.router.change.bssid;
+        request_.requested_at = now_;
+    }
+    if (view_.router.move_unacked) moves_acked_ = router_.moves;   // acknowledged; nothing for the application to do
+    to_face();
+    return true;
 }
 } // namespace guardian

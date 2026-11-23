@@ -220,7 +220,9 @@ void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 static_assert(DisconnectDetector::capacity == 128 && BaselineDetector::capacity == 32 && ApprovedScope::capacity == 16,
               "documented fixed capacities (docs/G06-detectors.md)");
 static_assert(sizeof(DisconnectDetector) <= 6 * 1024, "disconnect detector state stays within a few KiB of internal RAM");
-static_assert(sizeof(BaselineDetector) <= 2 * 1024, "baseline detector state stays small");
+// G25: + one router track per approved AP (17 tracks: the newest, the differing and an accepted fingerprint,
+// the channel compared with, a pending change); 3,328 B measured. The Monitor lives in PSRAM on the StickS3.
+static_assert(sizeof(BaselineDetector) <= 4 * 1024, "baseline detector state stays small");
 static_assert(sizeof(ApprovedScope) <= 4 * 1024, "approved scope stays small");
 static_assert(std::is_trivially_copyable_v<IncidentObservation> && std::is_trivially_copyable_v<ApprovedAp>
               && std::is_trivially_copyable_v<SettingsFingerprint>, "evidence records are plain values");
@@ -945,19 +947,17 @@ GUARDIAN_CASE(the_selected_ap_advertising_other_settings_is_a_settings_change_na
     CHECK_EQ(r.sink.count, std::size_t{0}); // one differing beacon is not yet a change (change_threshold 2)
     CHECK_EQ(d.stats().changed, 1u);
     r.feed(d, wpa2, 1100);
-    CHECK_EQ(r.sink.count, std::size_t{1});
-    const IncidentObservation& i = r.sink.last();
-    CHECK_EQ(i.kind, IncidentKind::SettingsChanged);
-    CHECK(i.affected == named(kHome));
+    // G25: the owner's router changing its own security is a pending RouterChange, never an incident.
+    CHECK_EQ(r.sink.count, std::size_t{0});
+    const RouterChange& i = d.router().change;
+    CHECK(i.pending);
     CHECK_EQ(i.bssid, kHome);
     CHECK_EQ(i.changes, static_cast<std::uint8_t>(change::Rsn | change::Pmf)); // SAE -> PSK, PMF required -> optional
     CHECK_EQ(i.count, 2u);
-    CHECK_EQ(i.raw_frames, 2u);
-    CHECK_EQ(i.threshold, 2u);
-    CHECK_EQ(i.window_ms, 10000u);
-    CHECK_EQ(i.acquired.at, Millis{1100});
-    CHECK_EQ(i.origin, Origin::Imported);
-    CHECK(!i.saturated);
+    CHECK_EQ(i.first.at, Millis{1100});
+    CHECK(i.from == home_baseline(c_).settings);
+    CHECK(i.to == fingerprint_of(c_, "beacon_wpa2_ccmp_pmf_optional"));
+    CHECK(i.downgrade);
     // Channel only: same settings on channel 11 against the approved channel 6.
     Rig ch;
     ch.scope.select(home_baseline(c_));
@@ -966,8 +966,9 @@ GUARDIAN_CASE(the_selected_ap_advertising_other_settings_is_a_settings_change_na
     if (!load(c_, "beacon_wpa3_channel_11", c11)) return;
     ch.feed(dc, c11, 0);
     ch.feed(dc, c11, 100);
-    CHECK_EQ(ch.sink.count, std::size_t{1});
-    CHECK_EQ(ch.sink.last().changes, change::Channel);
+    CHECK_EQ(ch.sink.count, std::size_t{0});   // G25: a channel move is re-baselined, never an incident
+    CHECK_EQ(dc.router().moves, 1u);
+    CHECK(!dc.router().change.pending);
     // Without an approved channel the same beacons are unchanged (settings match).
     Rig noch;
     noch.scope.select(home_baseline(c_, true, false));
@@ -985,12 +986,15 @@ GUARDIAN_CASE(the_selected_ap_advertising_other_settings_is_a_settings_change_na
     if (!load(c_, "beacon_open", o) || !load(c_, "beacon_wpa1_tkip_vendor", w1)) return;
     open.feed(dopen, o, 0);
     open.feed(dopen, o, 100);
-    CHECK_EQ(open.sink.last().changes, static_cast<std::uint8_t>(change::Privacy | change::Rsn | change::Pmf));
+    CHECK_EQ(dopen.router().change.changes, static_cast<std::uint8_t>(change::Privacy | change::Rsn | change::Pmf));
+    CHECK(dopen.router().change.downgrade);   // anything -> open
     open.tick(dopen, 20000); // window drained
     open.feed(dopen, w1, 20000);
     open.feed(dopen, w1, 20100);
-    CHECK_EQ(open.sink.last().changes & (change::Wpa | change::Rsn), change::Wpa | change::Rsn);
-    CHECK_EQ(open.sink.last().changes & change::Channel, 0);
+    // Still the same pending change (never re-reported); the fields seen differing accumulate.
+    CHECK_EQ(dopen.router().change.changes & (change::Wpa | change::Rsn), change::Wpa | change::Rsn);
+    CHECK_EQ(dopen.router().change.changes & change::Channel, 0);
+    CHECK_EQ(open.sink.count, std::size_t{0});
 }
 
 GUARDIAN_CASE(the_same_settings_from_the_selected_ap_are_unchanged_and_report_nothing) {
@@ -1023,10 +1027,11 @@ GUARDIAN_CASE(incomplete_or_unverified_advertisements_prove_nothing_about_a_chan
     CHECK_EQ(d.stats().skipped_incomplete, 10u);
     CHECK_EQ(d.stats().skipped_unverified, 5u);
     CHECK_EQ(d.stats().changed, 0u);
-    // Two verified, Complete differing beacons: a change.
+    // Two verified, Complete differing beacons: a change (G25: a pending router change, not an incident).
+    CHECK(!d.router().change.pending);
     r.feed(d, wpa2, 1000);
     r.feed(d, wpa2, 1100);
-    CHECK_EQ(r.sink.count, std::size_t{1});
+    CHECK(d.router().change.pending); CHECK_EQ(r.sink.count, std::size_t{0});
     CHECK_EQ(d.stats().advertisements, 17u);
 }
 
@@ -1110,13 +1115,14 @@ GUARDIAN_CASE(an_approved_extender_with_the_same_ssid_is_handled_like_the_select
     // Its own baseline applies: approved on channel 11, the channel-6 beacons are a change of the extender.
     ext.channel = 11;
     CHECK(r.scope.approve(ext));
+    d.reset();   // the owner changed the scope (Monitor::approve resets the detector)
     r.feed(d, b, 2000);
     r.feed(d, b, 2100);
-    CHECK_EQ(r.sink.count, std::size_t{1});
-    CHECK_EQ(r.sink.last().kind, IncidentKind::SettingsChanged);
-    CHECK_EQ(r.sink.last().bssid, kExtender);
-    CHECK(r.sink.last().affected == named(kHome));
-    CHECK_EQ(r.sink.last().changes, change::Channel);
+    CHECK_EQ(r.sink.count, std::size_t{0});   // G25: the extender moved channel: re-baselined, no incident
+    CHECK_EQ(d.router().moves, 1u);
+    CHECK_EQ(d.router().last_move.bssid, kExtender);
+    CHECK_EQ(unsigned(d.router().last_move.from), 11u);
+    CHECK_EQ(unsigned(d.router().last_move.to), 6u);
     // An approved related AP with no baseline facts is simply in scope.
     ApprovedAp plain{};
     plain.network = named(kExtender);
@@ -1163,16 +1169,18 @@ GUARDIAN_CASE(baseline_reports_follow_the_window_cooldown_and_bound_like_bursts)
     if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", wpa2)) return;
     r.feed(d, wpa2, 0);
     r.feed(d, wpa2, 15000); // 15 s apart: never two inside one window
-    CHECK_EQ(r.sink.count, std::size_t{0});
+    CHECK(!d.router().change.pending);
     r.feed(d, wpa2, 15100);
-    CHECK_EQ(r.sink.count, std::size_t{1});
+    CHECK(d.router().change.pending);
+    CHECK_EQ(d.router().change_seq, 1u);
     for (int k = 2; k < 100; ++k) r.feed(d, wpa2, 15000 + 100 * static_cast<Millis>(k)); // keeps differing for 10 s
-    CHECK_EQ(r.sink.count, std::size_t{1}); // inside cooldown
-    CHECK(d.stats().suppressed_by_cooldown > 90u);
     r.feed(d, wpa2, 15100 + DetectorLimits{}.cooldown_ms);
     r.feed(d, wpa2, 15200 + DetectorLimits{}.cooldown_ms);
-    CHECK_EQ(r.sink.count, std::size_t{2}); // cooldown elapsed, still differing
-    CHECK_EQ(r.sink.last().count, 2u);
+    // G25: confirmed once, never re-fired by the cooldown while the router keeps the new settings.
+    CHECK_EQ(r.sink.count, std::size_t{0});
+    CHECK_EQ(d.router().change_seq, 1u);
+    CHECK_EQ(d.stats().reports, 1u);
+    CHECK_EQ(d.router().change.count, 102u);   // 2 at the confirmation + 98 + 2
     // Foreign epochs and invalid instants are ignored and counted; reset clears.
     std::vector<std::uint8_t> b = wpa2;
     RxMeta foreign = meta_at(r.clock, 80000);
@@ -1255,8 +1263,9 @@ GUARDIAN_CASE(mixed_replay_over_every_fixture_allocates_nothing_and_reports_only
     // Disconnect fixtures: 4 distinct headers per pass, identical across passes but far outside dedupe_ms -> counted each pass.
     CHECK_EQ(dd.stats().counted, 12u);
     CHECK_EQ(dd.stats().reports, 0u);
-    // Baseline: the home BSSID advertises several different configurations across the fixtures -> SettingsChanged;
-    // the two unapproved same-SSID fixtures -> UnexpectedAp; neighbours/hidden ignored.
+    // Baseline: the home BSSID advertises several different configurations across the fixtures -> a pending
+    // router change (G25: never an incident); the two unapproved same-SSID fixtures -> UnexpectedAp;
+    // neighbours/hidden ignored.
     CHECK(db.stats().changed > 0u);
     CHECK(db.stats().unexpected == 6u);
     CHECK(db.stats().skipped_incomplete > 0u);
@@ -1266,7 +1275,8 @@ GUARDIAN_CASE(mixed_replay_over_every_fixture_allocates_nothing_and_reports_only
         saw_unexpected |= r.sink.incidents[i].kind == IncidentKind::UnexpectedAp;
         saw_burst |= r.sink.incidents[i].kind == IncidentKind::DisconnectBurst;
     }
-    CHECK(saw_settings);
+    CHECK(!saw_settings);
+    CHECK(db.router().change.pending);
     CHECK(saw_unexpected);
     CHECK(!saw_burst);
 }
@@ -1296,10 +1306,10 @@ GUARDIAN_CASE(review_baseline_cannot_relabel_imported_counts_as_live) {
     std::vector<std::uint8_t> b; if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", b)) return;
     r.feed(d, b, 100, Origin::Imported);
     r.feed(d, b, 101, Origin::LiveRadio);
-    CHECK_EQ(r.sink.count, std::size_t{0});
+    CHECK(!d.router().change.pending);   // the live frame was refused: one counted advertisement
     r.feed(d, b, 102, Origin::Imported);
-    CHECK_EQ(r.sink.count, std::size_t{1});
-    CHECK_EQ(r.sink.last().origin, Origin::Imported);
+    CHECK(d.router().change.pending); CHECK_EQ(d.router().change.count, 2u);
+    CHECK_EQ(d.stats().foreign_origin, 1u);
 }
 GUARDIAN_CASE(review_unverified_disconnect_bytes_do_not_create_a_burst) {
     Rig r; CHECK(r.scope.select(home_baseline(c_)));
@@ -1330,8 +1340,8 @@ GUARDIAN_CASE(g09_delayed_baseline_retains_acquisition_time) {
     BaselineDetector d(r.scope, r.limits);
     std::vector<std::uint8_t> b; if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", b)) return;
     r.feed(d, b, 100); r.tick(d, 5000); r.feed(d, b, 101);
-    CHECK_EQ(r.sink.count, std::size_t{1});
-    CHECK_EQ(r.sink.last().acquired.at, Millis{101});
+    CHECK(d.router().change.pending);   // G25: a pending router change, not an incident
+    CHECK_EQ(d.router().change.first.at, Millis{101});
 }
 GUARDIAN_CASE(g09_settings_threshold_is_per_ap) {
     Rig r; CHECK(r.scope.select(home_baseline(c_)));
@@ -1339,9 +1349,10 @@ GUARDIAN_CASE(g09_settings_threshold_is_per_ap) {
     BaselineDetector d(r.scope, r.limits);
     std::vector<std::uint8_t> b; if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", b)) return;
     r.feed(d, b, 100); set_bssid_and_transmitter(b, kExtender); r.feed(d, b, 101);
+    CHECK(!d.router().change.pending);
+    r.feed(d, b, 102); CHECK(d.router().change.pending); CHECK_EQ(unsigned(d.router().pending), 1u);
+    CHECK(d.router().change.bssid == kExtender); CHECK_EQ(d.router().change.count, 2u);
     CHECK_EQ(r.sink.count, std::size_t{0});
-    r.feed(d, b, 102); CHECK_EQ(r.sink.count, std::size_t{1});
-    CHECK(r.sink.last().bssid == kExtender); CHECK_EQ(r.sink.last().raw_frames, 2u);
 }
 
 GUARDIAN_CASE(g09_settings_cooldowns_are_per_ap) {
@@ -1349,13 +1360,181 @@ GUARDIAN_CASE(g09_settings_cooldowns_are_per_ap) {
     auto ext=home_baseline(c_);ext.network.bssid=kExtender;CHECK(r.scope.approve(ext));
     BaselineDetector d(r.scope,r.limits);std::vector<std::uint8_t> b;
     if(!load(c_,"beacon_wpa2_ccmp_pmf_optional",b))return;
-    r.feed(d,b,100);r.feed(d,b,101);CHECK_EQ(r.sink.count,std::size_t{1});
+    r.feed(d,b,100);r.feed(d,b,101);CHECK_EQ(unsigned(d.router().pending),1u);
     set_bssid_and_transmitter(b,kExtender);r.feed(d,b,102);r.feed(d,b,103);
-    CHECK_EQ(r.sink.count,std::size_t{2});CHECK(r.sink.last().bssid==kExtender);
+    // G25: one pending change per AP; the newest is shown first.
+    CHECK_EQ(unsigned(d.router().pending),2u);CHECK(d.router().change.bssid==kExtender);CHECK_EQ(d.router().change_seq,2u);
+    CHECK_EQ(r.sink.count,std::size_t{0});
 }
 GUARDIAN_CASE(g09_expired_delayed_frame_cannot_trigger_current_burst) {
     Rig r;CHECK(r.scope.select(home_baseline(c_)));DetectorLimits l;l.burst_threshold=2;l.cooldown_ms=1;
     DisconnectDetector d(r.scope,l);std::vector<std::uint8_t> b;if(!load(c_,"deauth_reason7",b))return;
     r.feed(d,b,10000);set_sequence(b,2);r.feed(d,b,10001);CHECK_EQ(r.sink.count,std::size_t{1});
     r.tick(d,10002);set_sequence(b,3);r.feed(d,b,1);CHECK_EQ(r.sink.count,std::size_t{1});
+}
+
+// ---- G25: the owner's router changing its own channel or settings is not an attack (TDD, red first) ----
+// Evidence (owner STATUS 2026-11-21 ~20:50): after the router restarted, baseline events=110 incidents=1 kept
+// re-firing a red "Advertised settings changed". Now: a channel move is re-baselined silently and counted;
+// a security change is a pending RouterChange the presenter colours by the owner's setting.
+namespace {
+std::vector<std::uint8_t> beacon_on(check::Case& c_, const char* fixture, std::uint8_t ds_channel) {
+    std::vector<std::uint8_t> b;
+    if (!load(c_, fixture, b)) return b;
+    // The DS Parameter Set element (id 3, length 1) after the fixed fields (24-byte header + 12).
+    for (std::size_t i = 36; i + 2 < b.size(); i += 2u + b[i + 1]) {
+        if (b[i] == 3 && b[i + 1] == 1) { b[i + 2] = ds_channel; return b; }
+    }
+    CHECK_FAIL(std::string(fixture) + ": no DS Parameter Set element");
+    return b;
+}
+} // namespace
+
+GUARDIAN_CASE(g25_a_channel_move_is_rebaselined_silently_counted_and_never_an_incident) {
+    Rig r; CHECK(r.scope.select(home_baseline(c_)));   // approved: WPA3, channel 6
+    Core core(r.clock, profiles::all_2g4_channels(), Origin::Imported); core.select(named(kHome));
+    BaselineDetector d(r.scope, r.limits);
+    const auto ch6 = beacon_on(c_, "beacon_wpa3_sae_pmf_required", 6), ch11 = beacon_on(c_, "beacon_wpa3_sae_pmf_required", 11);
+    r.clock.set(100000);
+    r.feed(d, ch6, 1000, Origin::Imported, RxStatus::Ok, &core);
+    // One odd advertisement on another channel is not a move (change_threshold 2) ...
+    r.feed(d, ch11, 1100, Origin::Imported, RxStatus::Ok, &core);
+    CHECK_EQ(d.router().moves, 0u);
+    // ... and an advertisement on the baseline channel in between starts the count again.
+    r.feed(d, ch6, 1200, Origin::Imported, RxStatus::Ok, &core);
+    r.feed(d, ch11, 1300, Origin::Imported, RxStatus::Ok, &core);
+    CHECK_EQ(d.router().moves, 0u);
+    r.feed(d, ch11, 1400, Origin::Imported, RxStatus::Ok, &core);
+    CHECK_EQ(d.router().moves, 1u);
+    const ChannelMove m = d.router().last_move;
+    CHECK(m.known); CHECK_EQ(m.bssid, kHome); CHECK_EQ(unsigned(m.from), 6u); CHECK_EQ(unsigned(m.to), 11u);
+    CHECK_EQ(m.at.at, Millis{1400}); CHECK(m.band == Band::Ghz2_4);
+    CHECK_EQ(d.stats().channel_moves, 1u);
+    // Handed once to the scope's owner for re-baselining.
+    ChannelMove taken{};
+    CHECK(d.take_move(taken)); CHECK_EQ(unsigned(taken.to), 11u); CHECK(!d.take_move(taken));
+    // A minute of beacons on the new channel: nothing more (the detector compares with channel 11 now),
+    // even before the owner of the scope re-baselines it.
+    for (int k = 0; k < 600; ++k) r.feed(d, ch11, 1500 + 100 * static_cast<Millis>(k), Origin::Imported, RxStatus::Ok, &core);
+    CHECK_EQ(d.router().moves, 1u);
+    CHECK(!d.router().change.pending);
+    CHECK_EQ(r.sink.count, std::size_t{0});
+    const Snapshot s = core.snapshot();
+    CHECK_EQ(s.incident_seq, 0u);   // nothing reached Core: no ALERT, no lit dark screen
+    for (bool on : s.incidents) CHECK(!on);
+    // It moves back: a second move, counted and named.
+    r.feed(d, ch6, 70000); r.feed(d, ch6, 70100);
+    CHECK_EQ(d.router().moves, 2u); CHECK_EQ(unsigned(d.router().last_move.from), 11u); CHECK_EQ(unsigned(d.router().last_move.to), 6u);
+    // STATUS facts: the last thing the baseline detector recorded.
+    CHECK(d.last().known); CHECK_EQ(d.last().bssid, kHome); CHECK_EQ(d.last().changes, change::Channel);
+    CHECK_EQ(d.last().count, 2u); CHECK_EQ(d.last().at.at, Millis{70100});
+    // The report keeps "incidents" for what was reported: no move is an incident.
+    CHECK_EQ(d.report(r.at(70100)).incidents, 0u);
+    // reset() (the owner changed the scope) forgets moves and the channel moved to.
+    d.reset(); CHECK_EQ(d.router().moves, 0u); CHECK(!d.last().known);
+}
+
+GUARDIAN_CASE(g25_a_security_change_is_one_pending_router_change_with_old_and_new_never_a_red_incident) {
+    Rig r; CHECK(r.scope.select(home_baseline(c_)));
+    Core core(r.clock, profiles::all_2g4_channels(), Origin::Imported); core.select(named(kHome));
+    BaselineDetector d(r.scope, r.limits);
+    std::vector<std::uint8_t> wpa2;
+    if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", wpa2)) return;
+    r.clock.set(200000);
+    for (int k = 0; k < 110; ++k) r.feed(d, wpa2, 1000 + 1000 * static_cast<Millis>(k), Origin::Imported, RxStatus::Ok, &core);
+    const RouterState st = d.router();
+    CHECK(st.change.pending); CHECK_EQ(unsigned(st.pending), 1u); CHECK_EQ(st.change_seq, 1u);   // once, never re-fired
+    CHECK_EQ(st.change.bssid, kHome);
+    CHECK_EQ(st.change.changes, static_cast<std::uint8_t>(change::Rsn | change::Pmf));
+    CHECK(st.change.from == home_baseline(c_).settings);
+    CHECK(st.change.to == fingerprint_of(c_, "beacon_wpa2_ccmp_pmf_optional"));
+    CHECK(st.change.downgrade);
+    CHECK_EQ(st.change.first.at, Millis{2000}); CHECK_EQ(st.change.last.at, Millis{110000});
+    CHECK_EQ(st.change.count, 110u);
+    CHECK_EQ(r.sink.count, std::size_t{0});
+    CHECK_EQ(core.snapshot().incident_seq, 0u);
+    CHECK(!core.snapshot().incidents[static_cast<std::size_t>(IncidentKind::SettingsChanged)]);
+    CHECK_EQ(d.report(r.at(110000)).incidents, 1u);   // STATUS: one router change confirmed
+    CHECK(d.last().known); CHECK_EQ(d.last().changes, static_cast<std::uint8_t>(change::Rsn | change::Pmf)); CHECK_EQ(d.last().count, 110u);
+    // Reverting does not end it: the owner decides.
+    std::vector<std::uint8_t> wpa3;
+    if (!load(c_, "beacon_wpa3_sae_pmf_required", wpa3)) return;
+    r.feed(d, wpa3, 120000); r.feed(d, wpa3, 120100);
+    CHECK(d.router().change.pending); CHECK_EQ(d.router().change_seq, 1u);
+    // A further field changing grows the record (seq + 1, so a dark screen may light once more).
+    std::vector<std::uint8_t> open;
+    if (!load(c_, "beacon_open", open)) return;
+    r.feed(d, open, 130000); r.feed(d, open, 130100);
+    CHECK_EQ(d.router().change_seq, 2u);
+    CHECK_EQ(d.router().change.changes & change::Privacy, change::Privacy);
+    CHECK(d.router().change.to == fingerprint_of(c_, "beacon_open"));
+}
+
+GUARDIAN_CASE(g25_accept_ends_the_change_hands_the_new_baseline_and_nothing_refires) {
+    Rig r; CHECK(r.scope.select(home_baseline(c_)));
+    BaselineDetector d(r.scope, r.limits);
+    std::vector<std::uint8_t> wpa2;
+    if (!load(c_, "beacon_wpa2_ccmp_pmf_optional", wpa2)) return;
+    r.feed(d, wpa2, 1000); r.feed(d, wpa2, 1100);
+    SettingsFingerprint seen{};
+    CHECK(!d.accept(kExtender, seen));   // nothing pending for another AP
+    CHECK(d.accept(kHome, seen));
+    CHECK(seen == fingerprint_of(c_, "beacon_wpa2_ccmp_pmf_optional"));
+    CHECK(!d.router().change.pending); CHECK_EQ(unsigned(d.router().pending), 0u);
+    CHECK(!d.accept(kHome, seen));
+    // The scope's owner stores the new baseline (Monitor::accept_router_change); the router keeps advertising it.
+    ApprovedAp now = home_baseline(c_); now.settings = seen; CHECK(r.scope.select(now));
+    for (int k = 0; k < 120; ++k) r.feed(d, wpa2, 2000 + 1000 * static_cast<Millis>(k));
+    CHECK(!d.router().change.pending); CHECK_EQ(d.router().change_seq, 1u); CHECK_EQ(r.sink.count, std::size_t{0});
+    // Even before the owner stores it, the accepted settings do not re-fire.
+    Rig q; CHECK(q.scope.select(home_baseline(c_)));
+    BaselineDetector e(q.scope, q.limits);
+    q.feed(e, wpa2, 1000); q.feed(e, wpa2, 1100); CHECK(e.accept(kHome, seen));
+    for (int k = 0; k < 60; ++k) q.feed(e, wpa2, 2000 + 1000 * static_cast<Millis>(k));
+    CHECK(!e.router().change.pending); CHECK_EQ(e.router().change_seq, 1u);
+    // ... but a different change after the accept is a new one.
+    std::vector<std::uint8_t> open;
+    if (!load(c_, "beacon_open", open)) return;
+    q.feed(e, open, 70000); q.feed(e, open, 70100);
+    CHECK(e.router().change.pending); CHECK_EQ(e.router().change_seq, 2u);
+}
+
+GUARDIAN_CASE(g25_downgrade_and_summary_follow_the_owner_list) {
+    const auto f = [&](const char* name) { return fingerprint_of(c_, name); };
+    const auto wpa3 = f("beacon_wpa3_sae_pmf_required"), wpa2 = f("beacon_wpa2_ccmp_pmf_optional"), open = f("beacon_open"),
+               wpa1 = f("beacon_wpa1_tkip_vendor"), mixed = f("beacon_wpa2_mixed_tkip");
+    CHECK(summarize(wpa3).mode == Mode::Wpa3Personal); CHECK(summarize(wpa3).pmf == Pmf::Required); CHECK(summarize(wpa3).pairwise == Cipher::Ccmp);
+    CHECK(summarize(wpa2).mode == Mode::Wpa2Personal); CHECK(summarize(wpa2).pmf == Pmf::Optional);
+    CHECK(summarize(open).mode == Mode::Open); CHECK(summarize(open).pairwise == Cipher::None);
+    CHECK(summarize(wpa1).mode == Mode::Wpa1); CHECK(summarize(wpa1).pairwise == Cipher::Tkip); CHECK(summarize(wpa1).pmf == Pmf::Disabled);
+    CHECK(summarize(mixed).pairwise == Cipher::Tkip);   // weakest advertised
+    CHECK(security_downgrade(wpa3, wpa2));    // WPA3 -> WPA2, PMF required -> optional
+    CHECK(!security_downgrade(wpa2, wpa3));   // an upgrade
+    CHECK(security_downgrade(wpa2, open));    // anything -> open
+    CHECK(security_downgrade(wpa2, wpa1));    // WPA2 -> WPA, CCMP -> TKIP
+    CHECK(security_downgrade(wpa2, mixed));   // CCMP -> TKIP alone
+    CHECK(!security_downgrade(open, wpa2));
+    CHECK(!security_downgrade(wpa2, wpa2));
+    // PMF required -> optional alone (same mode and cipher).
+    auto pmf_opt = wpa3; pmf_opt.pmf = Pmf::Optional;
+    CHECK(security_downgrade(wpa3, pmf_opt)); CHECK(!security_downgrade(pmf_opt, wpa3));
+    auto pmf_off = wpa3; pmf_off.pmf = Pmf::Disabled; CHECK(security_downgrade(wpa3, pmf_off));
+}
+
+GUARDIAN_CASE(g25_an_unexpected_ap_stays_a_red_incident_and_is_the_last_baseline_record) {
+    Rig r; CHECK(r.scope.select(home_baseline(c_)));
+    BaselineDetector d(r.scope, r.limits);
+    std::vector<std::uint8_t> other;
+    if (!load(c_, "beacon_same_ssid_other_bssid_wpa2", other)) return;
+    r.feed(d, other, 1000); r.feed(d, other, 1100);
+    CHECK_EQ(r.sink.count, std::size_t{1});
+    CHECK_EQ(r.sink.last().kind, IncidentKind::UnexpectedAp);   // red stays: another BSSID using the name
+    CHECK_EQ(r.sink.last().scope, IncidentScope::Network);
+    CHECK(d.last().known); CHECK_EQ(d.last().bssid, kOther);
+    CHECK_EQ(d.last().changes & change::Bssid, change::Bssid); CHECK_EQ(d.last().count, 1u); CHECK_EQ(d.last().at.at, Millis{1100});
+    CHECK(!d.router().change.pending); CHECK_EQ(d.router().moves, 0u);
+    // Its cooldown still holds (scope-wide), as before G25.
+    r.feed(d, other, 2000); r.feed(d, other, 2100); CHECK_EQ(r.sink.count, std::size_t{1});
+    r.feed(d, other, 1100 + DetectorLimits{}.cooldown_ms); r.feed(d, other, 1200 + DetectorLimits{}.cooldown_ms);
+    CHECK_EQ(r.sink.count, std::size_t{2});
 }

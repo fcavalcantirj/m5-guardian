@@ -63,6 +63,77 @@ std::uint8_t SettingsFingerprint::diff(const SettingsFingerprint& o) const {
     return bits;
 }
 
+// ---- G25: the weakest-advertised summary of a fingerprint, and what counts as a downgrade --------
+namespace {
+constexpr std::uint16_t kEnterpriseAkms = akm::Wpa1Eap | akm::Eap | akm::EapSha256 | akm::FtEap | akm::EapSuiteB | akm::EapSuiteB192;
+constexpr std::uint16_t kSaeAkms = akm::Sae | akm::FtSae | akm::SaeExt;
+constexpr std::uint16_t kPersonalAkms = akm::Psk | akm::PskSha256 | akm::FtPsk;
+Cipher weakest_cipher(std::uint16_t kinds) {
+    if (kinds & (cipher::Wep40 | cipher::Wep104)) return Cipher::Wep;
+    if (kinds & cipher::Tkip) return Cipher::Tkip;
+    if (kinds & (cipher::Ccmp128 | cipher::Ccmp256)) return Cipher::Ccmp;
+    if (kinds & (cipher::Gcmp128 | cipher::Gcmp256)) return Cipher::Gcmp;
+    return Cipher::Unknown;
+}
+// Higher = stronger; -1 = outside the owner's order (OWE, Enterprise, Unknown).
+int mode_rank(Mode m) {
+    switch (m) {
+    case Mode::Open: return 0; case Mode::Wep: return 1; case Mode::Wpa1: return 2; case Mode::Wpa2Personal: return 3;
+    case Mode::Transition: return 4; case Mode::Wpa3Personal: return 5;
+    case Mode::Owe: case Mode::Enterprise: case Mode::Unknown: return -1;
+    }
+    return -1;
+}
+int cipher_rank(Cipher c) {
+    switch (c) {
+    case Cipher::None: return 0; case Cipher::Wep: return 1; case Cipher::Tkip: return 2; case Cipher::Ccmp: case Cipher::Gcmp: return 3;
+    case Cipher::Unknown: return -1;
+    }
+    return -1;
+}
+int pmf_rank(Pmf p) {
+    switch (p) {
+    case Pmf::Disabled: return 0; case Pmf::Optional: return 1; case Pmf::Required: return 2; case Pmf::Unknown: return -1;
+    }
+    return -1;
+}
+bool weaker(int from, int to) { return from >= 0 && to >= 0 && to < from; }
+} // namespace
+
+SecuritySummary summarize(const SettingsFingerprint& f) {
+    // The G05 reduction (rating.cpp assess) over the fingerprint's Valid fields.
+    SecuritySummary s{};
+    const bool rsn = f.rsn_state == ElementState::Valid, wpa = f.wpa_state == ElementState::Valid;
+    std::uint16_t akms = 0, pairwise = 0;
+    if (rsn) { akms |= f.rsn_akms; pairwise |= f.rsn_pairwise; }
+    if (wpa) { akms |= f.wpa_akms; pairwise |= f.wpa_pairwise; }
+    if (!rsn && !wpa) {
+        if (f.owe_transition == ElementState::Valid) s.mode = Mode::Owe;
+        else if (!f.privacy_bit) { s.mode = Mode::Open; s.pairwise = Cipher::None; }
+        else { s.mode = Mode::Wep; s.pairwise = Cipher::Wep; }
+        s.pmf = Pmf::Disabled;
+        return s;
+    }
+    if (akms & akm::Unknown) s.mode = Mode::Unknown;
+    else if (akms & akm::Owe) s.mode = Mode::Owe;
+    else if (akms & kEnterpriseAkms) s.mode = Mode::Enterprise;
+    else if (wpa) s.mode = Mode::Wpa1;
+    else {
+        const bool sae = (akms & kSaeAkms) != 0, psk = (akms & kPersonalAkms) != 0;
+        s.mode = sae && psk ? Mode::Transition : sae ? Mode::Wpa3Personal : psk ? Mode::Wpa2Personal : Mode::Unknown;
+    }
+    if (!(pairwise & cipher::Unknown)) s.pairwise = weakest_cipher(pairwise);
+    s.pmf = rsn ? f.pmf : Pmf::Disabled;
+    return s;
+}
+
+bool security_downgrade(const SettingsFingerprint& from, const SettingsFingerprint& to) {
+    const SecuritySummary a = summarize(from), b = summarize(to);
+    if (b.mode == Mode::Open && a.mode != Mode::Open) return true;   // anything -> open
+    return weaker(mode_rank(a.mode), mode_rank(b.mode)) || weaker(cipher_rank(a.pairwise), cipher_rank(b.pairwise))
+        || weaker(pmf_rank(a.pmf), pmf_rank(b.pmf));
+}
+
 // ---- ApprovedScope --------------------------------------------------------------------------
 bool ApprovedScope::valid_identity(const Network& n) {
     return n.ssid_size <= n.ssid.size() && !(n.bssid[0] & 1)
@@ -482,6 +553,7 @@ void BaselineDetector::maybe_report(bool unexpected, Millis anchor, Millis acqui
     for (std::size_t i = 0; i < size_; ++i) {
         const Entry& e = ring_[(head_ + i) % capacity];
         if ((!unexpected && e.bssid != trigger) || e.unexpected != unexpected || anchor < e.at || anchor - e.at >= limits_.window_ms) continue;
+        if (!unexpected && e.changes == 0) continue;   // G25: belonged to a change the owner accepted
         ++raw;
         changes = static_cast<std::uint8_t>(changes | e.changes);
         if (!any || e.at >= newest) { newest_bssid = e.bssid; newest = e.at; any = true; }
@@ -493,32 +565,127 @@ void BaselineDetector::maybe_report(bool unexpected, Millis anchor, Millis acqui
         }
         if (!seen) ++distinct;
     }
-    if (raw < limits_.change_threshold) return;
-    // Slot zero is scope-wide unexpected APs; settings cooldowns are per AP.
-    std::size_t k = unexpected ? 0 : 1;
-    if (!unexpected && trigger != scope_.selected().network.bssid) {
-        for (std::size_t n = 0; n < scope_.approved_count(); ++n)
-            if (scope_.approved_at(n)->network.bssid == trigger) { k = n + 2; break; }
+    if (!unexpected) {   // G25: the router's own security change, never an incident
+        const ApprovedAp* ap = scope_.find(trigger);
+        Track* t = ap ? track(*ap) : nullptr;
+        if (t && (t->pending || raw >= limits_.change_threshold)) confirm(*t, changes, raw, acquired);
+        return;
     }
-    if (reported_[k] && anchor < add_ms(last_report_[k], limits_.cooldown_ms)) { ++stats_.suppressed_by_cooldown; return; }
+    if (raw < limits_.change_threshold) return;
+    if (unexpected_reported_ && anchor < add_ms(unexpected_last_, limits_.cooldown_ms)) { ++stats_.suppressed_by_cooldown; return; }
     IncidentObservation i{};
     i.affected = scope_.selected().network;
     i.acquired = Instant{epoch_, acquired, true};
     i.origin = origin;
-    i.kind = unexpected ? IncidentKind::UnexpectedAp : IncidentKind::SettingsChanged;
+    i.kind = IncidentKind::UnexpectedAp;
     i.scope = IncidentScope::Network;     // G16E
     i.family = DetectorFamily::Baseline;
-    i.count = unexpected ? distinct : raw;
+    i.count = distinct;
     i.window_ms = limits_.window_ms;
     i.bssid = newest_bssid;
     i.threshold = limits_.change_threshold;
     i.raw_frames = raw;
     i.saturated = anchor < saturated_until_;
     i.changes = changes;
-    reported_[k] = true;
-    last_report_[k] = anchor;
+    unexpected_reported_ = true;
+    unexpected_last_ = anchor;
     ++stats_.reports;
+    last_ = BaselineLast{true, newest_bssid, changes, distinct, i.acquired};   // G25 STATUS baseline_last
     out.incident(i);
+}
+
+// ---- G25: router tracks ---------------------------------------------------------------------
+BaselineDetector::Track* BaselineDetector::track(const ApprovedAp& ap) {
+    Track* found = nullptr;
+    Track* free = nullptr;
+    for (auto& t : tracks_) {
+        if (t.used && t.bssid == ap.network.bssid) { found = &t; break; }
+        if (!t.used && !free) free = &t;
+    }
+    if (!found) {
+        if (!free) return nullptr;   // more APs than the scope can hold: cannot happen (capacity + 1 tracks)
+        *free = Track{};
+        free->used = true;
+        free->bssid = ap.network.bssid;
+        found = free;
+        found->scope_channel_known = !ap.channel_known;   // forces the read below
+    }
+    // The scope's channel until a move is confirmed; when the scope itself changes (the owner, or the scope's
+    // owner storing a move), its facts are read again.
+    if (found->scope_channel_known != ap.channel_known || found->scope_band != ap.band || found->scope_channel != ap.channel) {
+        found->scope_channel_known = ap.channel_known; found->scope_band = ap.band; found->scope_channel = ap.channel;
+        found->channel_known = ap.channel_known; found->band = ap.band; found->channel = ap.channel; found->cand_hits = 0;
+    }
+    return found;
+}
+
+void BaselineDetector::confirm(Track& t, std::uint8_t changes, std::uint32_t raw, Millis at) {
+    const ApprovedAp* ap = scope_.find(t.bssid);
+    const SettingsFingerprint from = ap ? baseline_of(&t, *ap) : SettingsFingerprint{};
+    bool news = false;
+    if (!t.pending) {
+        t.pending = true; t.changes = changes; t.first = at; t.count = raw;
+        ++stats_.reports;   // STATUS "incidents": one router change confirmed (no incident reaches Core)
+        news = true;
+    } else {
+        ++t.count;
+        if ((t.changes | changes) != t.changes) { t.changes = static_cast<std::uint8_t>(t.changes | changes); news = true; }
+    }
+    t.to = t.seen;
+    t.last = at;
+    t.downgrade = security_downgrade(from, t.to);
+    if (news) ++change_seq_;
+    last_ = BaselineLast{true, t.bssid, t.changes, t.count, Instant{epoch_, at, true}};
+}
+
+RouterState BaselineDetector::router() const {
+    RouterState r{};
+    r.change_seq = change_seq_;
+    r.moves = moves_;
+    r.last_move = last_move_;
+    const Track* newest = nullptr;
+    for (const auto& t : tracks_) {
+        if (!t.used || !t.pending) continue;
+        ++r.pending;
+        if (!newest || t.first > newest->first) newest = &t;
+    }
+    if (newest) {
+        auto& c = r.change;
+        c.pending = true;
+        c.bssid = newest->bssid;
+        c.changes = newest->changes;
+        const ApprovedAp* ap = scope_.find(newest->bssid);
+        if (ap) c.from = baseline_of(newest, *ap);
+        c.to = newest->to;
+        c.downgrade = newest->downgrade;
+        c.first = Instant{epoch_, newest->first, true};
+        c.last = Instant{epoch_, newest->last, true};
+        c.count = newest->count;
+    }
+    return r;
+}
+
+bool BaselineDetector::take_move(ChannelMove& out) {
+    if (!move_waiting_) return false;
+    move_waiting_ = false;
+    out = last_move_;
+    return true;
+}
+
+bool BaselineDetector::accept(const Mac& bssid, SettingsFingerprint& seen) {
+    for (auto& t : tracks_) {
+        if (!t.used || t.bssid != bssid || !t.pending) continue;
+        seen = t.seen_known ? t.seen : t.to;
+        t.pending = false; t.changes = 0; t.count = 0; t.downgrade = false;
+        t.accepted_known = true; t.accepted = seen;   // compared with until the scope's owner stores it
+        // The differing advertisements in the window belong to the accepted change.
+        for (std::size_t i = 0; i < size_; ++i) {
+            Entry& e = ring_[(head_ + i) % capacity];
+            if (!e.unexpected && e.bssid == bssid) e.changes = 0;
+        }
+        return true;
+    }
+    return false;
 }
 
 void BaselineDetector::on_frame(const FrameSpan&, const RxMeta& meta, const ParseResult& p, ObservationSink& out) {
@@ -541,15 +708,47 @@ void BaselineDetector::on_frame(const FrameSpan&, const RxMeta& meta, const Pars
     const ApprovedAp* ap = scope_.find(p.identity.bssid);
     if (ap) {
         ++stats_.in_scope;
-        std::uint8_t changes = 0;
+        Track* t = track(*ap);
+        if (t) { t->seen = seen; t->seen_known = true; }
         bool compared = false;
-        if (ap->settings_known) { compared = true; changes = static_cast<std::uint8_t>(changes | ap->settings.diff(seen)); }
-        if (ap->channel_known && p.settings.ds_channel_present) {
+        // G25: the channel. A move of the router is re-baselined (no incident) after change_threshold
+        // advertisements on the new channel inside window_ms; one on the baseline channel restarts the count.
+        bool moved = false;
+        const bool channel_known = t ? t->channel_known : ap->channel_known;
+        if (channel_known && p.settings.ds_channel_present) {
             compared = true;
-            if (p.settings.ds_channel != ap->channel || meta.band != ap->band) changes = static_cast<std::uint8_t>(changes | change::Channel);
+            const std::uint8_t base = t ? t->channel : ap->channel;
+            const Band base_band = t ? t->band : ap->band;
+            const bool differs = p.settings.ds_channel != base || meta.band != base_band;
+            moved = differs;
+            if (t && !differs) t->cand_hits = 0;
+            if (t && differs) {
+                if (t->cand_hits == 0 || t->cand_channel != p.settings.ds_channel || t->cand_band != meta.band
+                    || at < t->cand_first || at - t->cand_first >= limits_.window_ms) {
+                    t->cand_channel = p.settings.ds_channel; t->cand_band = meta.band; t->cand_first = at; t->cand_hits = 0;
+                }
+                if (t->cand_hits < 0xff) ++t->cand_hits;
+                if (t->cand_hits >= limits_.change_threshold) {
+                    last_move_ = ChannelMove{true, t->bssid, meta.band, base, p.settings.ds_channel, Instant{epoch_, at, true}};
+                    last_ = BaselineLast{true, t->bssid, change::Channel, t->cand_hits, last_move_.at};
+                    t->channel = p.settings.ds_channel; t->band = meta.band; t->cand_hits = 0;
+                    ++moves_; ++stats_.channel_moves; move_waiting_ = true;
+                }
+            }
+        }
+        // Security: compared with the approved baseline (or, after an accept, with the accepted settings
+        // until the scope's owner stores them).
+        std::uint8_t changes = 0;
+        if (ap->settings_known) {
+            compared = true;
+            if (t && t->accepted_known && ap->settings == t->accepted) t->accepted_known = false;   // stored: the scope says it now
+            changes = baseline_of(t, *ap).diff(seen);
         }
         if (!compared) { ++stats_.no_baseline; return; }
-        if (changes == 0) { ++stats_.unchanged; return; }
+        if (changes == 0) {
+            if (moved) ++stats_.changed; else ++stats_.unchanged;
+            return;
+        }
         ++stats_.changed;
         Entry e{};
         e.at = at;
@@ -590,6 +789,8 @@ void BaselineDetector::on_tick(Instant now, ObservationSink&) {
 }
 
 void BaselineDetector::reset() {
+    unexpected_reported_ = false; unexpected_last_ = 0; tracks_.fill(Track{}); change_seq_ = moves_ = 0;   // G25
+    last_move_ = ChannelMove{}; move_waiting_ = false; last_ = BaselineLast{};
     origin_set_ = false;
     origin_ = Origin::LiveRadio;
     epoch_set_ = false;
@@ -598,8 +799,6 @@ void BaselineDetector::reset() {
     has_latest_ = false;
     head_ = size_ = 0;
     saturated_until_ = 0;
-    reported_.fill(false);
-    last_report_.fill(0);
     stats_ = BaselineStats{};
     frames_seen_ = 0;
     events_ = 0;
@@ -675,11 +874,15 @@ DetectorReport BaselineDetector::report(Instant now) const {
         if (now.at >= e.at && now.at - e.at < limits_.window_ms) ++r.events_in_window;
     }
     r.last_event_known = has_event_ && age_at(now, epoch_, last_event_, r.last_event_age_ms);
-    for (std::size_t k = 0; k < reported_.size(); ++k) {
-        Millis age{};
-        if (!reported_[k] || !age_at(now, epoch_, last_report_[k], age)) continue;
+    Millis age{};
+    if (unexpected_reported_ && age_at(now, epoch_, unexpected_last_, age)) {
+        r.last_incident_known = true; r.last_incident_age_ms = age;
+        if (age < limits_.cooldown_ms) r.cooldown_remaining_ms = limits_.cooldown_ms - age;
+    }
+    // G25: a confirmed router change counts as the detector's last report (never cooled down: never re-fired).
+    for (const auto& t : tracks_) {
+        if (!t.used || !t.pending || !age_at(now, epoch_, t.first, age)) continue;
         if (!r.last_incident_known || age < r.last_incident_age_ms) { r.last_incident_known = true; r.last_incident_age_ms = age; }
-        if (age < limits_.cooldown_ms) r.cooldown_remaining_ms = std::max<Millis>(r.cooldown_remaining_ms, limits_.cooldown_ms - age);
     }
     return r;
 }

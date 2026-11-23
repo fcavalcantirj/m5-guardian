@@ -127,10 +127,15 @@ GUARDIAN_CASE(hours_table_is_the_measured_spike_and_nothing_else) {
 }
 
 GUARDIAN_CASE(status_fragments) {
-    CHECK(text_of(settings_status, DeviceChoices{}, SettingsStore::Default) == "settings=guard:always,bright:60,store:default");
-    CHECK(text_of(settings_status, choices(GuardCycle::EveryMinute, 100), SettingsStore::Restored) == "settings=guard:every_minute,bright:100,store:restored");
-    CHECK(text_of(settings_status, choices(GuardCycle::Every30s, 10), SettingsStore::Failed) == "settings=guard:every_30s,bright:10,store:failed");
-    CHECK(text_of(settings_status, DeviceChoices{}, SettingsStore::Corrupt) == "settings=guard:always,bright:60,store:corrupt");
+    // G25: router:<details|amber|strict> appended.
+    CHECK(text_of(settings_status, DeviceChoices{}, SettingsStore::Default) == "settings=guard:always,bright:60,store:default,router:amber");
+    CHECK(text_of(settings_status, choices(GuardCycle::EveryMinute, 100), SettingsStore::Restored) == "settings=guard:every_minute,bright:100,store:restored,router:amber");
+    CHECK(text_of(settings_status, choices(GuardCycle::Every30s, 10), SettingsStore::Failed) == "settings=guard:every_30s,bright:10,store:failed,router:amber");
+    CHECK(text_of(settings_status, DeviceChoices{}, SettingsStore::Corrupt) == "settings=guard:always,bright:60,store:corrupt,router:amber");
+    DeviceChoices longest = choices(GuardCycle::EveryMinute, 100); longest.router = RouterPolicy::DetailsOnly;
+    CHECK(text_of(settings_status, longest, SettingsStore::Restored) == "settings=guard:every_minute,bright:100,store:restored,router:details");
+    longest.router = RouterPolicy::Strict;
+    CHECK(text_of(settings_status, longest, SettingsStore::Restored) == "settings=guard:every_minute,bright:100,store:restored,router:strict");
     char small[20]; CHECK_EQ(settings_status(DeviceChoices{}, SettingsStore::Default, small, sizeof small), std::size_t{0}); CHECK_EQ(small[0], '\0');
 
     CycleStats s; char g[guard_cycle_status_max];
@@ -152,4 +157,58 @@ GUARDIAN_CASE(status_fragments) {
     CHECK(parts_status(on, p, sizeof p) > 0); CHECK(std::string(p) == "parts=led:1,ir:?,boost5v:1,amp:1,codec:?");
     CHECK(parts_status(PartsRead{}, p, sizeof p) > 0); CHECK(std::string(p) == "parts=led:?,ir:?,boost5v:?,amp:?,codec:?");   // failed reads
     CHECK_EQ(parts_status(off, p, 20), std::size_t{0}); CHECK_EQ(p[0], '\0');
+}
+
+// ---- G25: ROUTER CHANGES in the GSET record (format 2) with a migration from format 1 (TDD, red first) ----
+namespace {
+std::uint32_t zlib_crc(const std::uint8_t* d, std::size_t n) {
+    std::uint32_t c = 0xffffffffu;
+    for (std::size_t i = 0; i < n; ++i) { c ^= d[i]; for (int b = 0; b < 8; ++b) c = (c >> 1) ^ (0xedb88320u & (0u - (c & 1u))); }
+    return ~c;
+}
+// A record as G24 wrote it: magic, format 1, guard, brightness, CRC-32 (12 bytes).
+std::vector<std::uint8_t> g24_record(std::uint8_t guard, std::uint8_t pct) {
+    std::vector<std::uint8_t> r{'G', 'S', 'E', 'T', 1, 0, guard, pct};
+    const auto crc = zlib_crc(r.data(), r.size());
+    for (int i = 0; i < 4; ++i) r.push_back(static_cast<std::uint8_t>(crc >> (8 * i)));
+    return r;
+}
+} // namespace
+
+GUARDIAN_CASE(g25_router_choice_round_trips_in_format_2) {
+    CHECK_EQ(settings_record_bytes, std::size_t{13});
+    for (const auto rp : {RouterPolicy::DetailsOnly, RouterPolicy::Amber, RouterPolicy::Strict}) {
+        DeviceChoices c = choices(GuardCycle::EveryMinute, 30); c.router = rp;
+        std::uint8_t buf[settings_record_bytes]{};
+        CHECK_EQ(encode_settings(c, buf, sizeof buf), settings_record_bytes);
+        CHECK_EQ(unsigned(buf[4]), 2u); CHECK_EQ(unsigned(buf[5]), 0u);   // format 2
+        DeviceChoices out; CHECK(decode_settings(buf, sizeof buf, out)); CHECK(out == c);
+        for (std::size_t i = 0; i < sizeof buf; ++i) {                    // every single flipped bit is refused
+            std::uint8_t bad[settings_record_bytes]; std::memcpy(bad, buf, sizeof bad); bad[i] ^= 0x01;
+            DeviceChoices keep; CHECK(!decode_settings(bad, sizeof bad, keep)); CHECK(keep == DeviceChoices{});
+        }
+    }
+    // An unknown router value with a valid CRC is refused too.
+    std::uint8_t buf[settings_record_bytes]{}; encode_settings(DeviceChoices{}, buf, sizeof buf);
+    buf[8] = 7; const auto crc = zlib_crc(buf, 9); for (int i = 0; i < 4; ++i) buf[9 + i] = static_cast<std::uint8_t>(crc >> (8 * i));
+    DeviceChoices out; CHECK(!decode_settings(buf, sizeof buf, out));
+}
+
+GUARDIAN_CASE(g25_a_g24_record_migrates_keeping_guard_and_brightness) {
+    const auto v1 = g24_record(2, 80);   // EVERY MINUTE, 80 %
+    DeviceChoices out; CHECK(decode_settings(v1.data(), v1.size(), out));
+    CHECK(out.guard == GuardCycle::EveryMinute); CHECK_EQ(unsigned(out.bright_pct), 80u); CHECK(out.router == RouterPolicy::Amber);
+    MemoryBlob blob; blob.bytes = v1; blob.exists = true;
+    DeviceSettingsStore store(blob);
+    CHECK(store.load() == out); CHECK(store.state() == SettingsStore::Restored); CHECK_EQ(blob.writes, 0u);   // read as it is, never rewritten at boot
+    // The next save writes format 2; it reads back the same.
+    DeviceChoices strict = out; strict.router = RouterPolicy::Strict;
+    CHECK(store.save(strict)); CHECK_EQ(blob.bytes.size(), settings_record_bytes); CHECK_EQ(unsigned(blob.bytes[4]), 2u);
+    DeviceSettingsStore next(blob); CHECK(next.load() == strict);
+    // A format-1 record with a bad CRC, a wrong length or an invalid value is still corrupt.
+    auto bad = v1; bad[11] ^= 0x10; DeviceChoices keep; CHECK(!decode_settings(bad.data(), bad.size(), keep));
+    CHECK(!decode_settings(v1.data(), v1.size() - 1, keep));
+    const auto invalid = g24_record(2, 55); CHECK(!decode_settings(invalid.data(), invalid.size(), keep));
+    auto v1_long = v1; v1_long.push_back(0); CHECK(!decode_settings(v1_long.data(), v1_long.size(), keep));
+    CHECK(keep == DeviceChoices{});
 }

@@ -41,17 +41,18 @@ is the first board, not a requirement of the library.
 | **Very good**, **Good**, **Medium**, **Bad**, **Horrible** | The rating of the settings the picked network advertises right now (protocol, cipher, management-frame protection). It is a rating of advertised settings, shown only while the evidence is fresh. |
 | Red **ALERT** and one sentence | An incident on the picked network, for example "Disconnect burst on" and the network's name, with the count and the time window. The cause is stated as unknown. |
 | Amber edge and one sentence | Something nearby that is not aimed at the picked network, for example a probe flood. The rating does not change. |
+| Amber "Router changed security" | Your own router changed its advertised security settings (for example after an update or a restart): what changed, old -> new, and "a downgrade" when it got weaker. It stays until you accept it on the Details page (hold the side key there). A router that only moves channel is followed silently and shown as one grey line on the details page. How these are coloured is the **Router changes** setting. |
 | **No fresh data** and an age | The network was not heard for 29 seconds or more. No rated face is shown without fresh evidence, and silence is never reported as "all clear". |
 | **DEMO n/5** | A labelled walk through the five faces, kept for development: no key opens it (since G24), and holding the front key leaves it. It is never shown as a reading. |
-| **SETTINGS n/2** | The device settings, one big option per page: how the guard listens on battery and the screen brightness. Each choice shows its battery hours **measured** on the stick from full to the 20 % floor, the highest and lowest measured marked, or "not measured yet". |
+| **SETTINGS n/3** | The device settings, one big option per page: how the guard listens on battery, the screen brightness and how your router's own changes are shown. The first two show their battery hours **measured** on the stick from full to the 20 % floor, the highest and lowest measured marked, or "not measured yet". |
 
 Two keys, each used alone (one hand is enough):
 
 | Where | Front (blue) key | Hold front | Side key | Hold side |
 |---|---|---|---|---|
-| Face | details, first page | Settings screen | (nothing) | network list |
-| Details | next page; after the last, the face | Settings screen | the face | network list |
-| Settings screen | next choice (wraps) | save this page, then the next page; after the last, the face | the face, nothing more saved | the face |
+| Face | details, first page (the router's change first while one waits) | Settings screen | (nothing) | network list |
+| Details | next page; after the last, the face | Settings screen | the face | network list; on the "Your router changed" page: accept the new settings |
+| Settings screen | the face, nothing more saved | the face, nothing more saved | next choice (wraps) | save this page, then the next page; after the last, the face |
 | Network list | next network | "this AP is mine too" on a same-name row | choose | back |
 
 The details pages give the reason for the rating, the evidence counts and a page named "What it
@@ -65,6 +66,9 @@ opens it.
 | | **Every 30 s**: listen 10 s, radio off 20 s | not measured yet | an alert can be up to 20 s late; a short burst inside an off period is missed |
 | | **Every minute**: listen 10 s, radio off 50 s | 7 h 14 min (highest, measured) | an alert can be up to 50 s late; a short burst inside an off period is missed |
 | Brightness | 10, 30, **60** (default), 80, 100 % | not measured yet | costs only while the screen is lit |
+| Router changes | **Details only**: listed on the Details page, no colour | (costs nothing) | a security change of your router is never coloured |
+| | **Amber** (default): a security change is amber until you accept it; a channel move is one grey line | | |
+| | **Strict**: a security change is the red ALERT until you accept it; a channel move is amber until you acknowledge it | | |
 
 The two cycled choices act only on battery while the screen is dark; a key, motion, USB power or a
 counted burst lights the screen and the radio listens at once. The hours come from the G24 battery
@@ -86,7 +90,7 @@ are counts in a time window, and each one can be changed over the tuning console
 | Probe flood | amber | yes: 2026-11-17, at 16 probes from 12 addresses in 10 s |
 | Beacon flood | amber | fired on 2026-11-17; counts and time-to-alert not recorded |
 | Another device using the picked network's name (on by default) | red | no: host tests only |
-| Baseline change of the picked network's advertised settings | red | on the host with live radio (L02) and through the ESP32 adapter (G13) |
+| Baseline change of the picked network's advertised settings | amber by default (G25: red only with Router changes = Strict); a channel move is followed silently | before G25, red on the host with live radio (L02) and through the ESP32 adapter (G13); the G25 colours are host-tested only |
 | Responder to many asked names, lure names, marked beacons, channel-switch and Quiet abuse, authentication and SAE floods, association floods | red or amber by scope | no: host tests only |
 | Handshake-harvest signs (needs the data path: only unprotected key-handshake frames pass a prefilter, every other data frame is dropped before the queue) | red | no: the data path is off by default until its load on the device is measured |
 | Noise-floor rise on the channel (the radio's own noise estimate, no frames needed) | amber | no: host tests only |
@@ -175,6 +179,7 @@ reviewer; what was measured is in the last column, with the row that records it.
 | Integrated review | G22 | accepted | independent verdict "REVISE INTEGRATED"; findings and dispositions in docs/review-status.md |
 | Delivery | G23 | accepted | the owner's run of 2026-11-21 (firmware/evidence/sticks3-G23-20261121.log); the device recordings are listed in docs/G23-delivery.md |
 | Settings: guard on battery, brightness, unused parts off | G24 | **open**: implemented and host-tested, awaiting review and the device acceptance | the hours shown are the G24 spike's full drains (always listening 2 h 05 min; listen 10 s / off 50 s with every lever 7 h 14 min, 380 cycles with 0 radio, rail or power-management failures); the six Settings pages render pixel for pixel as the owner-approved look; nothing of G24 is measured on the stick yet (firmware/README.md, G24) |
+| Router changes are not an alarm; Settings keys with the side key | G25 | **open**: implemented and host-tested, awaiting review | a channel move is followed and counted (STATUS `channel_moves=`), a security change is amber until accepted, ROUTER CHANGES is Settings page 3, the Settings keys are side = next, hold side = save, front = back; nothing of G25 has run on the stick (firmware/README.md, G25) |
 | Bluetooth guard | G16U | open, release 2 | not built |
 
 Router modes: the ratings were seen on the device for the owner's own router and, for all five faces,

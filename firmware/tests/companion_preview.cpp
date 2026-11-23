@@ -56,6 +56,16 @@ Packet wpa3(const Clock& clock) {
     p.meta.origin = Origin::LiveRadio; p.meta.status = RxStatus::Ok; p.meta.channel = 6; p.meta.rssi_dbm = -48; p.meta.rssi_valid = true;
     return p;
 }
+// G25: a fixture as a live packet, optionally with its DS channel rewritten (a router that moved).
+Packet fixture_packet(const Clock& clock, const char* name, std::uint8_t ds_channel = 0) {
+    guardian::fixtures::Fixture fx; std::string error; Packet p{};
+    if (!guardian::fixtures::load(name, fx, error)) { std::fprintf(stderr, "fixture: %s\n", error.c_str()); return p; }
+    std::memcpy(p.bytes.data(), fx.bytes.data(), fx.bytes.size()); p.size = static_cast<std::uint16_t>(fx.bytes.size());
+    p.meta.acquired = {clock.epoch(), clock.now(), true}; p.meta.origin = Origin::LiveRadio; p.meta.status = RxStatus::Ok;
+    p.meta.channel = ds_channel ? ds_channel : 6; p.meta.rssi_dbm = -48; p.meta.rssi_valid = true;
+    if (ds_channel) for (std::size_t i = 36; i + 2 < p.size; i += 2u + p.bytes[i + 1]) if (p.bytes[i] == 3 && p.bytes[i + 1] == 1) { p.bytes[i + 2] = ds_channel; break; }
+    return p;
+}
 Packet deauth_of(Packet p) { p.size = 26; p.bytes[0] = 0xc0; p.bytes[24] = 7; p.bytes[25] = 0; return p; }
 // G16E: a wildcard probe request from a randomized-looking source `n`.
 Packet probe(const Clock& clock, std::uint16_t n) {
@@ -286,17 +296,23 @@ int main(int argc, char** argv) {
     { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob, settings_blob; EncodedSelectionStore store(blob);
       DeviceSettingsStore settings(settings_blob);
       Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.attach_settings(settings); c.boot(); c.receive(wpa3(clock)); c.tick();
+      // G25 keys (owner 2026-11-23): SIDE = next value, hold SIDE = save, BLUE = leave.
       c.input(Action::PrimaryLong);   // hold FRONT on the face
       c.render(st, f); save("24-settings-1-guard-always", f, in, &batt);
-      c.input(Action::Primary); c.render(st, f); save("24-settings-2-guard-30s", f, in, &batt);
-      c.input(Action::Primary); c.render(st, f); save("24-settings-3-guard-1min", f, in, &batt);
-      c.input(Action::PrimaryLong); c.render(st, f); save("24-settings-4-guard-1min-saved", f, in, &batt);
+      c.input(Action::Secondary); c.render(st, f); save("24-settings-2-guard-30s", f, in, &batt);
+      c.input(Action::Secondary); c.render(st, f); save("24-settings-3-guard-1min", f, in, &batt);
+      c.input(Action::SecondaryLong); c.render(st, f); save("24-settings-4-guard-1min-saved", f, in, &batt);
       clock.at += Presenter::settings_plate_ms; c.tick();
-      for (int i = 0; i < 4; ++i) c.input(Action::Primary);   // 60 -> 80, 100, 10, 30
+      for (int i = 0; i < 4; ++i) c.input(Action::Secondary);   // 60 -> 80, 100, 10, 30
       c.render(st, f); save("24-settings-5-brightness-30", f, in, &batt);
-      for (int i = 0; i < 3; ++i) c.input(Action::Primary);   // 60, 80, 100
+      for (int i = 0; i < 3; ++i) c.input(Action::Secondary);   // 60, 80, 100
       c.render(st, f); save("24-settings-6-brightness-100", f, in, &batt);
-      c.input(Action::Secondary); }
+      // G25: page 3, ROUTER CHANGES (AMBER, STRICT, DETAILS ONLY), reached by saving page 2.
+      c.input(Action::SecondaryLong); clock.at += Presenter::settings_plate_ms; c.tick();
+      c.render(st, f); save("25-settings-8-router-amber", f, in, &batt);
+      c.input(Action::Secondary); c.render(st, f); save("25-settings-9-router-strict", f, in, &batt);
+      c.input(Action::Secondary); c.render(st, f); save("25-settings-10-router-details-only", f, in, &batt);
+      c.input(Action::Primary); }
     { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
       struct Refusing final : BlobStorage {
           BlobRead read(std::uint8_t*, std::size_t, std::size_t&) const override { return BlobRead::Absent; }
@@ -304,7 +320,22 @@ int main(int argc, char** argv) {
       } refusing;
       DeviceSettingsStore settings(refusing);
       Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.attach_settings(settings); c.boot(); c.receive(wpa3(clock)); c.tick();
-      c.input(Action::PrimaryLong); c.input(Action::Primary); c.input(Action::PrimaryLong);
+      c.input(Action::PrimaryLong); c.input(Action::Secondary); c.input(Action::SecondaryLong);
       c.render(st, f); save("24-settings-7-save-failed", f, in, &batt); }
+    // G25: the owner's router changing its own security (AMBER default, STRICT), its Details page, and a channel move.
+    for (const bool strict : {false, true}) {
+      Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob, settings_blob; EncodedSelectionStore store(blob);
+      DeviceSettingsStore settings(settings_blob);
+      if (strict) { DeviceChoices c; c.router = RouterPolicy::Strict; settings.save(c); }
+      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.attach_settings(settings); c.boot(); c.receive(wpa3(clock)); c.tick();
+      c.input(Action::SecondaryLong); c.input(Action::Secondary); clock.at += 1000; c.receive(wpa3(clock)); c.tick();
+      for (int i = 0; i < 3; ++i) { clock.at += 100; c.receive(fixture_packet(clock, "beacon_wpa2_ccmp_pmf_optional")); }
+      c.tick(); c.render(st, f); save(strict ? "25-router-strict-face" : "25-router-amber-face", f, in, &batt);
+      c.input(Action::Primary); c.render(st, f); save(strict ? "25-router-strict-details" : "25-router-amber-details", f, in, &batt); }
+    { Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); MemoryBlob blob; EncodedSelectionStore store(blob);
+      Companion c(clock, m, store, lcd(), Origin::LiveRadio); c.boot(); c.receive(wpa3(clock)); c.tick();
+      c.input(Action::SecondaryLong); c.input(Action::Secondary); clock.at += 1000; c.receive(wpa3(clock)); c.tick();
+      for (int i = 0; i < 3; ++i) { clock.at += 100; c.receive(fixture_packet(clock, "beacon_wpa3_sae_pmf_required", 11)); }
+      c.tick(); c.input(Action::Primary); c.render(st, f); save("25-channel-move-details", f, in, &batt); }
     return 0;
 }

@@ -785,13 +785,13 @@ GUARDIAN_CASE(g24_hold_front_opens_settings_from_the_face_and_from_details_never
         CHECK_EQ(q.screen(), Screen::Details); CHECK_EQ(q.details().page, page);
         CHECK(q.handle(Action::PrimaryLong, at())); CHECK_EQ(q.screen(), Screen::Settings); CHECK_EQ(q.mode(), ViewMode::Live);
         CHECK(q.settings().page == SettingsPage::Guard);
-        q.handle(Action::Secondary, at()); CHECK_EQ(q.screen(), Screen::Face);   // SIDE leaves to the face
+        q.handle(Action::Primary, at()); CHECK_EQ(q.screen(), Screen::Face);   // G25: BLUE leaves to the face
     }
-    // Hold FRONT never enters DEMO, however often; a hold of FRONT on the Settings screen is a save, not a toggle.
+    // Hold FRONT never enters DEMO, however often; G25: a hold of FRONT on the Settings screen leaves it (no save).
     Presenter r(display()); r.update(fresh(), at());
     for (int i = 0; i < 4; ++i) {
         r.handle(Action::PrimaryLong, at()); CHECK_EQ(r.mode(), ViewMode::Live); CHECK(!r.view().demo);
-        if (r.has_settings_save()) { r.take_settings_save(); r.settings_saved(true); }
+        CHECK(!r.has_settings_save());
     }
     // Somehow in DEMO (the direct method): hold FRONT returns to LIVE, on the face and on a details page.
     Presenter d(display()); d.update(fresh(), at()); CHECK(d.set_demo(true)); CHECK_EQ(d.mode(), ViewMode::Demo);
@@ -835,57 +835,65 @@ GUARDIAN_CASE(g24_details_order_is_as_before_g24_and_side_always_goes_back) {
             CHECK_EQ(q.details().page, page); q.handle(key, at()); CHECK_EQ(q.screen(), Screen::Face);
         }
     }
-    // The page count is back to six kinds (no DEVICE SETTINGS page).
-    CHECK_EQ(static_cast<unsigned>(DetailsPage::Count), 6u);
+    // The page count is back to six kinds (no DEVICE SETTINGS page), plus G25's Router page (offered only
+    // while a router change waits; never in this order without one).
+    CHECK_EQ(static_cast<unsigned>(DetailsPage::Count), 7u);
 }
 
-GUARDIAN_CASE(g24_front_cycles_values_and_wraps_side_leaves_without_saving) {
+// G25 keys (owner 2026-11-23): SIDE = next value, hold SIDE = save, BLUE = leave without saving.
+GUARDIAN_CASE(g24_side_cycles_values_and_wraps_blue_leaves_without_saving) {
     Presenter p(display()); p.update(fresh(), at());
     open_settings(p, at());
     CHECK(p.settings().shown.guard == GuardCycle::Always);
-    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
-    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::EveryMinute);
-    CHECK(p.handle(Action::Primary, at())); CHECK(p.settings().shown.guard == GuardCycle::Always);   // wraps
-    p.handle(Action::Primary, at()); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
+    CHECK(p.handle(Action::Secondary, at())); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
+    CHECK(p.handle(Action::Secondary, at())); CHECK(p.settings().shown.guard == GuardCycle::EveryMinute);
+    CHECK(p.handle(Action::Secondary, at())); CHECK(p.settings().shown.guard == GuardCycle::Always);   // wraps
+    p.handle(Action::Secondary, at()); CHECK(p.settings().shown.guard == GuardCycle::Every30s);
     CHECK(p.device() == DeviceChoices{}); CHECK(!p.has_settings_save());                          // a draft only
     CHECK_EQ(p.screen(), Screen::Settings);
-    CHECK(p.handle(Action::Secondary, at())); CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.settings().open);
+    CHECK(p.handle(Action::Primary, at())); CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.settings().open);
     CHECK(p.device() == DeviceChoices{}); CHECK(!p.has_settings_save());
     // Opened again: the draft starts from the values in effect.
     open_settings(p, at()); CHECK(p.settings().shown.guard == GuardCycle::Always);
-    // A hold of SIDE leaves too (never the network list from here).
-    CHECK(p.handle(Action::SecondaryLong, at())); CHECK_EQ(p.screen(), Screen::Face);
+    // A hold of BLUE leaves too (no save); the abstract Back as well.
+    p.handle(Action::Secondary, at());
+    CHECK(p.handle(Action::PrimaryLong, at())); CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.has_settings_save());
     open_settings(p, at()); p.handle(Action::Back, at()); CHECK_EQ(p.screen(), Screen::Face);
 }
 
-GUARDIAN_CASE(g24_hold_front_saves_this_page_shows_saved_then_next_page_then_face) {
+GUARDIAN_CASE(g24_hold_side_saves_this_page_shows_saved_then_next_page_then_face) {
     Presenter p(display()); p.update(fresh(), at(1000));
     p.set_device(choice(GuardCycle::Always, 60));
     open_settings(p, at(1000));
-    p.handle(Action::Primary, at(1000)); p.handle(Action::Primary, at(1000));                       // EVERY MINUTE
-    CHECK(p.handle(Action::PrimaryLong, at(1000))); CHECK(p.has_settings_save());
+    p.handle(Action::Secondary, at(1000)); p.handle(Action::Secondary, at(1000));                   // EVERY MINUTE
+    CHECK(p.handle(Action::SecondaryLong, at(1000))); CHECK(p.has_settings_save());
     const auto save = p.take_settings_save(); CHECK(!p.has_settings_save());
     CHECK(save == choice(GuardCycle::EveryMinute, 60));                                             // this page only
     p.settings_saved(true);
     CHECK(p.settings().plate == SavePlate::Saved); CHECK(p.settings().page == SettingsPage::Guard);
     CHECK(p.device() == choice(GuardCycle::EveryMinute, 60)); CHECK(p.settings().saved == choice(GuardCycle::EveryMinute, 60));
-    // FRONT during the plate does nothing; the plate stays for settings_plate_ms.
-    CHECK(!p.handle(Action::Primary, at(1000 + Presenter::settings_plate_ms - 1)) || p.settings().shown.guard == GuardCycle::EveryMinute);
+    // SIDE during the plate does nothing; the plate stays for settings_plate_ms.
+    CHECK(!p.handle(Action::Secondary, at(1000 + Presenter::settings_plate_ms - 1)) || p.settings().shown.guard == GuardCycle::EveryMinute);
     CHECK(p.settings().shown.guard == GuardCycle::EveryMinute); CHECK(p.settings().plate == SavePlate::Saved);
-    p.handle(Action::PrimaryLong, at(1000 + Presenter::settings_plate_ms - 1)); CHECK(!p.has_settings_save());
+    p.handle(Action::SecondaryLong, at(1000 + Presenter::settings_plate_ms - 1)); CHECK(!p.has_settings_save());
     p.update(fresh(), at(1000 + Presenter::settings_plate_ms));                                    // the plate's time is over
     CHECK(p.settings().plate == SavePlate::None); CHECK(p.settings().page == SettingsPage::Brightness);
     CHECK_EQ(unsigned(p.settings().number), 2u); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 60u);
     // Brightness: 60 -> 80 -> 100 -> 10 (wraps) -> 30, previewed at once, saved by a hold.
     const Instant t = at(3000);
-    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 80u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);
-    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 100u);
-    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 10u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 10u);
-    p.handle(Action::Primary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 30u);
+    p.handle(Action::Secondary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 80u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);
+    p.handle(Action::Secondary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 100u);
+    p.handle(Action::Secondary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 10u); CHECK_EQ(unsigned(p.lit_brightness_pct()), 10u);
+    p.handle(Action::Secondary, t); CHECK_EQ(unsigned(p.settings().shown.bright_pct), 30u);
     CHECK_EQ(unsigned(p.device().bright_pct), 60u);
-    p.handle(Action::PrimaryLong, t); CHECK(p.take_settings_save() == choice(GuardCycle::EveryMinute, 30)); p.settings_saved(true);
+    p.handle(Action::SecondaryLong, t); CHECK(p.take_settings_save() == choice(GuardCycle::EveryMinute, 30)); p.settings_saved(true);
     CHECK(p.settings().plate == SavePlate::Saved); CHECK_EQ(p.screen(), Screen::Settings);
-    p.handle(Action::Tick, at(3000 + Presenter::settings_plate_ms));                                // after the last page: Face
+    // G25: then page 3, ROUTER CHANGES, saved as it is; after the last page: Face.
+    p.handle(Action::Tick, at(3000 + Presenter::settings_plate_ms));
+    CHECK_EQ(p.screen(), Screen::Settings); CHECK(p.settings().page == SettingsPage::Router); CHECK_EQ(unsigned(p.settings().number), 3u);
+    CHECK_EQ(unsigned(p.lit_brightness_pct()), 30u);
+    p.handle(Action::SecondaryLong, at(5000)); CHECK(p.take_settings_save() == choice(GuardCycle::EveryMinute, 30)); p.settings_saved(true);
+    p.handle(Action::Tick, at(5000 + Presenter::settings_plate_ms));
     CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.settings().open); CHECK(p.device() == choice(GuardCycle::EveryMinute, 30));
     CHECK_EQ(unsigned(p.lit_brightness_pct()), 30u);
 }
@@ -893,37 +901,37 @@ GUARDIAN_CASE(g24_hold_front_saves_this_page_shows_saved_then_next_page_then_fac
 GUARDIAN_CASE(g24_a_failed_save_shows_save_failed_keeps_the_value_and_stays) {
     Presenter p(display()); p.update(fresh(), at(1000));
     open_settings(p, at(1000));
-    p.handle(Action::Primary, at(1000));                                                             // EVERY 30 S
-    p.handle(Action::PrimaryLong, at(1000)); CHECK(p.take_settings_save() == choice(GuardCycle::Every30s, 60));
+    p.handle(Action::Secondary, at(1000));                                                           // EVERY 30 S
+    p.handle(Action::SecondaryLong, at(1000)); CHECK(p.take_settings_save() == choice(GuardCycle::Every30s, 60));
     p.settings_saved(false);
     CHECK(p.settings().plate == SavePlate::Failed); CHECK(p.device() == DeviceChoices{});
     p.handle(Action::Tick, at(1000 + Presenter::settings_plate_ms));
     CHECK_EQ(p.screen(), Screen::Settings); CHECK(p.settings().page == SettingsPage::Guard); CHECK(p.settings().plate == SavePlate::None);
     CHECK(p.settings().shown.guard == GuardCycle::Every30s);                                       // the draft stays: try again
     // Without a report no plate shows; a second hold does not stack a second request.
-    p.handle(Action::PrimaryLong, at(2500)); CHECK(p.has_settings_save());
-    p.handle(Action::PrimaryLong, at(2500)); p.take_settings_save(); CHECK(!p.has_settings_save());
+    p.handle(Action::SecondaryLong, at(2500)); CHECK(p.has_settings_save());
+    p.handle(Action::SecondaryLong, at(2500)); p.take_settings_save(); CHECK(!p.has_settings_save());
     CHECK(p.settings().plate == SavePlate::None);
     p.settings_saved(false); CHECK(p.settings().plate == SavePlate::Failed); CHECK(p.device() == DeviceChoices{});
     // A report with nothing taken changes nothing.
     Presenter q(display()); q.update(fresh(), at(1000)); q.settings_saved(true);
     CHECK(q.settings().plate == SavePlate::None); CHECK(q.device() == DeviceChoices{}); CHECK_EQ(q.screen(), Screen::Face);
-    open_settings(q, at(1000)); q.handle(Action::Primary, at(1000)); q.settings_saved(true);
+    open_settings(q, at(1000)); q.handle(Action::Secondary, at(1000)); q.settings_saved(true);
     CHECK(q.settings().plate == SavePlate::None); CHECK(q.device() == DeviceChoices{});
 }
 
-GUARDIAN_CASE(g24_the_brightness_preview_ends_when_leaving_and_the_side_leaves_during_a_plate) {
+GUARDIAN_CASE(g24_the_brightness_preview_ends_when_leaving_and_blue_leaves_during_a_plate) {
     Presenter p(display()); p.update(fresh(), at(1000)); p.set_device(choice(GuardCycle::Always, 60));
     open_settings(p, at(1000));
-    p.handle(Action::PrimaryLong, at(1000)); p.take_settings_save(); p.settings_saved(true);       // guard saved as it was
+    p.handle(Action::SecondaryLong, at(1000)); p.take_settings_save(); p.settings_saved(true);     // guard saved as it was
     p.handle(Action::Tick, at(1000 + Presenter::settings_plate_ms));
-    p.handle(Action::Primary, at(2500)); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);           // previewed
-    p.handle(Action::Secondary, at(2500)); CHECK_EQ(p.screen(), Screen::Face);
+    p.handle(Action::Secondary, at(2500)); CHECK_EQ(unsigned(p.lit_brightness_pct()), 80u);         // previewed
+    p.handle(Action::Primary, at(2500)); CHECK_EQ(p.screen(), Screen::Face);
     CHECK_EQ(unsigned(p.lit_brightness_pct()), 60u);                                                // back to the value in effect
-    // SIDE during a SAVED plate leaves at once (the save already happened).
-    open_settings(p, at(3000)); p.handle(Action::Primary, at(3000));
-    p.handle(Action::PrimaryLong, at(3000)); p.take_settings_save(); p.settings_saved(true);
-    p.handle(Action::Secondary, at(3100)); CHECK_EQ(p.screen(), Screen::Face); CHECK(p.device().guard == GuardCycle::Every30s);
+    // BLUE during a SAVED plate leaves at once (the save already happened).
+    open_settings(p, at(3000)); p.handle(Action::Secondary, at(3000));
+    p.handle(Action::SecondaryLong, at(3000)); p.take_settings_save(); p.settings_saved(true);
+    p.handle(Action::Primary, at(3100)); CHECK_EQ(p.screen(), Screen::Face); CHECK(p.device().guard == GuardCycle::Every30s);
     CHECK(p.settings().plate == SavePlate::None);
 }
 
@@ -933,7 +941,7 @@ GUARDIAN_CASE(g24_alert_first_a_new_red_alert_returns_to_the_face_amber_does_not
         Presenter p(display()); p.update(fresh(), at(1000));
         if (where == 0) { p.handle(Action::Primary, at(1000)); p.handle(Action::Primary, at(1000)); CHECK_EQ(p.screen(), Screen::Details); }
         if (where == 1) { p.handle(Action::SecondaryLong, at(1000)); CHECK_EQ(p.screen(), Screen::Picker); }
-        if (where == 2) { open_settings(p, at(1000)); p.handle(Action::Primary, at(1000)); CHECK_EQ(p.screen(), Screen::Settings); }
+        if (where == 2) { open_settings(p, at(1000)); p.handle(Action::Secondary, at(1000)); CHECK_EQ(p.screen(), Screen::Settings); }
         p.update(red_alert(1500), at(1500));
         CHECK(p.view().alert); CHECK_EQ(p.screen(), Screen::Face); CHECK_EQ(p.view().screen, Screen::Face);
         CHECK(!p.settings().open); CHECK(!p.has_settings_save()); CHECK(p.device() == DeviceChoices{});   // the draft is dropped, nothing saved
@@ -955,4 +963,219 @@ GUARDIAN_CASE(g24_alert_first_a_new_red_alert_returns_to_the_face_amber_does_not
     // Idle on the face: an alert keeps the face (nothing else changes).
     Presenter f(display()); f.update(fresh(), at(1000)); f.update(red_alert(1500), at(1500));
     CHECK_EQ(f.screen(), Screen::Face); CHECK(f.view().alert);
+}
+
+// ---- G25: router changes coloured by the ROUTER CHANGES setting, accepted on the Details page, and the
+// Settings keys with SIDE (TDD, red first) ----
+namespace {
+SettingsFingerprint fp_wpa3() {
+    SettingsFingerprint f{}; f.privacy_bit = true; f.rsn_state = ElementState::Valid; f.rsn_akms = akm::Sae;
+    f.rsn_pairwise = cipher::Ccmp128; f.rsn_group = cipher::Ccmp128; f.rsn_group_management = cipher::BipCmac128; f.pmf = Pmf::Required;
+    return f;
+}
+SettingsFingerprint fp_wpa2() { auto f = fp_wpa3(); f.rsn_akms = akm::Psk; f.pmf = Pmf::Optional; return f; }
+RouterState router_change(Millis first, std::uint32_t seq = 1) {
+    RouterState r{}; auto& c = r.change;
+    c.pending = true; c.bssid = home().bssid; c.changes = change::Rsn | change::Pmf;
+    c.from = fp_wpa3(); c.to = fp_wpa2(); c.downgrade = security_downgrade(c.from, c.to);
+    c.first = at(first); c.last = at(first); c.count = 2; r.pending = 1; r.change_seq = seq;
+    return r;
+}
+RouterState moved(std::uint32_t moves, std::uint8_t from = 6, std::uint8_t to = 11) {
+    RouterState r{}; r.moves = moves; r.last_move.known = moves > 0; r.last_move.bssid = home().bssid;
+    r.last_move.from = from; r.last_move.to = to; r.last_move.at = at(); return r;
+}
+DeviceChoices policy(RouterPolicy rp) { DeviceChoices c; c.router = rp; return c; }
+std::string sentence(const ViewModel& v, RouterWording w) { char t[160]; router_sentence(v.router, w, t, sizeof t); return t; }
+} // namespace
+
+GUARDIAN_CASE(g25_device_choices_router_default_amber_and_validity) {
+    CHECK(DeviceChoices{}.router == RouterPolicy::Amber);
+    CHECK(DeviceChoices{}.valid());
+    DeviceChoices bad; bad.router = static_cast<RouterPolicy>(7); CHECK(!bad.valid());
+    Presenter p(display()); p.update(fresh(), at());
+    CHECK(!p.set_device(bad)); CHECK(p.device() == DeviceChoices{});
+    CHECK(p.set_device(policy(RouterPolicy::Strict))); CHECK(p.device().router == RouterPolicy::Strict);
+    CHECK(!(policy(RouterPolicy::Strict) == DeviceChoices{}));
+    CHECK_EQ(std::string(router_policy_text(RouterPolicy::DetailsOnly)), "details");
+    CHECK_EQ(std::string(router_policy_text(RouterPolicy::Amber)), "amber");
+    CHECK_EQ(std::string(router_policy_text(RouterPolicy::Strict)), "strict");
+    CHECK_EQ(unsigned(settings_pages), 3u);
+}
+
+GUARDIAN_CASE(g25_a_router_security_change_is_amber_by_default_never_red_and_lights_the_dark_screen_once) {
+    Presenter p(display());
+    const auto rc = router_change(900);
+    p.update(fresh(), at(1000), nullptr, &rc);
+    const auto& v = p.view();
+    CHECK(!v.alert); CHECK(!v.router_alert); CHECK(v.router_amber);
+    CHECK(v.router.change.pending); CHECK(v.router.change_tone == Tone::Amber); CHECK(v.router.page);
+    CHECK(v.router.policy == RouterPolicy::Amber);
+    CHECK(!v.celebrate); CHECK_EQ(v.face, Mood::VeryGood);                 // the rating stays; no celebration
+    CHECK_EQ(v.incident_seq, 1u);                                          // a new amber lights a dark screen
+    p.update(fresh(), at(2000), nullptr, &rc); CHECK_EQ(p.view().incident_seq, 1u);   // the same change: once
+    const auto grown = router_change(900, 2);
+    p.update(fresh(), at(3000), nullptr, &grown); CHECK_EQ(p.view().incident_seq, 2u);
+    // It stays (no expiry) until accepted: two minutes later still amber.
+    p.update(fresh(), at(125000), nullptr, &grown); CHECK(p.view().router_amber);
+    // Plain words, old -> new, and the downgrade.
+    CHECK_EQ(sentence(p.view(), RouterWording::Full),
+             "Your router changed its security settings: mode (WPA3 -> WPA2), PMF (required -> optional), a downgrade");
+    CHECK_EQ(sentence(p.view(), RouterWording::Short), "Router changed security: mode, PMF, a downgrade");
+    CHECK_EQ(sentence(p.view(), RouterWording::Minimal), "Router changed its security settings");
+    // An upgrade says no "downgrade"; a cipher change names the cipher; finer fields only: "other options".
+    RouterState up = rc; std::swap(up.change.from, up.change.to); up.change.downgrade = security_downgrade(up.change.from, up.change.to);
+    Presenter u(display()); u.update(fresh(), at(1000), nullptr, &up);
+    CHECK_EQ(sentence(u.view(), RouterWording::Full),
+             "Your router changed its security settings: mode (WPA2 -> WPA3), PMF (optional -> required)");
+    RouterState tk = rc; tk.change.to = fp_wpa3(); tk.change.to.rsn_pairwise = cipher::Tkip; tk.change.changes = change::Rsn;
+    tk.change.downgrade = security_downgrade(tk.change.from, tk.change.to);
+    Presenter t(display()); t.update(fresh(), at(1000), nullptr, &tk);
+    CHECK_EQ(sentence(t.view(), RouterWording::Full), "Your router changed its security settings: cipher (CCMP -> TKIP), a downgrade");
+    RouterState fine = rc; fine.change.to = fp_wpa3(); fine.change.to.rsn_group_management = cipher::BipGmac256; fine.change.changes = change::Rsn;
+    fine.change.downgrade = false;
+    Presenter f(display()); f.update(fresh(), at(1000), nullptr, &fine);
+    CHECK_EQ(sentence(f.view(), RouterWording::Full), "Your router changed its security settings: other options");
+    RouterState op = rc; op.change.to = SettingsFingerprint{}; op.change.changes = change::Privacy | change::Rsn | change::Pmf;
+    op.change.downgrade = security_downgrade(op.change.from, op.change.to);
+    Presenter o(display()); o.update(fresh(), at(1000), nullptr, &op);
+    CHECK_EQ(sentence(o.view(), RouterWording::Full),
+             "Your router changed its security settings: mode (WPA3 -> open), cipher (CCMP -> none), PMF (required -> off), a downgrade");
+    // Nothing pending: nothing to say.
+    Presenter n(display()); n.update(fresh(), at(1000));
+    char none[8]{'#'}; CHECK_EQ(router_sentence(n.view().router, RouterWording::Full, none, sizeof none), 0u); CHECK_EQ(none[0], '\0');
+    CHECK(!n.view().router_amber); CHECK(!n.view().router.page);
+}
+
+GUARDIAN_CASE(g25_the_router_page_is_first_and_hold_side_there_accepts_the_new_settings) {
+    Presenter p(display());
+    const auto rc = router_change(900);
+    p.update(fresh(), at(1000), nullptr, &rc);
+    CHECK(p.handle(Action::Primary, at(1000))); CHECK_EQ(p.screen(), Screen::Details);
+    CHECK_EQ(p.details().page, DetailsPage::Router);
+    CHECK_EQ(std::string(p.details().title), "Your router changed");
+    // BLUE goes on to the usual pages.
+    p.handle(Action::Primary, at(1000)); CHECK_EQ(p.details().page, DetailsPage::Settings);
+    // Hold SIDE on another details page still opens the network list.
+    CHECK(p.handle(Action::SecondaryLong, at(1000))); CHECK_EQ(p.screen(), Screen::Picker); CHECK(!p.has_request());
+    p.handle(Action::Back, at(1000));
+    // On the Router page hold SIDE = accept the new settings: one owner request, then the face.
+    p.handle(Action::Primary, at(1000)); CHECK_EQ(p.details().page, DetailsPage::Router);
+    CHECK(p.handle(Action::SecondaryLong, at(1100)));
+    CHECK(p.has_request()); CHECK_EQ(p.screen(), Screen::Face);
+    const auto r = p.take_request();
+    CHECK(r.kind == RequestKind::AcceptChange); CHECK_EQ(r.ap.network.bssid, home().bssid);
+    // The application re-baselined: the detector has nothing pending any more, the amber ends.
+    RouterState after = rc; after.change = RouterChange{}; after.pending = 0;
+    p.update(fresh(), at(1200), nullptr, &after);
+    CHECK(!p.view().router_amber); CHECK(!p.view().router.page);
+    p.handle(Action::Primary, at(1200)); CHECK_EQ(p.details().page, DetailsPage::Settings);   // no Router page now
+    // SIDE on the Router page goes back like every page; a pending request blocks a second accept.
+    Presenter q(display()); q.update(fresh(), at(1000), nullptr, &rc); q.handle(Action::Primary, at(1000));
+    q.handle(Action::Secondary, at(1000)); CHECK_EQ(q.screen(), Screen::Face); CHECK(!q.has_request());
+    // The Router page open while the change disappears (another pick reset the detector): the usual first page.
+    Presenter w(display()); w.update(fresh(), at(1000), nullptr, &rc); w.handle(Action::Primary, at(1000));
+    w.update(fresh(), at(1100), nullptr, &after); CHECK_EQ(w.screen(), Screen::Details); CHECK_EQ(w.details().page, DetailsPage::Settings);
+    // DEMO never offers the page and never asks.
+    Presenter d(display()); d.update(fresh(), at(1000), nullptr, &rc); CHECK(d.set_demo(true));
+    d.handle(Action::Primary, at(1000)); CHECK(d.details().page != DetailsPage::Router);
+}
+
+GUARDIAN_CASE(g25_strict_makes_a_security_change_red_details_only_gives_it_no_colour) {
+    const auto rc = router_change(900);
+    Presenter s(display()); s.set_device(policy(RouterPolicy::Strict)); s.update(fresh(), at(1000));
+    s.handle(Action::Primary, at(1000)); CHECK_EQ(s.screen(), Screen::Details);
+    s.update(fresh(), at(1100), nullptr, &rc);
+    CHECK(s.view().alert); CHECK(s.view().router_alert); CHECK(!s.view().router_amber);
+    CHECK(s.view().router.change_tone == Tone::Red);
+    CHECK_EQ(s.screen(), Screen::Face);                          // alert-first, as every new red ALERT
+    CHECK(!s.view().celebrate); CHECK_EQ(s.view().incident_seq, 1u);
+    char text[96]; CHECK(alert_sentence(s.view(), text, sizeof text) > 0);
+    CHECK_EQ(std::string(text), "Router changed security: mode, PMF, a downgrade");
+    CHECK(std::strlen(s.view().alert_reason) > 0);
+    // DETAILS ONLY: recorded on the Details page, no colour, never lights a dark screen.
+    Presenter d(display()); d.set_device(policy(RouterPolicy::DetailsOnly)); d.update(fresh(), at(1000), nullptr, &rc);
+    CHECK(!d.view().alert); CHECK(!d.view().router_amber); CHECK(d.view().router.change_tone == Tone::Grey);
+    CHECK(d.view().router.page); CHECK_EQ(d.view().incident_seq, 0u); CHECK(d.view().celebrate);
+    d.handle(Action::Primary, at(1000)); CHECK_EQ(d.details().page, DetailsPage::Router);
+    d.handle(Action::SecondaryLong, at(1000)); CHECK(d.take_request().kind == RequestKind::AcceptChange);
+    // The setting applies at once to a change already pending.
+    Presenter a(display()); a.update(fresh(), at(1000), nullptr, &rc); CHECK(a.view().router_amber);
+    a.set_device(policy(RouterPolicy::DetailsOnly)); CHECK(!a.view().router_amber);
+    a.set_device(policy(RouterPolicy::Strict)); CHECK(a.view().alert); CHECK(a.view().router_alert);
+}
+
+GUARDIAN_CASE(g25_channel_moves_are_one_grey_line_strict_makes_them_amber_until_acknowledged) {
+    // AMBER (default): grey, no page, no wake.
+    Presenter p(display()); const auto one = moved(1);
+    p.update(fresh(), at(1000), nullptr, &one);
+    CHECK(!p.view().router_amber); CHECK(!p.view().alert); CHECK(!p.view().router.page);
+    CHECK(p.view().router.move_tone == Tone::Grey); CHECK_EQ(p.view().incident_seq, 0u); CHECK(p.view().celebrate);
+    char line[48]; CHECK(move_line(p.view().router, line, sizeof line) > 0); CHECK_EQ(std::string(line), "Router moved ch 6->11");
+    const auto three = moved(3, 11, 1); p.update(fresh(), at(2000), nullptr, &three);
+    move_line(p.view().router, line, sizeof line); CHECK_EQ(std::string(line), "Router moved 3x, 11->1");
+    Presenter none(display()); none.update(fresh(), at(1000));
+    CHECK_EQ(move_line(none.view().router, line, sizeof line), 0u); CHECK_EQ(line[0], '\0');
+    // Moves seen before STRICT was chosen are not turned amber afterwards.
+    p.set_device(policy(RouterPolicy::Strict)); CHECK(!p.view().router_amber);
+    // STRICT: a new move is amber until the owner acknowledges it on the Router page.
+    const auto four = moved(4, 1, 6); p.update(fresh(), at(3000), nullptr, &four);
+    CHECK(p.view().router_amber); CHECK(!p.view().alert); CHECK(p.view().router.move_unacked);
+    CHECK(p.view().router.move_tone == Tone::Amber); CHECK(p.view().router.page); CHECK_EQ(p.view().incident_seq, 1u);
+    CHECK_EQ(sentence(p.view(), RouterWording::Full), "Your router moved to channel 6 (from 1)");
+    CHECK_EQ(sentence(p.view(), RouterWording::Short), "Router moved to ch 6");
+    p.handle(Action::Primary, at(3000)); CHECK_EQ(p.details().page, DetailsPage::Router);
+    CHECK(p.handle(Action::SecondaryLong, at(3000))); CHECK(!p.has_request());   // nothing for the application to do
+    CHECK_EQ(p.screen(), Screen::Face); CHECK(!p.view().router_amber); CHECK(!p.view().router.page);
+    p.update(fresh(), at(4000), nullptr, &four); CHECK(!p.view().router_amber);  // acknowledged stays acknowledged
+}
+
+GUARDIAN_CASE(g25_red_stays_for_disconnect_bursts_and_another_bssid_using_the_name) {
+    const auto rc = router_change(900);
+    for (const auto kind : {IncidentKind::DisconnectBurst, IncidentKind::UnexpectedAp}) {
+        Presenter p(display());
+        auto s = fresh(); const auto k = static_cast<std::size_t>(kind);
+        s.incidents[k] = true; s.evidence[k].acquired = at(1000); s.evidence[k].count = 24; s.evidence[k].kind = kind; s.incident_seq = 1;
+        p.update(s, at(1000), nullptr, &rc);
+        CHECK(p.view().alert); CHECK(!p.view().router_alert); CHECK(!p.view().router_amber);   // red owns the face
+        CHECK_EQ(p.view().incident.kind, kind);
+        CHECK_EQ(std::string(p.view().alert_reason), std::string(alert_text(kind)));
+        CHECK(p.view().router.change_tone == Tone::Amber);   // still recorded, back to amber once the red ends
+        p.handle(Action::Tick, at(1000 + Core::incident_ms)); CHECK(!p.view().alert); CHECK(p.view().router_amber);
+    }
+    // In STRICT the Core incident keeps the words of the ALERT.
+    Presenter q(display()); q.set_device(policy(RouterPolicy::Strict));
+    auto s = fresh(); s.incidents[0] = true; s.evidence[0].acquired = at(1000); s.evidence[0].count = 24; s.incident_seq = 1;
+    q.update(s, at(1000), nullptr, &rc); CHECK(q.view().alert); CHECK(!q.view().router_alert);
+    CHECK_EQ(std::string(q.view().alert_reason), "Disconnect burst detected");
+}
+
+GUARDIAN_CASE(g25_settings_keys_side_next_hold_side_save_blue_back_on_every_page) {
+    Presenter p(display()); p.update(fresh(), at(1000));
+    open_settings(p, at(1000)); CHECK_EQ(p.screen(), Screen::Settings);
+    Millis t = 1000;
+    for (const auto page : {SettingsPage::Guard, SettingsPage::Brightness, SettingsPage::Router}) {
+        CHECK(p.settings().page == page);
+        // BLUE leaves without saving (from every page), then reopen and walk back to this page.
+        const auto before = p.device();
+        p.handle(Action::Secondary, at(t)); CHECK(!(p.settings().shown == before));   // SIDE = next value
+        Presenter q = p; q.handle(Action::Primary, at(t)); CHECK_EQ(q.screen(), Screen::Face); CHECK(!q.has_settings_save());
+        CHECK(q.device() == before);
+        Presenter h = p; h.handle(Action::PrimaryLong, at(t)); CHECK_EQ(h.screen(), Screen::Face); CHECK(!h.has_settings_save());
+        // hold SIDE = save this page.
+        CHECK(p.handle(Action::SecondaryLong, at(t))); CHECK(p.has_settings_save());
+        p.take_settings_save(); p.settings_saved(true); CHECK(p.settings().plate == SavePlate::Saved);
+        t += Presenter::settings_plate_ms; p.handle(Action::Tick, at(t));
+    }
+    CHECK_EQ(p.screen(), Screen::Face);   // after the last page
+    CHECK(p.device().guard == GuardCycle::Every30s); CHECK_EQ(unsigned(p.device().bright_pct), 80u);
+    CHECK(p.device().router == RouterPolicy::Strict);   // AMBER -> STRICT
+    // ROUTER CHANGES cycles DETAILS ONLY / AMBER / STRICT and wraps.
+    open_settings(p, at(t));
+    for (int i = 0; i < 2; ++i) { p.handle(Action::SecondaryLong, at(t)); p.take_settings_save(); p.settings_saved(true); t += Presenter::settings_plate_ms; p.handle(Action::Tick, at(t)); }
+    CHECK(p.settings().page == SettingsPage::Router); CHECK(p.settings().shown.router == RouterPolicy::Strict);
+    p.handle(Action::Secondary, at(t)); CHECK(p.settings().shown.router == RouterPolicy::DetailsOnly);
+    p.handle(Action::Secondary, at(t)); CHECK(p.settings().shown.router == RouterPolicy::Amber);
+    p.handle(Action::Secondary, at(t)); CHECK(p.settings().shown.router == RouterPolicy::Strict);
+    CHECK(p.device().router == RouterPolicy::Strict);   // a draft only until saved
 }

@@ -195,6 +195,7 @@ StoreState Companion::boot() {
     if (store_ == StoreState::Restored && presenter_.impostor_watch() && !monitor_.scope().selected().watch_impostors
         && monitor_.set_watch(true) && !store_ref_.save(persist(monitor_.scope()))) store_ = StoreState::SaveFailed;
     if (settings_) presenter_.set_device(settings_->load());   // G24: corrupt or absent = the defaults (said in STATUS)
+    saved_revision_ = monitor_.scope_revision();                // G25: what boot restored is what is stored
     tick();
     return store_;
 }
@@ -212,7 +213,10 @@ bool Companion::receive(const measurement::Packet& packet) {
 }
 
 void Companion::tick() {
-    presenter_.update(monitor_.snapshot(), now(), &monitor_.scope());
+    // G25: the Monitor re-baselined a channel move (or an accept) without an owner request: store the scope.
+    if (monitor_.scope_revision() != saved_revision_) save();
+    const RouterState router = monitor_.router();
+    presenter_.update(monitor_.snapshot(), now(), &monitor_.scope(), &router);
     for (std::size_t i = 0; i < pending_count_; ++i) presenter_.offer(pending_[i]);
     pending_count_ = 0;
 }
@@ -255,6 +259,7 @@ void Companion::apply(const OwnerRequest& r) {
     case RequestKind::Select: ok = monitor_.select(r.ap); break;
     case RequestKind::Approve: ok = monitor_.approve(r.ap); break;
     case RequestKind::Revoke: ok = monitor_.revoke(r.ap.network.bssid); break;
+    case RequestKind::AcceptChange: ok = monitor_.accept_router_change(r.ap.network.bssid); break;   // G25
     case RequestKind::None: return;
     }
     if (ok) save();
@@ -268,6 +273,7 @@ void Companion::set_impostor_watch(bool on) {
 
 void Companion::save() {
     store_ = store_ref_.save(persist(monitor_.scope())) ? StoreState::Saved : StoreState::SaveFailed;
+    saved_revision_ = monitor_.scope_revision();   // G25: a failed write is shown (StoreState), not retried every tick
 }
 
 } // namespace guardian::companion

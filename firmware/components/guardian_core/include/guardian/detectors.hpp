@@ -335,8 +335,74 @@ struct BaselineStats {
     std::uint32_t same_name_unwatched{};// same SSID from another BSSID while the selection is not watched: ignored
     std::uint32_t neighbours{};         // other SSIDs or hidden SSIDs from unapproved BSSIDs: ignored
     std::uint32_t evicted_in_window{};
-    std::uint32_t reports{};
+    std::uint32_t reports{};            // UnexpectedAp reports + router security changes confirmed (G25)
     std::uint32_t suppressed_by_cooldown{};
+    std::uint32_t channel_moves{};      // G25: an approved AP's channel re-baselined (no incident)
+};
+
+// ---- G25: the owner's router changing its own settings ---------------------------------------
+// Owner 2026-11-21/23 ("IMMENSE BUG"): a router that moves channel or changes its own security
+// settings is not an attack. The baseline detector therefore never reports SettingsChanged to Core
+// (no red ALERT, no incident_seq); it keeps these facts instead, and the presenter colours them by
+// the owner's ROUTER CHANGES setting (presenter.hpp RouterPolicy). Red stays for disconnect bursts,
+// another BSSID using the network's name (UnexpectedAp) and the network-scope patterns.
+
+// The weakest-advertised summary of one fingerprint: the G05 reduction (rating.cpp assess) applied to
+// the fingerprint's Valid fields. Unknown where the fingerprint cannot say.
+struct SecuritySummary {
+    Mode mode{Mode::Unknown};
+    Cipher pairwise{Cipher::Unknown};
+    Pmf pmf{Pmf::Unknown};
+};
+SecuritySummary summarize(const SettingsFingerprint&);
+// True when `to` advertises weaker security than `from`: WPA3 -> WPA2/WPA3 -> WPA2 -> WPA -> WEP
+// (a lower mode), PMF required -> optional / off, a weaker pairwise cipher (GCMP/CCMP -> TKIP -> WEP),
+// or anything -> open. Modes outside that order (OWE, Enterprise, Unknown) count only when the new
+// mode is open.
+bool security_downgrade(const SettingsFingerprint& from, const SettingsFingerprint& to);
+
+// One approved AP whose advertised security differs from its approved baseline, confirmed by
+// change_threshold differing advertisements inside window_ms. It stays pending until the owner
+// accepts it (Monitor::accept_router_change re-baselines) or the scope is reset; the router
+// reverting does not clear it.
+struct RouterChange {
+    bool pending{};
+    Mac bssid{};
+    std::uint8_t changes{};           // change:: security bits (Privacy, Wpa, Rsn, Pmf, OweTransition), union while pending
+    SettingsFingerprint from{};       // the approved baseline
+    SettingsFingerprint to{};         // the newest differing advertisement
+    bool downgrade{};                 // security_downgrade(from, to)
+    Instant first{};                  // the advertisement that confirmed it
+    Instant last{};                   // the newest differing advertisement
+    std::uint32_t count{};            // differing advertisements counted for it (threshold included)
+};
+// An approved AP's DS channel moved and was re-baselined after change_threshold advertisements on the
+// new channel inside window_ms (an advertisement on the baseline channel in between restarts the count).
+struct ChannelMove {
+    bool known{};
+    Mac bssid{};
+    Band band{Band::Ghz2_4};          // the new band
+    std::uint8_t from{};
+    std::uint8_t to{};
+    Instant at{};
+};
+// What the presenter reads (Monitor::router()). change = the newest pending change.
+struct RouterState {
+    RouterChange change{};
+    std::uint8_t pending{};           // approved APs with a pending change
+    std::uint32_t change_seq{};       // changes confirmed or grown since reset (only goes up)
+    std::uint32_t moves{};            // channel moves since reset
+    ChannelMove last_move{};
+};
+// The last thing the baseline detector reported or recorded (STATUS baseline_last=): an UnexpectedAp
+// report (changes has Bssid; count = distinct BSSIDs), a router security change (count = differing
+// advertisements so far) or a channel move (changes = Channel; count = advertisements on the new channel).
+struct BaselineLast {
+    bool known{};
+    Mac bssid{};
+    std::uint8_t changes{};
+    std::uint32_t count{};
+    Instant at{};
 };
 
 // Baseline-change detector. Compares Complete, receive-verified advertisements
@@ -346,9 +412,9 @@ struct BaselineStats {
 //                   neither selected nor approved (count = distinct BSSIDs;
 //                   changes = Bssid, plus Channel/settings bits when the
 //                   selected AP has an approved channel/settings to compare)
-//   SettingsChanged the selected or an approved AP advertising a fingerprint
-//                   or DS channel different from its approved baseline
-//                   (changes names the fields)
+//   (G25: no longer reported) the selected or an approved AP advertising other
+//                   security settings: a pending RouterChange (router()); a different
+//                   DS channel: a ChannelMove, re-baselined, never an incident
 // Approved mesh/extender APs with the same SSID are in scope and compared
 // against their own baseline like the selected AP; they never raise
 // UnexpectedAp. Hidden-SSID advertisements from unknown BSSIDs are ignored:
@@ -370,6 +436,17 @@ public:
 
     const BaselineStats& stats() const { return stats_; }
 
+    // G25. router(): the pending changes and channel moves at `now` (from = the scope's baseline).
+    RouterState router() const;
+    // A channel move not yet applied to the scope; the scope's owner re-baselines it (Monitor). The
+    // detector already compares that AP with the new channel. False when none is waiting.
+    bool take_move(ChannelMove& out);
+    // The owner accepted the pending change of `bssid`: it ends (no re-report while the router keeps
+    // advertising the same settings) and `seen` is that AP's newest advertised fingerprint, the new
+    // baseline the scope's owner stores. False when nothing is pending for it.
+    bool accept(const Mac& bssid, SettingsFingerprint& seen);
+    const BaselineLast& last() const { return last_; }
+
 private:
     struct Entry {
         Millis at{};
@@ -380,6 +457,8 @@ private:
     bool adopt_epoch(const Instant& at);
     void push(const Entry& e);
     void prune(Millis anchor);
+    // UnexpectedAp: report after change_threshold within window_ms (scope-wide cooldown). G25: a security
+    // difference of an approved AP confirms or grows its RouterChange instead (never an incident).
     void maybe_report(bool unexpected, Millis anchor, Millis acquired, const Mac& trigger, Origin origin, ObservationSink& out);
 
     const ApprovedScope& scope_;
@@ -395,8 +474,44 @@ private:
     std::size_t head_{};
     std::size_t size_{};
     Millis saturated_until_{};
-    std::array<bool, ApprovedScope::capacity + 2> reported_{};
-    std::array<Millis, ApprovedScope::capacity + 2> last_report_{};
+    bool unexpected_reported_{};    // UnexpectedAp cooldown (scope-wide)
+    Millis unexpected_last_{};
+    // G25: per approved AP (selected + capacity approved), keyed by BSSID.
+    struct Track {
+        bool used{};
+        Mac bssid{};
+        bool seen_known{};
+        SettingsFingerprint seen{};   // newest Complete, verified advertisement
+        bool scope_channel_known{};   // the scope's channel facts when last read: a change there re-reads them
+        Band scope_band{Band::Ghz2_4};
+        std::uint8_t scope_channel{};
+        bool channel_known{};         // the channel compared with: the scope's, or the one moved to
+        Band band{Band::Ghz2_4};
+        std::uint8_t channel{};
+        Band cand_band{Band::Ghz2_4}; // a move being confirmed
+        std::uint8_t cand_channel{};
+        std::uint8_t cand_hits{};
+        Millis cand_first{};
+        bool pending{};
+        bool downgrade{};
+        std::uint8_t changes{};
+        SettingsFingerprint to{};
+        Millis first{}, last{};
+        std::uint32_t count{};
+        bool accepted_known{};        // accepted by the owner, not yet in the scope: compared with instead
+        SettingsFingerprint accepted{};
+    };
+    static const SettingsFingerprint& baseline_of(const Track* t, const ApprovedAp& ap) {
+        return t && t->accepted_known ? t->accepted : ap.settings;
+    }
+    Track* track(const ApprovedAp& ap);
+    void confirm(Track& t, std::uint8_t changes, std::uint32_t raw, Millis at);
+    std::array<Track, ApprovedScope::capacity + 1> tracks_{};
+    std::uint32_t change_seq_{};
+    std::uint32_t moves_{};
+    ChannelMove last_move_{};
+    bool move_waiting_{};
+    BaselineLast last_{};
     BaselineStats stats_{};
     std::uint32_t frames_seen_{};   // G16E report
     std::uint32_t events_{};        // differing / unexpected advertisements counted

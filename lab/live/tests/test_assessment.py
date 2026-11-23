@@ -36,17 +36,21 @@ class AssessmentTests(unittest.TestCase):
   s += [dict(x,now_ms=x['now_ms']+20000,mode=4,pmf=2) for x in quiet_states()]
   e={'role':'test_ap','completed_groups':0,'stop_requested':True}
   self.assertTrue(self.check('settings',s,emitter=e,ap_stopped=True)['pass']);self.assertFalse(self.check('settings',s,emitter=e)['pass'])
+  red=[dict(x,alert=True) if x.get('settings_changed') else x for x in s]   # G25: a security change is amber, never the red ALERT
+  self.assertFalse(self.check('settings',red,emitter=e,ap_stopped=True)['pass'])
   for x in s:x['mode']=4
   self.assertFalse(self.check('settings',s,emitter=e,ap_stopped=True)['pass'])
  def test_channel_change_requires_full_sequence_gap_and_stopped_ap(self):
   states=[dict(x,channel=13) for x in quiet_states()]
   states += [dict(quiet_states()[0],now_ms=10000,coverage=3,mood=0)]
-  states += [dict(x,now_ms=x['now_ms']+15000,channel=6,settings_changed=True,incident_visible=True) for x in quiet_states()]
+  states += [dict(x,now_ms=x['now_ms']+15000,channel=6) for x in quiet_states()]   # G25: followed silently, no incident
   states += [dict(quiet_states()[0],now_ms=30000,coverage=3,mood=0)]
   states += [dict(x,now_ms=x['now_ms']+35000,channel=13) for x in quiet_states()]
   emitter={'role':'test_ap','completed_groups':0}
   self.assertTrue(self.check('channel',states,emitter=emitter,ap_stopped=True)['pass'])
   self.assertFalse(self.check('channel',states,emitter=emitter)['pass'])
+  flagged=[dict(x,settings_changed=True) if x.get('channel')==6 else x for x in states]
+  self.assertFalse(self.check('channel',flagged,emitter=emitter,ap_stopped=True)['pass'])   # a channel move must not be an incident
   no_gap=[s for s in states if s['coverage']==1]
   self.assertFalse(self.check('channel',no_gap,emitter=emitter,ap_stopped=True)['pass'])
   startup_only=[dict(quiet_states()[0],now_ms=0,coverage=3,mood=0)]+no_gap

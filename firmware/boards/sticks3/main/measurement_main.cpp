@@ -172,7 +172,7 @@ struct TextBuffers {
     char wire_line[grx::max_packet*2+7];
     char state_line[8192];      // G16F: 14 detector records in the G13 JSON
     char snapshot_line[8256];   // one USB write keeps state prefix/body together
-    char status_line[8120];     // G24: + settings= / guard_cycle= / parts= (272); G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
+    char status_line[8152];     // G25: the g24 fragment 272 -> 304 (settings= router:); the baseline_last= / channel_moves= tokens ride in `detect`; G24: + settings= / guard_cycle= / parts= (272); G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
     char detect[2048];          // G16E/G16F: per-detector counters (14), air meter, area observations
     char bursts[measurement::Monitor::burst_text_max];   // G16S: last_burst_network= / last_burst_area= (its own buffer: never lost with `detect`)
     char frames_reply[1024];
@@ -772,7 +772,7 @@ void companion_status() {
         std::snprintf(energy,sizeof energy," ota_auto_batt_s=%d poll_s=%u cpu_mhz=%u dark_cpu_mhz=%u dark_cpu=%s cpu_set_fail=%u cpu_switches=%u",
             batt_s<0.0f?-1:int(std::lround(batt_s)),unsigned(poll_period_ms(power_source.source()==gp::Source::Battery)/1000u),
             unsigned(cpu_applied_mhz),unsigned(dark_mhz()),dark_cpu_built?"built":"unbuilt",cpu_set_fail,cpu_switches);}
-    char g24[272];   // G24: " settings=... guard_cycle=... parts=..." (each one space-free token)
+    char g24[304];   // G24: " settings=... guard_cycle=... parts=..." (each one space-free token); G25: settings 64 -> 96 (router:)
     {   std::size_t used=0;g24[0]=0;
         char a[companion::settings_status_max],b[companion::guard_cycle_status_max],c[companion::parts_status_max];
         if(!companion::settings_status(app->device(),app->settings_store(),a,sizeof a))std::snprintf(a,sizeof a,"settings=status_overflow");

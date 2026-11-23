@@ -139,6 +139,7 @@ private:
     BlobStorage* onboarding_seen_{};
     std::uint8_t onboarding_page_{onboarding_pages}; // == pages: not showing
     DeviceSettingsStore* settings_{};                 // G24
+    std::uint32_t saved_revision_{};                  // G25: Monitor::scope_revision() last stored
 };
 
 // ---- screen composition (diagnostic visuals until art is accepted) ---------

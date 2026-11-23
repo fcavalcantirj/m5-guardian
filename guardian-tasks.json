@@ -873,7 +873,7 @@
       "SETTINGS KEYS (owner 2026-11-23: 'SIDE changes, BLUE saves' then 'or hold side to save'): open with hold BLUE (unchanged); inside: SIDE = next value (wraps), hold SIDE = save (green SAVED / SAVE FAILED, then the next page; after the last page the face), BLUE = leave without saving. Update the on-screen hints ('SIDE next  BLUE back', 'hold SIDE = save'), the onboarding Buttons page, README and firmware/README key tables; the look compare is re-run and the only pixel changes are the two hint rows and the new page 3.",
       "Host TDD red first (plain + ASan): channel move -> no incident and re-baselined; security change -> amber with old/new; downgrade wording; accept by hold SIDE -> re-baseline, no re-fire; STRICT and DETAILS ONLY; UnexpectedAp and disconnect bursts still red; the new keys on every Settings page; GSET migration round trip. One signed build; no flash, no commit."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "G26",

@@ -1382,7 +1382,7 @@ int look_centered(const char* t, int scale) { const int w = int(std::strlen(t)) 
 void look_center(Frame& f, const char* t, int y, int scale, std::uint16_t c) { look_add(f, t, look_centered(t, scale), y, scale, c); }
 Frame look(const char* title, int idx, const LookOption& o, bool saved_flash) {
     Frame f; f.header_color = color::grey;
-    char tag[24]; std::snprintf(tag, sizeof tag, "SETTINGS %d/%d", idx, 2);
+    char tag[24]; std::snprintf(tag, sizeof tag, "SETTINGS %d/%d", idx, 3);   // G25: a third page
     look_add(f, tag, 0, Frame::tag_y, 1, color::black, true, color::grey);
     look_center(f, title, 26, 1, color::grey);
     look_add(f, "<", 2, 78, 2, color::grey);
@@ -1394,8 +1394,8 @@ Frame look(const char* title, int idx, const LookOption& o, bool saved_flash) {
     if (o.cost1) look_center(f, o.cost1, 166, 1, amber);
     if (o.cost2) look_center(f, o.cost2, 177, 1, amber);
     if (saved_flash) look_add(f, "   SAVED   ", look_centered("   SAVED   ", 2), 196, 2, color::black, true, color::green);
-    look_center(f, "FRONT next  SIDE back", 216, 1, color::grey);
-    look_center(f, "hold FRONT = save", 228, 1, color::grey);
+    look_center(f, "SIDE next  BLUE back", 216, 1, color::grey);   // G25 keys (owner 2026-11-23)
+    look_center(f, "hold SIDE = save", 228, 1, color::grey);
     return f;
 }
 std::string line_diff(const Frame& got, const Frame& want) {
@@ -1430,8 +1430,8 @@ GUARDIAN_CASE(g24_companion_loads_saves_and_reports_device_settings) {
     r.boot();
     CHECK(r.c.device() == stored); CHECK(r.c.settings_store() == SettingsStore::Restored); CHECK_EQ(unsigned(r.c.lit_brightness_pct()), 80u);
     CHECK(r.c.input(Action::PrimaryLong)); CHECK_EQ(r.c.presenter().screen(), Screen::Settings);   // hold FRONT on the face
-    r.c.input(Action::Primary);                                                    // EVERY MINUTE -> ALWAYS
-    CHECK(r.c.input(Action::PrimaryLong));
+    r.c.input(Action::Secondary);                                                  // EVERY MINUTE -> ALWAYS (G25: SIDE)
+    CHECK(r.c.input(Action::SecondaryLong));                                       // G25: hold SIDE saves
     CHECK(r.c.settings_store() == SettingsStore::Saved); CHECK(r.c.device().guard == GuardCycle::Always);
     DeviceChoices back; CHECK(decode_settings(r.settings_blob.bytes.data(), r.settings_blob.bytes.size(), back));
     CHECK(back.guard == GuardCycle::Always); CHECK_EQ(unsigned(back.bright_pct), 80u);
@@ -1440,8 +1440,8 @@ GUARDIAN_CASE(g24_companion_loads_saves_and_reports_device_settings) {
     r.clock.at += Presenter::settings_plate_ms; r.c.tick();
     CHECK(r.c.presenter().settings().page == SettingsPage::Brightness);
     r.settings_blob.fail_write = true;
-    r.c.input(Action::Primary); CHECK_EQ(unsigned(r.c.lit_brightness_pct()), 100u);   // previewed
-    r.c.input(Action::PrimaryLong);
+    r.c.input(Action::Secondary); CHECK_EQ(unsigned(r.c.lit_brightness_pct()), 100u);   // previewed
+    r.c.input(Action::SecondaryLong);
     CHECK(r.c.settings_store() == SettingsStore::Failed); CHECK_EQ(unsigned(r.c.device().bright_pct), 80u);
     CHECK(r.c.presenter().settings().plate == SavePlate::Failed);
     const auto f = r.frame(); const Line* plate = line_with(f, "SAVE FAILED");
@@ -1469,14 +1469,14 @@ GUARDIAN_CASE(g24_settings_pages_are_exactly_the_approved_look) {
     const LookOption b60{"60%", nullptr, "-", nullptr, color::grey, "costs only while lit", nullptr};
     std::string d;
     d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, always, false)); CHECK_EQ(d, std::string());
-    r.c.input(Action::Primary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, half, false)); CHECK_EQ(d, std::string());
-    r.c.input(Action::Primary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, false)); CHECK_EQ(d, std::string());
-    r.c.input(Action::PrimaryLong); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, true)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Secondary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, half, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::Secondary); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, false)); CHECK_EQ(d, std::string());
+    r.c.input(Action::SecondaryLong); d = line_diff(r.frame(), look("GUARD ON BATTERY", 1, minute, true)); CHECK_EQ(d, std::string());
     r.clock.at += Presenter::settings_plate_ms; r.c.tick();
     d = line_diff(r.frame(), look("BRIGHTNESS", 2, b60, false)); CHECK_EQ(d, std::string());
-    r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary);   // 80, 100, 10, 30
+    r.c.input(Action::Secondary); r.c.input(Action::Secondary); r.c.input(Action::Secondary); r.c.input(Action::Secondary);   // 80, 100, 10, 30
     d = line_diff(r.frame(), look("BRIGHTNESS", 2, b30, false)); CHECK_EQ(d, std::string());
-    r.c.input(Action::Primary); r.c.input(Action::Primary); r.c.input(Action::Primary);                              // 60, 80, 100
+    r.c.input(Action::Secondary); r.c.input(Action::Secondary); r.c.input(Action::Secondary);                                // 60, 80, 100
     d = line_diff(r.frame(), look("BRIGHTNESS", 2, b100, false)); CHECK_EQ(d, std::string());
     CHECK(fits_without_overlap(r.frame()));
     CHECK_EQ(scale_of(r.frame(), "100%"), 3);
@@ -1496,9 +1496,169 @@ GUARDIAN_CASE(g24_hold_front_opens_settings_and_the_details_pages_are_as_before)
     r.c.input(Action::Primary); r.c.input(Action::Primary);
     CHECK(r.c.input(Action::PrimaryLong)); CHECK_EQ(r.c.presenter().screen(), Screen::Settings); CHECK(!r.c.presenter().view().demo);
     CHECK(has(r.frame(), "GUARD ON BATTERY"));
-    CHECK(r.c.input(Action::Secondary)); CHECK_EQ(r.c.presenter().screen(), Screen::Face);
+    CHECK(r.c.input(Action::Primary)); CHECK_EQ(r.c.presenter().screen(), Screen::Face);   // G25: BLUE leaves
     r.open_settings(); CHECK_EQ(r.c.presenter().screen(), Screen::Settings); CHECK(!r.c.presenter().view().demo);
     // The Buttons onboarding page tells the new hold: settings, never demo faces.
     Frame b; compose_onboarding(1, b);
     CHECK(has_words(b, "Hold BLUE: settings")); CHECK(!has_words(b, "demo")); CHECK(fits_without_overlap(b));
+}
+
+// ---- G25: router changes through the real Monitor, ROUTER CHANGES on the Settings screen, the keys (TDD, red first) ----
+namespace {
+Packet fixture_live(const Clock& clock, const char* name, std::uint8_t ds_channel = 0) {
+    guardian::fixtures::Fixture fx; std::string error;
+    Packet p{};
+    if (!guardian::fixtures::load(name, fx, error)) return p;
+    std::memcpy(p.bytes.data(), fx.bytes.data(), fx.bytes.size()); p.size = static_cast<std::uint16_t>(fx.bytes.size());
+    p.meta.acquired = {clock.epoch(), clock.now(), true};
+    p.meta.origin = Origin::LiveRadio; p.meta.status = RxStatus::Ok; p.meta.channel = ds_channel ? ds_channel : 6;
+    p.meta.rssi_dbm = -48; p.meta.rssi_valid = true;
+    if (ds_channel) for (std::size_t i = 36; i + 2 < p.size; i += 2u + p.bytes[i + 1]) if (p.bytes[i] == 3 && p.bytes[i + 1] == 1) { p.bytes[i + 2] = ds_channel; break; }
+    return p;
+}
+// The VeryGoodRig with a settings store and a status buffer: the WPA3 network picked from the list.
+struct RouterRig {
+    Clock clock; Monitor m{clock, profiles::all_2g4_channels(), Origin::LiveRadio};
+    MemoryBlob blob, settings_blob; EncodedSelectionStore store{blob}; DeviceSettingsStore settings{settings_blob};
+    Companion c{clock, m, store, lcd(), Origin::LiveRadio};
+    RouterRig() {
+        c.attach_settings(settings); c.boot(); c.receive(wpa3_live(clock)); c.tick();
+        c.input(Action::SecondaryLong); c.input(Action::Secondary);       // choose the one listed network
+        c.receive(wpa3_live(clock)); c.tick();
+    }
+    void feed(const char* name, int n, std::uint8_t ds = 0) {
+        for (int i = 0; i < n; ++i) { clock.at += 100; c.receive(fixture_live(clock, name, ds)); }
+        c.tick();
+    }
+    Frame frame() { Frame f; Status st{}; st.radio = RadioState::Monitoring; st.persona_art = true; c.render(st, f); return f; }
+    PersistedSelection stored() const { PersistedSelection p{}; decode(blob.bytes.data(), blob.bytes.size(), p); return p; }
+    std::string status() const { char t[2048]; return m.status_text(t, sizeof t) ? std::string(t) : std::string("overflow"); }
+};
+SettingsFingerprint fingerprint_of(const char* name) {
+    guardian::fixtures::Fixture fx; std::string error;
+    if (!guardian::fixtures::load(name, fx, error)) return {};
+    RxMeta meta{}; meta.status = RxStatus::Ok;
+    const auto p = SecurityFrameParser{}.parse({fx.bytes.data(), static_cast<std::uint16_t>(fx.bytes.size()), false}, meta);
+    return SettingsFingerprint::of(p.settings);
+}
+} // namespace
+
+GUARDIAN_CASE(g25_the_router_changing_its_security_is_amber_accepted_on_details_and_stored) {
+    RouterRig r;
+    CHECK(r.m.scope().has_selection()); CHECK(r.m.scope().selected().settings_known);
+    CHECK(r.stored().selected.settings == fingerprint_of("beacon_wpa3_sae_pmf_required"));
+    const auto writes = r.blob.writes;
+    r.feed("beacon_wpa2_ccmp_pmf_optional", 3);
+    const auto& v = r.c.presenter().view();
+    CHECK(!v.alert); CHECK(v.router_amber); CHECK(v.router.change.pending);
+    // The face: amber, the rating's label stays, the router's words (never "attack").
+    Frame f = r.frame();
+    CHECK(f.caution || f.header_color == amber); CHECK(!f.alert);
+    CHECK(has_words(f, "Router changed")); CHECK(!forbidden_claim(f)); CHECK(fits_without_overlap(f));
+    // STATUS says what it was, never guesswork.
+    const auto st = r.status();
+    CHECK(st.find(" baseline_last=bssid:") != std::string::npos);
+    CHECK(st.find(",changes:rsn+pmf,count:3,age_s:0") != std::string::npos);
+    CHECK(st.find(" channel_moves=0,last:none") != std::string::npos);
+    CHECK(st.find("baseline:frames=") != std::string::npos);
+    // BLUE: the Router page first, in plain words, with the accept hint.
+    r.c.input(Action::Primary); CHECK_EQ(r.c.presenter().details().page, DetailsPage::Router);
+    f = r.frame();
+    CHECK(has_words(f, "Your router changed")); CHECK(has_words(f, "PMF (required -> optional)")); CHECK(has_words(f, "downgrade"));
+    CHECK(has_words(f, "hold side: accept new")); CHECK(!f.overflow); CHECK(fits_without_overlap(f)); CHECK(!forbidden_claim(f));
+    // Hold SIDE accepts: the new settings become the baseline and are stored; the amber ends.
+    CHECK(r.c.input(Action::SecondaryLong));
+    CHECK_EQ(r.c.presenter().screen(), Screen::Face);
+    CHECK(!r.c.presenter().view().router_amber);
+    CHECK(r.m.scope().selected().settings == fingerprint_of("beacon_wpa2_ccmp_pmf_optional"));
+    CHECK(r.blob.writes > writes); CHECK(r.stored().selected.settings == fingerprint_of("beacon_wpa2_ccmp_pmf_optional"));
+    // The router keeps the new settings: nothing comes back.
+    r.feed("beacon_wpa2_ccmp_pmf_optional", 20);
+    CHECK(!r.c.presenter().view().router_amber); CHECK(!r.c.presenter().view().alert);
+    CHECK(!r.c.presenter().view().router.change.pending);
+}
+
+GUARDIAN_CASE(g25_a_channel_move_is_stored_shown_grey_and_counted_in_status) {
+    RouterRig r;
+    CHECK(r.m.scope().selected().channel_known); CHECK_EQ(unsigned(r.m.scope().selected().channel), 6u);
+    const auto writes = r.blob.writes;
+    r.feed("beacon_wpa3_sae_pmf_required", 3, 11);
+    CHECK_EQ(unsigned(r.m.scope().selected().channel), 11u);          // re-baselined at once
+    CHECK(r.blob.writes > writes); CHECK_EQ(unsigned(r.stored().selected.channel), 11u);   // and stored for the next boot
+    const auto& v = r.c.presenter().view();
+    CHECK(!v.alert); CHECK(!v.router_amber); CHECK_EQ(v.router.moves, 1u);
+    const auto st = r.status();
+    CHECK(st.find(" channel_moves=1,last:6->11") != std::string::npos);
+    CHECK(st.find(",changes:channel,count:2,") != std::string::npos);
+    // The grey line on the Advertised Wi-Fi settings page; the page still fits.
+    r.c.input(Action::Primary); CHECK_EQ(r.c.presenter().details().page, DetailsPage::Settings);
+    const Frame f = r.frame();
+    const Line* l = line_with(f, "Router moved ch 6->11");
+    CHECK(l != nullptr); if (l) CHECK_EQ(l->color, color::grey);
+    CHECK(!f.overflow); CHECK(fits_without_overlap(f));
+    // A second boot restores channel 11: no new move is counted.
+    Clock clock; Monitor m(clock, profiles::all_2g4_channels(), Origin::LiveRadio); EncodedSelectionStore store(r.blob);
+    Companion again(clock, m, store, lcd(), Origin::LiveRadio); CHECK_EQ(again.boot(), StoreState::Restored);
+    for (int i = 0; i < 5; ++i) { clock.at += 100; again.receive(fixture_live(clock, "beacon_wpa3_sae_pmf_required", 11)); }
+    again.tick(); CHECK_EQ(m.router().moves, 0u);
+}
+
+GUARDIAN_CASE(g25_strict_alert_and_details_only_through_the_companion) {
+    RouterRig r;
+    // Set through the Settings screen: page 3, SIDE to STRICT, hold SIDE to save.
+    r.c.input(Action::PrimaryLong);
+    for (int i = 0; i < 2; ++i) { r.c.input(Action::SecondaryLong); r.clock.at += Presenter::settings_plate_ms; r.c.tick(); }
+    CHECK(r.c.presenter().settings().page == SettingsPage::Router);
+    r.c.input(Action::Secondary); CHECK(r.c.presenter().settings().shown.router == RouterPolicy::Strict);
+    r.c.input(Action::SecondaryLong); CHECK(r.c.device().router == RouterPolicy::Strict);
+    DeviceChoices back; CHECK(decode_settings(r.settings_blob.bytes.data(), r.settings_blob.bytes.size(), back)); CHECK(back.router == RouterPolicy::Strict);
+    r.clock.at += Presenter::settings_plate_ms; r.c.tick(); CHECK_EQ(r.c.presenter().screen(), Screen::Face);
+    r.feed("beacon_wpa2_ccmp_pmf_optional", 3);
+    CHECK(r.c.presenter().view().alert); CHECK(r.c.presenter().view().router_alert);
+    Frame f = r.frame(); CHECK(f.alert); CHECK(has_words(f, "Router changed security")); CHECK(fits_without_overlap(f));
+    CHECK(!has_words(f, "0 in 0s"));   // no Core incident behind it: no burst count line
+    // Its Details page fits (the red status slot has two rows).
+    r.c.input(Action::Primary); CHECK_EQ(r.c.presenter().details().page, DetailsPage::Router);
+    f = r.frame(); CHECK(!f.overflow); CHECK(fits_without_overlap(f)); CHECK(has_words(f, "hold side: accept new"));
+    // DETAILS ONLY: the same change shows no colour on the face; the Router page still lists it.
+    RouterRig q;
+    q.c.input(Action::PrimaryLong);
+    for (int i = 0; i < 2; ++i) { q.c.input(Action::SecondaryLong); q.clock.at += Presenter::settings_plate_ms; q.c.tick(); }
+    q.c.input(Action::Secondary); q.c.input(Action::Secondary); CHECK(q.c.presenter().settings().shown.router == RouterPolicy::DetailsOnly);
+    q.c.input(Action::SecondaryLong); q.clock.at += Presenter::settings_plate_ms; q.c.tick();
+    q.feed("beacon_wpa2_ccmp_pmf_optional", 3);
+    f = q.frame(); CHECK(!f.alert); CHECK(!f.caution); CHECK(f.header_color != amber); CHECK(!has_words(f, "Router changed"));
+    q.c.input(Action::Primary); CHECK_EQ(q.c.presenter().details().page, DetailsPage::Router);
+    f = q.frame(); CHECK(has_words(f, "Your router changed its security settings")); CHECK(!f.overflow);
+}
+
+GUARDIAN_CASE(g25_settings_page_three_router_changes_and_the_new_hints) {
+    SettingsRig r; r.boot(); r.open_settings();
+    for (int i = 0; i < 2; ++i) { r.c.input(Action::SecondaryLong); r.clock.at += Presenter::settings_plate_ms; r.c.tick(); }
+    CHECK(r.c.presenter().settings().page == SettingsPage::Router);
+    struct Want { const char* big; const char* big2; const char* note; const char* l1; std::uint16_t c1; const char* l2; std::uint16_t c2; };
+    const Want amber_w{"AMBER", nullptr, "default", "security change: amber", amber, "channel move: grey", color::grey};
+    const Want strict_w{"STRICT", nullptr, nullptr, "security change: red", color::red, "channel move: amber", amber};
+    const Want details_w{"DETAILS", "ONLY", nullptr, "router changes listed", color::grey, "on Details, no colour", color::grey};
+    for (const auto* w : {&amber_w, &strict_w, &details_w}) {
+        Frame want; want.header_color = color::grey;
+        look_add(want, "SETTINGS 3/3", 0, Frame::tag_y, 1, color::black, true, color::grey);
+        look_center(want, "ROUTER CHANGES", 26, 1, color::grey);
+        look_add(want, "<", 2, 78, 2, color::grey);
+        look_add(want, ">", Frame::width - 14, 78, 2, color::grey);
+        if (w->big2) { look_center(want, w->big, 64, 2, color::white); look_center(want, w->big2, 86, 2, color::white); }
+        else look_center(want, w->big, 76, 2, color::white);
+        if (w->note) look_center(want, w->note, 126, 1, color::grey);
+        look_center(want, w->l1, 166, 1, w->c1);
+        look_center(want, w->l2, 177, 1, w->c2);
+        look_center(want, "SIDE next  BLUE back", 216, 1, color::grey);
+        look_center(want, "hold SIDE = save", 228, 1, color::grey);
+        const auto got = r.frame();
+        CHECK_EQ(line_diff(got, want), std::string()); CHECK(fits_without_overlap(got));
+        r.c.input(Action::Secondary);
+    }
+    // The Buttons onboarding page tells the Settings keys.
+    Frame b; compose_onboarding(1, b);
+    CHECK(has_words(b, "Hold BLUE: settings")); CHECK(has_words(b, "SIDE next")); CHECK(has_words(b, "hold SIDE save"));
+    CHECK(has_words(b, "BLUE back")); CHECK(fits_without_overlap(b));
 }

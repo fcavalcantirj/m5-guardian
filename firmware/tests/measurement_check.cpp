@@ -299,10 +299,14 @@ GUARDIAN_CASE(adjacent_channel_reception_is_not_a_settings_change) {
     CHECK(m.approve_baseline());
     for(unsigned i=0;i<25;++i){++clock.at;p.meta.acquired.at=clock.at;CHECK(m.receive(p));}
     CHECK(!m.snapshot().incidents[2]);
-    // A real advertised-channel change must still be detected.
+    // A real advertised-channel change must still be detected. G25 (owner 2026-11-21/23): as a channel move of
+    // the router, re-baselined in the scope and counted, never an incident.
+    const auto revision=m.scope_revision();
     p.bytes[42]=7;
     for(unsigned i=0;i<25;++i){++clock.at;p.meta.acquired.at=clock.at;CHECK(m.receive(p));}
-    CHECK(m.snapshot().incidents[2]);
+    CHECK(!m.snapshot().incidents[2]);
+    CHECK_EQ(m.router().moves,1u);CHECK_EQ(unsigned(m.router().last_move.from),5u);CHECK_EQ(unsigned(m.router().last_move.to),7u);
+    CHECK_EQ(unsigned(m.scope().selected().channel),7u);CHECK_EQ(m.scope_revision(),revision+1u);
 }
 GUARDIAN_CASE(survey_follows_valid_advertised_channel_without_claiming_lock) {
     Survey s;CHECK(s.begin(1,13,6,0));

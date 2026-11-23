@@ -161,6 +161,13 @@ void area_banner(const IncidentObservation& o, char* out, std::size_t n, int row
     }
 }
 // Compact rate: up to 3 characters ("12", "340", "12k", "99k+"), with "+" when capped.
+// G25: the router's change in the most words that fit `rows` wrapped rows (Full, Short, then Minimal).
+void router_banner(const RouterView& r, char* out, std::size_t n, int rows, int columns) {
+    for (const auto w : {RouterWording::Full, RouterWording::Short, RouterWording::Minimal}) {
+        if (router_sentence(r, w, out, n) && wrapped_rows(out, static_cast<std::size_t>(columns)) <= static_cast<std::size_t>(rows)) return;
+    }
+    router_sentence(r, RouterWording::Minimal, out, n);
+}
 void rate_text(char* out, std::size_t n, std::uint32_t v, bool capped = false) {
     if (v < 1000) std::snprintf(out, n, "%u%s", unsigned(v), capped ? "+" : "");
     else if (v < 100000) std::snprintf(out, n, "%uk%s", unsigned(v / 1000), capped ? "+" : "");
@@ -206,7 +213,7 @@ void header(Frame& f, const ViewModel& v) {
         return;
     }
     if (v.alert) plate(add(f, 2, Frame::tag_y, color::white, 1, "ALERT"), color::red);
-    else plate(add(f, 2, Frame::tag_y, color::black, 1, "%s", v.source_label), v.caution ? amber : cyan);   // G16E: amber = nearby
+    else plate(add(f, 2, Frame::tag_y, color::black, 1, "%s", v.source_label), v.caution || v.router_amber ? amber : cyan);   // G16E: amber = nearby; G25: the router
     if (!v.has_selection) { add(f, 2, Frame::name_y, color::grey, 1, "(no network)"); return; }
     add(f, Frame::bssid_x, Frame::tag_y, color::grey, 1, "..:%s", bssid_tail(v));
     // Up to 22 glyphs; a longer name is shortened with a visible '~', never cut silently.
@@ -261,6 +268,13 @@ void rated_hud(const Presenter& p, const Status& st, Frame& f) {
     const auto& v = p.view(); const auto& d = p.details();
     add(f, 2, hud_y, v.face == Mood::VeryGood ? gold : mood_color(v.face), 2, "%.11s", v.mood_label);
     const char* store = store_short(st.store);
+    if (v.router_amber) {   // G25 amber: the rating label stays; the router's change in words below it
+        char text[160]; router_banner(v.router, text, sizeof text, 3, cols1);
+        wrap(f, 197, amber, text, 215);
+        if (store) add(f, 2, hint1_y, color::orange, 1, "%s", store); else add(f, 2, hint1_y, cyan, 1, "blue: info");
+        add(f, 2, hint2_y, cyan, 1, "hold side: networks");
+        return;
+    }
     if (v.caution) {   // G16E amber: the rating label stays; the observation in words below it
         char text[160]; area_banner(v.caution_evidence, text, sizeof text, 3, cols1);
         wrap(f, 197, amber, text, 215);
@@ -302,6 +316,14 @@ void alert_hud(const Presenter& p, const Status& st, Frame& f) {
     char sentence[96];
     alert_sentence(v, sentence, sizeof sentence, static_cast<std::size_t>(cols1));
     rows.line(color::red, sentence);
+    if (v.router_alert) {   // G25 STRICT: the router's own change; no burst count, no cause line
+        const char* state = v.overlay == Overlay::NoFreshData ? "No fresh data" : v.overlay == Overlay::CoverageDegraded ? "Coverage degraded" : nullptr;
+        rows.line(color::white, "accept it on Details");
+        if (state && rows.y <= hint2_y) rows.line(color::white, state);
+        if (const char* store = store_short(st.store); store && rows.y <= hint2_y) rows.line(color::orange, store);
+        if (rows.y <= hint2_y) add(f, 2, rows.y, cyan, 1, "blue: info");
+        return;
+    }
     const auto& b = v.incident;
     const unsigned seconds = std::min(999u, static_cast<unsigned>((b.window_ms + 999) / 1000));
     const unsigned count = std::min(999u, static_cast<unsigned>(b.count));
@@ -341,10 +363,12 @@ void no_data_hud(const Presenter& p, const Status& st, Frame& f) {
         y += 4 + pitch2;
     }
     // G16E: area observations need no selection: amber inside the NoData zone, under the message.
-    if (v.caution && !v.alert && !v.demo) {
+    if ((v.caution || v.router_amber) && !v.alert && !v.demo) {
         const int top = std::max(y + 2, 124), last = 151;
-        if (top <= last) {
-            char text[160]; area_banner(v.caution_evidence, text, sizeof text, (last - top) / pitch1 + 1, cols1);
+        if (top <= last) {   // G25: the router's change first (it is about your network), else the nearby observation
+            char text[160];
+            if (v.router_amber) router_banner(v.router, text, sizeof text, (last - top) / pitch1 + 1, cols1);
+            else area_banner(v.caution_evidence, text, sizeof text, (last - top) / pitch1 + 1, cols1);
             bool cut = false; wrap(f, top, amber, text, last, 1, pitch1, &cut);
         }
     }
@@ -362,7 +386,7 @@ void face_screen(const Presenter& p, const Status& st, Frame& f) {
     const auto& v = p.view();
     const bool rated = v.face != Mood::Unknown && !v.muted;   // a fresh rating (G08: muted = Unknown or historical)
     f.face_shown = true; f.face = v.face; f.muted = v.muted; f.alert = v.alert; f.celebrate = v.celebrate && !v.alert && rated;
-    f.caution = v.caution && !v.alert && !v.demo;   // G16E: red owns the face; amber only without an ALERT
+    f.caution = (v.caution || v.router_amber) && !v.alert && !v.demo;   // G16E: red owns the face; amber only without an ALERT (G25: the router too)
     f.face_color = v.alert ? color::red : v.muted ? color::grey : mood_color(v.face);
     f.header_color = f.caution ? amber : f.face_color;
     f.art = v.alert ? (rated ? FaceArt::Alert : FaceArt::NoData) : rated ? FaceArt::Rated : FaceArt::NoData;
@@ -420,11 +444,16 @@ void details_screen(const Presenter& p, const Status& st, Frame& f) {
     header(f, v);
     wrap(f, details_title_y, cyan, d.title, details_title_y + pitch1);
     if (v.alert) {   // G16R: the same sentence as the face (the network by its name)
-        char sentence[96];
-        alert_sentence(v, sentence, sizeof sentence, static_cast<std::size_t>(cols1));
+        char sentence[160];
+        if (v.router_alert) router_banner(v.router, sentence, sizeof sentence, 2, cols1);   // G25: the words that fit two rows
+        else alert_sentence(v, sentence, sizeof sentence, static_cast<std::size_t>(cols1));
         wrap(f, details_status_y, color::red, sentence, details_status_y + pitch1);
     }
     else if (v.demo) add(f, 2, details_status_y, color::yellow, 1, "simulated example");
+    else if (v.router_amber) {   // G25: the router's change, in the words that fit the two status rows
+        char text[160]; router_banner(v.router, text, sizeof text, 2, cols1);
+        wrap(f, details_status_y, amber, text, details_status_y + pitch1);
+    }
     else if (v.caution) wrap(f, details_status_y, amber, v.caution_reason, details_status_y + pitch1);   // G16E
     Page pg{f, details_body_y};
     switch (d.page) {
@@ -441,6 +470,10 @@ void details_screen(const Presenter& p, const Status& st, Frame& f) {
             pg.line(color::white, "Evidence age: %u s%s", unsigned(d.age_ms / 1000), d.advice.signal.available ? "," : "");
             if (d.advice.signal.available) pg.line(color::white, "heard on ch %u", unsigned(d.advice.signal.channel));
         } else pg.line(color::white, "Evidence age: none");
+        {   // G25: the router's own channel moves, one grey line (re-baselined, never an alert)
+            char moved[40];
+            if (move_line(v.router, moved, sizeof moved)) pg.line(color::grey, "%s", moved);
+        }
         pg.y += 3;
         pg.line(color::grey, "Not measured: password strength, router patch status, 5 GHz, actual client negotiation.");
         pg.line(color::grey, "Weak signal, Internet loss or a dictionary test never change it.");
@@ -537,7 +570,29 @@ void details_screen(const Presenter& p, const Status& st, Frame& f) {
         pg.line(color::grey, "It says what it saw, never who sent it.");
         break;
     }
+    case DetailsPage::Router: {   // G25: what the router changed, old -> new, and the owner's choice
+        const auto& r = v.router;
+        const std::uint16_t ink = r.change_tone == Tone::Red ? color::red : r.change_tone == Tone::Amber ? amber : color::white;
+        char text[200];
+        if (r.change.pending) {
+            if (router_sentence(r, RouterWording::Full, text, sizeof text)) pg.line(ink, "%s", text);
+            if (r.age_known) pg.line(color::white, "seen %u times, %u s ago", unsigned(r.change.count), unsigned(r.age_ms / 1000));
+            else pg.line(color::white, "seen %u times", unsigned(r.change.count));
+            const auto ap = mac_text(r.change.bssid);
+            pg.line(color::white, "AP ..:%s", ap.c_str() + 12);
+            if (r.pending > 1) pg.line(color::white, "%u of your APs changed", unsigned(r.pending));
+        }
+        if (r.move_unacked && router_sentence(r, RouterWording::Full, text, sizeof text) && !r.change.pending) pg.line(amber, "%s", text);
+        pg.y += 3;
+        pg.line(color::grey, "Routers change settings after an update or a restart. If nobody did, check the router.");
+        break;
+    }
     case DetailsPage::Count: break;
+    }
+    if (d.page == DetailsPage::Router) {   // G25: hold SIDE here accepts the new settings
+        add(f, 2, hint1_y, cyan, 1, "blue: next  side: back");
+        add(f, 2, hint2_y, cyan, 1, "hold side: accept new");
+        return;
     }
     add(f, 2, hint1_y, cyan, 1, "blue: next page");
     if (d.page_count > 1) add(f, 110, hint1_y, color::white, 1, "%u/%u", unsigned(d.page_index) + 1, unsigned(d.page_count));
@@ -697,7 +752,8 @@ void compose_onboarding(std::uint8_t page, Frame& f) {
         add(f, 2, 26, cyan, 2, "BLUE");      add(f, 2, 44, color::white, 2, "next / info");
         add(f, 2, 68, cyan, 2, "SIDE");      add(f, 2, 86, color::white, 2, "choose");
         add(f, 2, 110, cyan, 2, "HOLD SIDE"); add(f, 2, 128, color::white, 2, "list");
-        wrap(f, 156, color::grey, "Hold BLUE: settings", 200);   // G24 retry: hold FRONT opens Settings (no key enters DEMO)
+        // G24 retry: hold FRONT opens Settings (no key enters DEMO); G25: the Settings keys (owner 2026-11-23).
+        wrap(f, 156, color::grey, "Hold BLUE: settings. There: SIDE next, hold SIDE save, BLUE back.", 200);
         break;
     default:
         add(f, 2, 2, color::yellow, 2, "Start");        // G16B: clear of the battery corner
@@ -730,14 +786,39 @@ static void session_hints(Frame& f, const Status& st, bool settings) {
 // existing font and colours only; the battery indicator is the board's, as on every screen.
 int settings_centred(const char* t, int scale) { return std::max(0, (Frame::width - text_w(t, scale)) / 2); }
 void settings_line(Frame& f, int y, int scale, std::uint16_t c, const char* t) { add(f, settings_centred(t, scale), y, c, static_cast<std::uint8_t>(scale), "%s", t); }
+// The SAVED / SAVE FAILED plate and the key hints (G25 keys, owner 2026-11-23: "SIDE changes", "hold side to save").
+void settings_plate_and_hints(Frame& f, const SettingsView& sv) {
+    if (sv.plate == SavePlate::Saved) plate(add(f, settings_centred("   SAVED   ", 2), 196, color::black, 2, "   SAVED   "), color::green);
+    else if (sv.plate == SavePlate::Failed) plate(add(f, settings_centred("SAVE FAILED", 2), 196, color::white, 2, "SAVE FAILED"), color::red);
+    settings_line(f, settings_hint1_y, 1, color::grey, "SIDE next  BLUE back");
+    settings_line(f, settings_hint2_y, 1, color::grey, "hold SIDE = save");
+}
 void settings_screen(const Presenter& p, Frame& f) {
     const auto& sv = p.settings();
     const bool guard = sv.page == SettingsPage::Guard;
     f.header_color = color::grey;
     plate(add(f, 0, Frame::tag_y, color::black, 1, "SETTINGS %u/%u", unsigned(sv.number), unsigned(settings_pages)), color::grey);
-    settings_line(f, 26, 1, color::grey, guard ? "GUARD ON BATTERY" : "BRIGHTNESS");
+    settings_line(f, 26, 1, color::grey, guard ? "GUARD ON BATTERY" : sv.page == SettingsPage::Router ? "ROUTER CHANGES" : "BRIGHTNESS");
     add(f, 2, 78, color::grey, 2, "<");
     add(f, Frame::width - 14, 78, color::grey, 2, ">");
+    if (sv.page == SettingsPage::Router) {   // G25: how the router's own changes are coloured (no hours: costs nothing)
+        switch (sv.shown.router) {
+        case RouterPolicy::DetailsOnly:
+            settings_line(f, 64, 2, color::white, "DETAILS"); settings_line(f, 86, 2, color::white, "ONLY");
+            settings_line(f, 166, 1, color::grey, "router changes listed"); settings_line(f, 177, 1, color::grey, "on Details, no colour");
+            break;
+        case RouterPolicy::Amber:
+            settings_line(f, 76, 2, color::white, "AMBER"); settings_line(f, 126, 1, color::grey, "default");
+            settings_line(f, 166, 1, amber, "security change: amber"); settings_line(f, 177, 1, color::grey, "channel move: grey");
+            break;
+        case RouterPolicy::Strict:
+            settings_line(f, 76, 2, color::white, "STRICT");
+            settings_line(f, 166, 1, color::red, "security change: red"); settings_line(f, 177, 1, amber, "channel move: amber");
+            break;
+        }
+        settings_plate_and_hints(f, sv);
+        return;
+    }
     Hours hours; Extreme mark = Extreme::None;
     char cost1[40] = "", cost2[40] = "";
     if (guard) {
@@ -767,10 +848,7 @@ void settings_screen(const Presenter& p, Frame& f) {
     else if (mark == Extreme::Highest) settings_line(f, 142, 1, color::green, "highest, measured");
     if (cost1[0]) settings_line(f, 166, 1, amber, cost1);
     if (cost2[0]) settings_line(f, 177, 1, amber, cost2);
-    if (sv.plate == SavePlate::Saved) plate(add(f, settings_centred("   SAVED   ", 2), 196, color::black, 2, "   SAVED   "), color::green);
-    else if (sv.plate == SavePlate::Failed) plate(add(f, settings_centred("SAVE FAILED", 2), 196, color::white, 2, "SAVE FAILED"), color::red);
-    settings_line(f, settings_hint1_y, 1, color::grey, "FRONT next  SIDE back");
-    settings_line(f, settings_hint2_y, 1, color::grey, "hold FRONT = save");
+    settings_plate_and_hints(f, sv);
 }
 
 void compose(const Presenter& p, const Status& st, Frame& f) {

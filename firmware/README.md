@@ -711,7 +711,7 @@ host-tested; nothing of G24 is measured on the stick yet (the supervisor's devic
   FRONT = next page (Advertised Wi-Fi settings, Explanation, Signal and evidence, Owner checks, What it cannot see,
   Nearby while something is nearby, then the face), SIDE = face, **hold FRONT = Settings screen**, hold SIDE = network
   list. No details page opens Settings (the DEVICE SETTINGS page of the first attempt is gone). On the Settings
-  screen: FRONT = next value (wraps); hold FRONT = save this page (green `SAVED` plate for 1 s, then the next page,
+  screen (**superseded by G25**: SIDE = next value, hold SIDE = save, FRONT = back; see the G25 section): FRONT = next value (wraps); hold FRONT = save this page (green `SAVED` plate for 1 s, then the next page,
   after the last page the face; `SAVE FAILED` on a red plate in the same place keeps the value in effect and stays on
   the page); SIDE (or a hold of SIDE) = back to the face, nothing more saved. The network list keeps its keys (hold
   FRONT = "this AP is mine too" on a same-name row). **No key enters DEMO**: the capability stays behind
@@ -786,6 +786,60 @@ host-tested; nothing of G24 is measured on the stick yet (the supervisor's devic
 - **Not done here (the supervisor's acceptance, ledger row):** install over USB; STATUS `parts=` all off and
   `settings=`; the Settings screen photographed against the look; full drains for EVERY MINUTE, ALWAYS and EVERY 30 S
   (its hours then entered in the table, with the log line); zero `resume_fail`; any `reset=brownout` stops it.
+
+## G25 Router changes are not an alarm; Settings keys with SIDE (worker 2026-11-23; ledger G25 open)
+
+Owner, after living with G24 (2026-11-21/23): the router misbehaved and was restarted, and the stick showed a red
+ALERT with **0** disconnect events while the baseline detector re-fired "Advertised settings changed" every cooldown
+(STATUS: baseline events=110 incidents=1). A router changing its own channel or settings is not an attack. Implemented
+and host-tested; nothing of G25 has run on the stick.
+
+- **Baseline detector** (components/guardian_core/detectors.cpp, `BaselineDetector`; guardian/detectors.hpp `RouterState`):
+  it never reports `SettingsChanged` to Core any more, so no red ALERT, no `incident_seq` and no re-fire. A **channel
+  move** of the selected or an approved AP (2 advertisements on the new DS channel inside the 10 s window; one on the
+  baseline channel in between restarts the count) is re-baselined at once: the detector compares with the new channel,
+  `Monitor::receive` stores it in the scope without resetting any detector and `Monitor::scope_revision()` makes the
+  Companion save the selection (the next boot does not count it again). A **security change** (privacy, WPA, RSN, PMF,
+  OWE-transition fields, 2 differing advertisements inside the window) becomes one pending `RouterChange` per AP with
+  the approved and the newest fingerprints, `downgrade` (`security_downgrade`: WPA3 -> WPA2/WPA3 -> WPA2 -> WPA -> WEP,
+  PMF required -> optional -> off, GCMP/CCMP -> TKIP -> WEP, anything -> open) and its count. It is never re-reported
+  while the router keeps it, grows (and counts once more) only when another field changes, and stays until the owner
+  accepts it, also when the router reverts. Accepting (`Monitor::accept_router_change`) stores the newest advertised
+  fingerprint as the baseline and saves the selection. `UnexpectedAp` (another BSSID with the network's name) and the
+  disconnect bursts are unchanged and stay red. `sizeof(BaselineDetector)` 3,328 B (17 router tracks; the Monitor is in
+  PSRAM); the guard in tests/detector_check.cpp is now 4 KiB.
+- **Colours: Settings page 3, ROUTER CHANGES** (`RouterPolicy`, presenter.hpp `RouterView`): DETAILS ONLY = listed on the
+  Details page, no colour, never lights the dark screen; **AMBER** (default) = a security change is amber on the face
+  (header plate and HUD, "Router changed security: PMF, a downgrade" in the words that fit) until accepted, a channel
+  move is one grey line ("Router moved ch 6->11", or "Router moved 3x, 6->11") on the Advertised Wi-Fi settings page;
+  STRICT = a security change is the red ALERT ("Router changed security: ...", no burst count line) until accepted,
+  and a channel move is amber until acknowledged. A Core incident keeps the ALERT and its words; the router's amber
+  returns when it ends. Every change or move shown in colour adds one to `ViewModel::incident_seq` (the dark screen
+  lights once per new event, never per cooldown). Moves seen before STRICT was chosen are not turned amber.
+- **Details page "Your router changed"** (`DetailsPage::Router`, the first page while a change or an unacknowledged STRICT
+  move waits): "Your router changed its security settings: mode (WPA3 -> WPA2), PMF (required -> optional), a
+  downgrade" (every differing item of mode, cipher and PMF, or "other options"), how many times and how long ago,
+  the AP's address tail, and a grey line that routers change settings after an update or a restart. **Hold SIDE there
+  = accept the new settings** (OwnerRequest `AcceptChange`; the amber ends at once); hints `blue: next  side: back` /
+  `hold side: accept new`. Hold SIDE on every other page still opens the network list.
+- **Settings keys** (owner 2026-11-23: "SIDE changes, BLUE saves", then "or hold side to save"): open with hold BLUE
+  (unchanged); inside, **SIDE = next value (wraps), hold SIDE = save** (green SAVED / red SAVE FAILED, then the next
+  page; after the last page the face), **BLUE (or a hold of BLUE) = leave without saving**. Hints `SIDE next  BLUE back`
+  and `hold SIDE = save`; the Buttons onboarding page adds "There: SIDE next, hold SIDE save, BLUE back."
+- **Look compare** (tools/settings_look_compare.py, now also counting the differing pixels by row band and taking
+  `--allow-rows`): on pages 24-settings-1..6 the body rows (11-215) are identical to the approved look; the hint rows
+  differ (626 px a page) and so do 14 px of the tag row, because the page count reads `1/3` instead of `1/2`. Page 3
+  is new (`25-settings-8..10` in companion_preview) and is checked line by line in tests/companion_check.cpp.
+- **Storage**: the GSET record is format 2 (13 bytes: magic, format, guard, brightness, router, CRC-32). A G24 record
+  (format 1, 12 bytes) is still read, keeping guard and brightness with ROUTER CHANGES = AMBER, and is replaced by
+  format 2 at the next save (never rewritten at boot). tests/device_settings_check.cpp `g25_*`.
+- **STATUS**: `settings=...,router:<details|amber|strict>` (the fragment buffer 64 -> 96, the board's line buffer
+  8120 -> 8152), and in the detector fragment
+  `baseline_last=none|bssid:<last 4 hex digits>,changes:<bssid|channel|privacy|wpa|rsn|pmf|owe joined by +>,count:<n>,age_s:<n>`
+  (the last UnexpectedAp report, router change or channel move) and `channel_moves=<n>,last:<from>-><to>|none`.
+- **Not done here:** the device run (install, STATUS, a router channel move and a security change on the owner's own
+  router, the glass). The lab harness's accepted live scenarios `settings` and `channel` (lab/live/assessment.py) still
+  expect the old red `settings_changed`; they were not changed by this task.
 
 ## G16I upright by gravity and the snow-globe burst (implemented 2026-11-17; ledger G16I: accepted 2026-11-18, upright mode off by default by the owner's ruling)
 

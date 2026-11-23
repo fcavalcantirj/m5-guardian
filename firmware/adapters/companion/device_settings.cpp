@@ -7,8 +7,10 @@
 namespace guardian::companion {
 namespace {
 constexpr char magic[4] = {'G', 'S', 'E', 'T'};
-constexpr std::uint16_t format = 1;
-// CRC-32 (reflected 0xEDB88320, initial and final inversion: the zlib value), bitwise: 12 bytes only.
+constexpr std::uint16_t format = 2;          // G25: + the ROUTER CHANGES byte
+constexpr std::uint16_t format_g24 = 1;      // magic, format, guard, brightness, CRC-32 (12 bytes): still read
+constexpr std::size_t g24_record_bytes = 12;
+// CRC-32 (reflected 0xEDB88320, initial and final inversion: the zlib value), bitwise: 13 bytes at most.
 std::uint32_t crc32_of(const std::uint8_t* data, std::size_t n) {
     std::uint32_t crc = 0xffffffffu;
     for (std::size_t i = 0; i < n; ++i) {
@@ -70,18 +72,25 @@ std::size_t encode_settings(const DeviceChoices& c, std::uint8_t* out, std::size
     if (!out || capacity < settings_record_bytes || !c.valid()) return 0;
     std::memcpy(out, magic, 4);
     out[4] = static_cast<std::uint8_t>(format & 0xff); out[5] = static_cast<std::uint8_t>(format >> 8);
-    out[6] = static_cast<std::uint8_t>(c.guard); out[7] = c.bright_pct;
-    put32(out + 8, crc32_of(out, 8));
+    out[6] = static_cast<std::uint8_t>(c.guard); out[7] = c.bright_pct; out[8] = static_cast<std::uint8_t>(c.router);
+    put32(out + 9, crc32_of(out, 9));
     return settings_record_bytes;
 }
 
+// Format 2 (13 bytes), or a G24 record (format 1, 12 bytes) migrated: its guard and brightness are kept and
+// ROUTER CHANGES takes its default (Amber). Each format only at its own exact size.
 bool decode_settings(const std::uint8_t* in, std::size_t size, DeviceChoices& out) {
-    if (!in || size != settings_record_bytes || std::memcmp(in, magic, 4) != 0) return false;
-    if (get32(in + 8) != crc32_of(in, 8)) return false;
-    if ((in[4] | (in[5] << 8)) != format) return false;
+    if (!in || size < g24_record_bytes || std::memcmp(in, magic, 4) != 0) return false;
+    const unsigned version = static_cast<unsigned>(in[4] | (in[5] << 8));
+    const std::size_t body = version == format ? 9 : version == format_g24 ? 8 : 0;
+    if (!body || size != body + 4 || get32(in + body) != crc32_of(in, body)) return false;
     DeviceChoices c;
     if (!guard_cycle_from(in[6], c.guard)) return false;
     c.bright_pct = in[7];
+    if (version == format) {
+        if (in[8] >= router_policy_count) return false;
+        c.router = static_cast<RouterPolicy>(in[8]);
+    }
     if (!c.valid()) return false;
     out = c;
     return true;
@@ -138,8 +147,8 @@ std::size_t hours_text(std::uint16_t minutes, char* out, std::size_t capacity) {
 
 std::size_t settings_status(const DeviceChoices& c, SettingsStore s, char* out, std::size_t capacity) {
     if (!out || !capacity) return 0;
-    return fit(std::snprintf(out, capacity, "settings=guard:%s,bright:%u,store:%s", guard_cycle_name(c.guard), unsigned(c.bright_pct),
-                             settings_store_text(s)), out, capacity);
+    return fit(std::snprintf(out, capacity, "settings=guard:%s,bright:%u,store:%s,router:%s", guard_cycle_name(c.guard), unsigned(c.bright_pct),
+                             settings_store_text(s), router_policy_text(c.router)), out, capacity);
 }
 
 std::size_t guard_cycle_status(GuardCycle c, const CycleStats& s, char* out, std::size_t capacity) {

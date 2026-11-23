@@ -26,7 +26,7 @@ def assess(scenario,states,witness,emitter,ack_us,end_us,uncertainty_us,groups,a
             mode=s.get('mode',0)
             if not modes or modes[-1]!=mode:modes.append(mode)
         result['advertised_mode_sequence']=modes
-        ok=ok and modes==[4,5,4] and any(s.get('mode')==5 and s.get('pmf')==3 for s in fresh) and any(s.get('settings_changed') and s.get('incident_visible') for s in states) and ap_stop_observed and bool(emitter) and emitter.get('role')=='test_ap'
+        ok=ok and modes==[4,5,4] and any(s.get('mode')==5 and s.get('pmf')==3 for s in fresh) and any(s.get('settings_changed') for s in states) and not any(s.get('alert') and s.get('settings_changed') for s in states) and ap_stop_observed and bool(emitter) and emitter.get('role')=='test_ap'   # G25: a security change is amber (recorded, never the red ALERT at the default sensitivity)
     elif scenario=='channel':
         channels=[]
         for s in fresh:
@@ -40,7 +40,7 @@ def assess(scenario,states,witness,emitter,ack_us,end_us,uncertainty_us,groups,a
         gap=len(gaps)==2 and all(gaps)
         result['observed_channel_sequence']=channels;result['coverage_gap_visible']=gap
         result['transition_gaps']=gaps
-        ok=ok and channels==[13,6,13] and gap and any(s.get('settings_changed') and s.get('incident_visible') for s in states) and ap_stop_observed and bool(emitter) and emitter.get('role')=='test_ap'
+        ok=ok and channels==[13,6,13] and gap and not any(s.get('settings_changed') or s.get('alert') for s in states) and ap_stop_observed   # G25: the router moving channel is followed silently, never an incident and bool(emitter) and emitter.get('role')=='test_ap'
     elif scenario in ('related-approved','related-unapproved'):
         observed=max((s.get('watched_advertisements',0) for s in states),default=0)
         unexpected=any(s.get('unexpected_ap') and s.get('incident_visible') for s in states)

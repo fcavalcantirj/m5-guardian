@@ -67,10 +67,14 @@ enum class ViewMode : std::uint8_t { Live, Demo };
 //            while something is nearby; after the last page: Face); Secondary/Back -> Face;
 //            PrimaryLong -> Settings screen (in DEMO: back to Live, Face); SecondaryLong -> Picker (Live only)
 //   No key enters DEMO (owner 2026-11-21, "is for development, ditch"): set_demo() is the direct method.
-//   Settings (G24, single-key, the owner is one-handed): Primary -> next value of this page (wraps);
-//            PrimaryLong -> save this page (SettingsSave request; the SAVED / SAVE FAILED plate shows for
-//            settings_plate_ms, then the next page, after the last page Face; a failed save stays on the
-//            page); Secondary / SecondaryLong / Back -> Face (nothing more saved; the draft is dropped)
+//   Settings (G25 keys, owner 2026-11-23 "SIDE changes, BLUE saves" then "or hold side to save"; single key,
+//            the owner is one-handed): Secondary -> next value of this page (wraps); SecondaryLong -> save
+//            this page (SettingsSave request; the SAVED / SAVE FAILED plate shows for settings_plate_ms, then
+//            the next page, after the last page Face; a failed save stays on the page); Primary /
+//            PrimaryLong / Back -> Face (nothing more saved; the draft is dropped)
+//   Details, Router page (G25, first while a router change waits): SecondaryLong -> accept the new settings
+//            (OwnerRequest AcceptChange; a STRICT channel move is acknowledged here) and Face; every other key
+//            as on the other details pages
 //   Any screen: a NEW red ALERT (view().alert turning on) returns to Face (alert-first, G24); amber does not.
 //   Picker:  Primary -> move the cursor (wraps); Secondary -> select the highlighted
 //            network (OwnerRequest::Select, then Face); PrimaryLong -> approve or revoke
@@ -78,6 +82,48 @@ enum class ViewMode : std::uint8_t { Live, Demo };
 //            another BSSID); SecondaryLong/Back -> cancel (Face)
 //   Tick / None never change the screen; Tick expires old candidates.
 enum class Action : std::uint8_t { None, Tick, Primary, PrimaryLong, Secondary, SecondaryLong, Back };
+
+// ---- G25: the owner's router changing its own settings ----------------------------------------------
+// ROUTER CHANGES (Settings page 3): how the router's own changes (guardian/detectors.hpp RouterState) are
+// coloured. DetailsOnly: recorded on the Details Router page, no colour, never lights the dark screen.
+// Amber (default): a security change is amber until the owner accepts it; a channel move is one grey line.
+// Strict: a security change is the red ALERT until accepted; a channel move is amber until acknowledged.
+enum class RouterPolicy : std::uint8_t { DetailsOnly, Amber, Strict };
+constexpr std::uint8_t router_policy_count = 3;
+const char* router_policy_text(RouterPolicy);   // STATUS: "details", "amber", "strict"
+enum class Tone : std::uint8_t { None, Grey, Amber, Red };
+struct RouterView {
+    RouterPolicy policy{RouterPolicy::Amber};
+    RouterChange change{};           // change.pending: a security change waiting for the owner
+    std::uint8_t pending{};          // approved APs with a pending change (the newest is `change`)
+    Tone change_tone{Tone::None};    // pending: Grey (DetailsOnly), Amber, Red (Strict)
+    std::uint32_t moves{};           // channel moves since the scope was set
+    ChannelMove last_move{};
+    bool move_unacked{};             // Strict: a channel move the owner has not acknowledged
+    Tone move_tone{Tone::None};      // moves: Grey, or Amber while move_unacked
+    bool page{};                     // the Details Router page is offered (change pending or move_unacked)
+    bool age_known{};                // change.first's age at the presenter's instant (same epoch)
+    Millis age_ms{};
+};
+// Short display labels of the summary values ("WPA3", "WPA2/WPA3", "WPA2", "WPA", "WEP", "open", "OWE",
+// "Enterprise", "unknown"; "GCMP", "CCMP", "TKIP", "WEP", "none"; "required", "optional", "off").
+const char* router_mode_text(Mode);
+const char* router_cipher_text(Cipher);
+const char* router_pmf_text(Pmf);
+// The router's change in plain words (owner wording), copied by hand (no formatted output here):
+//   Full    "Your router changed its security settings: PMF (required -> optional), a downgrade"
+//           (every differing item of mode / cipher / PMF, or "other options" when only finer fields
+//           differ; ", a downgrade" when security_downgrade());
+//   Short   "Router changed security: PMF, a downgrade" (the items' names only);
+//   Minimal "Router changed its security settings".
+// Without a pending change but with a move the owner has not acknowledged (Strict):
+//   Full "Your router moved to channel 11 (from 6)", Short/Minimal "Router moved to ch 11".
+// Returns the length written; 0 with an empty string when there is nothing to say or it does not fit.
+enum class RouterWording : std::uint8_t { Full, Short, Minimal };
+std::size_t router_sentence(const RouterView&, RouterWording, char* out, std::size_t capacity);
+// The grey channel-move line: "Router moved ch 6->11", or "Router moved 3x, 6->11" after several
+// moves; 0 with an empty string without a move.
+std::size_t move_line(const RouterView&, char* out, std::size_t capacity);
 
 // Display text derived from SSID bytes. NEVER an identity (identity.hpp): two
 // different byte strings may share a label; selection always carries the bytes.
@@ -213,7 +259,15 @@ struct ViewModel {
     const char* caution_reason{""};        // area_text(caution_evidence.family)
     // G16N: Snapshot::incident_seq of the LIVE snapshot (also while DEMO is shown): it changes
     // with every new incident report, red or amber, so a dark screen can be lit for each one.
+    // G25: plus every router change or channel move shown in colour (amber or red) under the owner's
+    // ROUTER CHANGES setting; a DetailsOnly or grey one never changes it.
     std::uint32_t incident_seq{};
+    // G25: the router's own changes and how they are coloured. router_amber: amber on the face from the
+    // router (never while a red ALERT shows; it ends the celebration). router_alert: the red ALERT is the
+    // router's security change (Strict) and no Core incident is shown (a Core incident keeps the alert's words).
+    RouterView router{};
+    bool router_amber{};
+    bool router_alert{};
 };
 // Pure reducer of one Snapshot to the face view (pre-G08 API, kept; G08 fills
 // the additional fields that need no clock or interaction state).
@@ -239,7 +293,8 @@ std::size_t alert_sentence(const ViewModel&, char* out, std::size_t capacity, st
 // G16E: Nearby is shown only while an area observation is current.
 // G16J: Limits ("What it cannot see") follows OwnerChecks, always; then Nearby when current.
 // (Appended so the earlier values stay stable.)
-enum class DetailsPage : std::uint8_t { Settings, Explanation, SignalAndEvidence, OwnerChecks, Nearby, Limits, Count };
+// G25: Router ("Your router changed") is the FIRST page while RouterView::page; hold SIDE there accepts.
+enum class DetailsPage : std::uint8_t { Settings, Explanation, SignalAndEvidence, OwnerChecks, Nearby, Limits, Router, Count };
 
 // ---- G24 device settings ------------------------------------------------------------------------
 // Two settings the owner sets on the stick: the guard listen cycle on battery (guard_cycle.hpp) and the
@@ -250,11 +305,12 @@ constexpr std::array<std::uint8_t, 5> brightness_choices{{10, 30, 60, 80, 100}};
 struct DeviceChoices {
     GuardCycle guard{GuardCycle::Always};
     std::uint8_t bright_pct{brightness_default_pct};
-    bool valid() const;               // a known guard choice and one of brightness_choices
-    bool operator==(const DeviceChoices& o) const { return guard == o.guard && bright_pct == o.bright_pct; }
+    RouterPolicy router{RouterPolicy::Amber};   // G25
+    bool valid() const;               // a known guard choice, one of brightness_choices and a known router policy
+    bool operator==(const DeviceChoices& o) const { return guard == o.guard && bright_pct == o.bright_pct && router == o.router; }
 };
-enum class SettingsPage : std::uint8_t { Guard, Brightness };
-constexpr std::uint8_t settings_pages = 2;
+enum class SettingsPage : std::uint8_t { Guard, Brightness, Router };
+constexpr std::uint8_t settings_pages = 3;
 enum class SavePlate : std::uint8_t { None, Saved, Failed };
 struct SettingsView {
     bool open{};                      // the Settings screen is shown
@@ -385,7 +441,9 @@ struct PickerView {
 // (Core::select, ApprovedScope::select/approve/revoke, SelectionStore::save)
 // and the presenter learns the outcome from the next Snapshot/scope. Never
 // emitted in DEMO.
-enum class RequestKind : std::uint8_t { None, Select, Approve, Revoke };
+// G25 AcceptChange: the owner accepted the router's new settings (ap.network.bssid names the AP); the
+// application re-baselines it (Monitor::accept_router_change) and stores the selection.
+enum class RequestKind : std::uint8_t { None, Select, Approve, Revoke, AcceptChange };
 struct OwnerRequest {
     RequestKind kind{RequestKind::None};
     ApprovedAp ap{};                      // identity bytes + the offered baseline facts
@@ -434,7 +492,8 @@ public:
     // New live evidence and the current instant (the clock the application reads).
     // `scope` may be null; otherwise borrowed until next update(), must outlive
     // use. Mismatched-origin snapshots are ignored. Refresh from Core regularly.
-    void update(const Snapshot& live, Instant now, const ApprovedScope* scope = nullptr);
+    // G25 `router`: the baseline detector's router state (Monitor::router()); null = none (kept as is).
+    void update(const Snapshot& live, Instant now, const ApprovedScope* scope = nullptr, const RouterState* router = nullptr);
     // One input action at `now`. Returns true when the view changed.
     bool handle(Action, Instant now);
     // A received advertisement reduced by candidate_from(). Refused (and
@@ -507,6 +566,8 @@ private:
     void to_face();                   // Face, details reset, any settings draft / plate dropped
     void tick_plate();                // the plate's time over: settings_advance()
     DeviceChoices merged() const;     // device_ with this page's draft
+    void rebuild_router();            // G25: view_.router and the face colours from router_ and the policy
+    bool router_key(Action);          // G25: hold SIDE on the Router page
 
     DisplayCapabilities display_;
     Origin live_origin_;
@@ -546,6 +607,11 @@ private:
     SavePlate plate_{SavePlate::None};
     Millis plate_at_{};
     SettingsView settings_view_{};
+    // G25
+    RouterState router_{};
+    std::uint32_t router_seen_seq_{}, router_seen_moves_{};   // last change_seq / moves taken into account
+    std::uint32_t router_wakes_{};    // coloured router events (added to incident_seq)
+    std::uint32_t moves_acked_{};     // Strict: channel moves the owner acknowledged
     ViewModel view_{};
     DetailsView details_{};
     PickerView picker_{};

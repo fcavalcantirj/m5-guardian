@@ -196,6 +196,15 @@ public:
     bool approve(const ApprovedAp&);  // related AP: same SSID bytes, other BSSID
     bool revoke(const Mac&);
     bool restore(const PersistedSelection&); // atomic: false leaves everything unchanged
+    // G25: the router's own changes (the baseline detector's RouterState). A channel move of the selected or
+    // an approved AP is re-baselined in the scope as soon as the detector confirms it (inside receive(); no
+    // incident, the detector keeps its state) and scope_revision() goes up so the owner of the
+    // SelectionStore saves the new channel. accept_router_change(): the owner accepted the pending security
+    // change of `bssid`: its baseline becomes the newest advertised fingerprint, the detector stops showing
+    // it (no re-report while the router keeps it) and scope_revision() goes up. False when nothing is pending.
+    RouterState router() const { return baseline_.router(); }
+    bool accept_router_change(const Mac& bssid);
+    std::uint32_t scope_revision() const { return scope_revision_; }
     const ApprovedScope& scope() const { return scope_; }
     void coverage(const CoverageReport&);
     Snapshot snapshot();
@@ -241,7 +250,9 @@ public:
     Radar radar() const;
     // STATUS fragment: " detectors=<name>:frames=..,in_window=..,events=..,incidents=..,last=<s>s|none,cooldown=<s>;..."
     // " air=probes:..,beacons:..,tx:..[+],window_s:.. area_visible=N same_name=N same_name_evicted=N" (G16R: the
-    // addresses heard under the picked name). 0 when it does not fit (never cut).
+    // addresses heard under the picked name)
+    // " baseline_last=none|bssid:<last 4 hex digits>,changes:<bssid|channel|privacy|wpa|rsn|pmf|owe joined by +>,count:<n>,age_s:<n>"
+    // " channel_moves=<n>,last:<from>-><to>|none" (G25). 0 when it does not fit (never cut).
     std::size_t status_text(char*, std::size_t) const;
     // G16S burst forensics: the last disconnect burst of one scope that reached a
     // detector threshold (guardian/shapes.hpp LastBurst), at the Monitor's clock.
@@ -283,5 +294,7 @@ private:
     bool ble_scan_{};
     DetectorRegistry registry_{};
     AirMeter air_{};
+    std::uint32_t scope_revision_{};   // G25: the scope changed without an owner request (a channel move, an accept)
+    bool rebaseline(const Mac& bssid, const ApprovedAp& updated);
 };
 } // namespace guardian::measurement
