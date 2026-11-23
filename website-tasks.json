@@ -133,6 +133,6 @@
       "Tests: unit tests for the plan checks, protected ranges, manifest parsing and signature, error mapping and reset sequence with a fake port and signed fixtures (a throwaway key); the route tests with a mocked fetch. Owner-run real-stick smoke (Playwright + Chrome, not in CI): backup, first install from a non-Guardian image, update keeps settings, restore the backup byte-exact.",
       "Gates: make website-check, the browser suite, the preview Lighthouse gate (the flasher loads esptool-js only after a click), public_check 0. No commit, push or deploy by the worker."
     ],
-    "passes": false
+    "passes": true
   }
 ]
