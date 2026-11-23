@@ -854,6 +854,25 @@
       "CARRY-OVER from the G23 owner run (owner, 2026-11-21): during a long attack the screen alternates between the page the owner was on (lit by each new burst) and the face (the dim view). When a NEW red ALERT starts, the presenter goes to the Face screen and stays there while the alert lasts (alert-first); amber keeps today's behaviour. Presenter host TDD red first; idle rules unchanged.",
       "RETRY CARRY-OVER (Author + owner, 2026-11-21 15:5x, after the first device look): the owner could not reach Settings (nine Details pages deep; fast FRONT presses opened UPDATE on the third and answered yes on the fourth). Owner rulings: 'why dont press and hold blue, like side opens net list, blue opens settings'; DEMO 'is for development, ditch'. FINAL KEY MAP, single key, one-handed: Face: FRONT = Details (first page Advertised Wi-Fi settings, exactly as before G24), HOLD FRONT = Settings screen, hold SIDE = network list. Details: FRONT = next page, SIDE = face, HOLD FRONT = Settings screen, hold SIDE = network list. Remove the DEVICE SETTINGS details page and its SIDE = open exception (Details is again as before G24). Settings screen keys unchanged (FRONT next value, hold FRONT save, SIDE leaves). Picker keys unchanged (its hold FRONT stays approve/revoke). No key enters DEMO any more; keep the presenter's DEMO capability behind a direct method for tests and the console (if a console verb exists keep it), and if the stick is somehow in DEMO, hold FRONT returns to LIVE. FRONT x3 (UPDATE / SETUP) counts only on the Face screen (already in the tree, measurement_main.cpp; keep it and document it). The supervisor's working-tree edits since the handoff, keep: the TUNE-session fix in screens.cpp (session_hints drops the Settings screen's own hint rows, settings_hint1_y/2_y) with its test; revert the supervisor's 'DEVICE SETTINGS first page' order change (presenter.cpp and the tests he edited) since the page goes away. Update every test that used hold FRONT to reach DEMO to the direct method, deliberately and listed in the handoff; add presenter tests: hold FRONT from Face and from Details opens Settings, never DEMO; Details order as before G24. Update README.md and firmware/README.md (keys). Host plain + ASan, the look compare (0 px), one signed build; no flash, no commit."
     ],
+    "passes": true
+  },
+  {
+    "id": "G25",
+    "category": "core",
+    "description": "RELEASE 1 owner fixes after living with G24 (2026-11-21/23): a router that changes its own channel or settings must not raise a red 'attack' alarm, its sensitivity is a Settings choice, and the Settings keys use SIDE as the owner asked.",
+    "depends_on": [
+      "G24"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "EVIDENCE (MEASURED 2026-11-21 ~20:50, STATUS over USB): after the owner's router misbehaved and was restarted, the stick showed red ALERT; detectors disconnect events=0 (no attack frames), baseline events=110 incidents=1 re-firing every cooldown. BaselineDetector (firmware/components/guardian_core/detectors.cpp:524-584) raises IncidentKind::SettingsChanged, Network scope (red, 'Advertised settings changed', presenter.cpp:163,178) for a channel change (change::Channel) or any advertised security field (core.hpp:202-210), and keeps re-reporting while the router advertises the new values; only re-picking the network clears it. Owner: 'IMMENSE BUG'.",
+      "STATUS first: print the last baseline incident as baseline_last=bssid:<tail>,changes:<channel|privacy|wpa|rsn|pmf|owe>,count:<n>,age_s:<n> so a future report is never guesswork.",
+      "CHANNEL MOVE of the selected or an approved AP is normal router behaviour: re-baseline the channel silently, count it (STATUS channel_moves=<n>,last:<from>-><to>), one grey line on the Details page. No incident.",
+      "SECURITY CHANGE on the same approved BSSID = AMBER, not red, plain words: 'Your router changed its security settings: <what> (<old> -> <new>)'; a downgrade (WPA3->WPA2, PMF required->optional/off, CCMP->TKIP, any->open) says 'downgrade'. It stays until the owner accepts it: on the Details page that shows the change, hold SIDE = 'accept the new settings' (re-baseline, the amber ends). Red stays ONLY for disconnect bursts and UnexpectedAp (another BSSID using the network's name).",
+      "SETTINGS PAGE 3 'ROUTER CHANGES' in the approved Bruce look (firmware/evidence/sticks3-G24-settings-look-20261121.png): DETAILS ONLY (record, no colour) / AMBER (default) / STRICT (security changes red, channel moves amber). Stored in the GSET record (format bump with a migration that keeps guard and brightness); STATUS settings= adds router:<choice>.",
+      "SETTINGS KEYS (owner 2026-11-23: 'SIDE changes, BLUE saves' then 'or hold side to save'): open with hold BLUE (unchanged); inside: SIDE = next value (wraps), hold SIDE = save (green SAVED / SAVE FAILED, then the next page; after the last page the face), BLUE = leave without saving. Update the on-screen hints ('SIDE next  BLUE back', 'hold SIDE = save'), the onboarding Buttons page, README and firmware/README key tables; the look compare is re-run and the only pixel changes are the two hint rows and the new page 3.",
+      "Host TDD red first (plain + ASan): channel move -> no incident and re-baselined; security change -> amber with old/new; downgrade wording; accept by hold SIDE -> re-baseline, no re-fire; STRICT and DETAILS ONLY; UnexpectedAp and disconnect bursts still red; the new keys on every Settings page; GSET migration round trip. One signed build; no flash, no commit."
+    ],
     "passes": false
   },
   {
@@ -871,6 +890,22 @@
       "RELEASE BUILD: build.sh build-release = the normal image plus the release country, built twice from a clean tree with identical sha256 (fail otherwise), signed with the owner's OTA key (the vendor model, like Doutor VPD: every flashed stick trusts the owner's later images). Only the four flash files ship; never the ELF, map, source tarball or SDK inputs.",
       "RELEASE TOOLING (owner runs --publish only): tools/release_package.sh (the reproducible double build, SHA256SUMS, BUILD_INFO.txt) and tools/release_publish.sh, modelled on Doutor VPD's: manifest.json {tag guardian-<ver>-b<build>-<sha12>, version, date, notes, parts[{file,offset,sha256,size}]} signed with a separate ECDSA P-256 release key kept in ~/.config/m5-guardian/ (mode 600, never in the repo; the public key is committed for the website), published as a GitHub Release of fcavalcantirj/m5-guardian with the four parts. --dry-run by default; tests with a throwaway key.",
       "PUBLIC TREE: public_check 0; no key material committed except the release PUBLIC key. No commit (the supervisor commits on the owner's word)."
+    ],
+    "passes": false
+  },
+  {
+    "id": "R1",
+    "category": "acceptance",
+    "description": "RELEASE 1 combined owner acceptance (owner, 2026-11-22: 'I test everything all together'): the hands-on and battery checks of G24, G25 and G26 on the device, in one sitting, before any public release.",
+    "depends_on": [
+      "G26"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "MOVED FROM G24 (Author 2026-11-23): G24 was accepted for its built and host-validated scope (handoffs 20261121-125201 and 20261121-155444, host plain+ASan 56/56, look compare 0 px, installed as guardian-20261121-160856, STATUS parts=led:0,ir:low,boost5v:0,amp:0,codec:down from register reads, settings saved and restored across a USB update in the W07 spike). Its remaining device acceptance moves here.",
+      "Owner on the glass: photos of every Settings page with the final keys (G25), the false-alarm cases (router channel move -> no red; security change -> amber; accept by hold SIDE), the welcome pages on a clean install from the website (W07 when live).",
+      "Battery drains, full charge to the floor, one per choice: EVERY MINUTE within 10 % of 7 h 14 min, ALWAYS within 10 % of 2 h 05 min, EVERY 30 S measured and entered in the hours table (G24's table; a code change by the supervisor with the log line). Any reset=brownout stops the acceptance and is reported.",
+      "Results to firmware/evidence/sticks3-R1-<date>.log with raw files under $GUARDIAN_STORE/evidence-raw/ and their sha256."
     ],
     "passes": false
   },
