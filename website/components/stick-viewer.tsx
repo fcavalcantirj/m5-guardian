@@ -26,6 +26,7 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Presentation } from "@/lib/guardian";
+import { LABEL_H, LABEL_W, drawLabel, resolveLabelFonts } from "./back-label";
 import {
   SCREEN_TEXTURE,
   applyKey,
@@ -46,6 +47,8 @@ import {
 // Model units: the CAD is in millimetres, scaled to 0.1 scene units per mm.
 const MM = 0.1;
 const FRONT_Z = 0.652;
+/** The back face of the case; the label sits just behind it (Doutor VPD: BACK_Z - 0.004). */
+const BACK_Z = -0.75;
 const SCREEN_W = 1.36;
 const SCREEN_H = 2.42;
 const SCREEN_Y = 0.69;
@@ -216,6 +219,7 @@ export default function StickViewer({ view, motion, onReady, onFail, onExit }: P
             root={root}
           >
             <Model />
+            <BackLabel />
             <Screen view={view} onFail={onFail} onPainted={() => markReady("screen")} root={root} />
           </Turntable>
           <BlobShadow />
@@ -354,6 +358,38 @@ function Model() {
         <meshPhysicalMaterial vertexColors roughness={0.38} clearcoat={0.5} clearcoatRoughness={0.3} />
       </mesh>
     </>
+  );
+}
+
+/** The printed label that closes the open back of the case model (see back-label.ts). */
+function BackLabel() {
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
+  const gl = useThree((s) => s.gl);
+  const invalidate = useThree((s) => s.invalidate);
+
+  useEffect(() => {
+    let cancelled = false;
+    let tex: THREE.CanvasTexture | null = null;
+    document.fonts.ready.then(() => {
+      if (cancelled) return;
+      tex = new THREE.CanvasTexture(drawLabel(resolveLabelFonts()));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = gl.capabilities.getMaxAnisotropy();
+      setTexture(tex);
+      invalidate();
+    });
+    return () => {
+      cancelled = true;
+      tex?.dispose();
+    };
+  }, [gl, invalidate]);
+
+  if (!texture) return null;
+  return (
+    <mesh position={[0, 0, BACK_Z - 0.004]} rotation-y={Math.PI}>
+      <planeGeometry args={[LABEL_W, LABEL_H]} />
+      <meshStandardMaterial map={texture} roughness={0.55} transparent alphaTest={0.5} />
+    </mesh>
   );
 }
 
