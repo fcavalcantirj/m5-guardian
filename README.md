@@ -108,8 +108,9 @@ The full matrix, with the evidence file of every proven row and the source of ev
 - Bluetooth, on this board.
 - A transmitter that copies the picked access point's own address, name, settings and channel: it is
   counted as the network itself.
-- The air during its own update check: by default every 120 s the stick stops listening for the
-  seconds the check takes. A due check waits while a red ALERT is active.
+- The air during its own update check: on a stick with an update server stored, by default every 120 s
+  the stick stops listening for the seconds the check takes. A due check waits while a red ALERT is
+  active. A stick without an update server (installed from the website) never checks by itself.
 - Who is behind an event. It names the behaviour and the counts, never a tool or a person.
 
 A detector that has never fired on the device is listed as unproven, not as protection.

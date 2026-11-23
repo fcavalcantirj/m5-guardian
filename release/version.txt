@@ -1,0 +1,5 @@
+# M5 Guardian public release number (G26). tools/release_package.sh names the package
+# guardian-<version>-b<build>-<sha12 of the signed app>; tools/release_publish.sh refuses a
+# build that is not higher than the release already published. Raise build for every release.
+version=1.0.0
+build=1

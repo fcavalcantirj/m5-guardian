@@ -1,0 +1,13 @@
+# G26 public release image, applied on top of sdkconfig.defaults by
+# `tools/build.sh build-release` (own build directory, archive and version suffix -rel).
+# tools/release_package.sh builds it twice from a clean tree and publishes only when
+# both builds give the same bytes. Everything else is the normal Guardian image.
+CONFIG_GUARDIAN_RELEASE=y
+# World safe radio country (ESP-IDF "01": esp_wifi.h lists it as channels 1-11) instead
+# of the owner lab's explicit "BR", and the joined network's country adopted through
+# 802.11d while the stick is a station (update join, setup password check).
+CONFIG_GUARDIAN_COUNTRY="01"
+CONFIG_GUARDIAN_COUNTRY_80211D=y
+# Reproducible build: no compile date/time in the app descriptor, build and source paths
+# mapped to fixed names (ESP-IDF Kconfig APP_REPRODUCIBLE_BUILD, tools/cmake/prefix_map.cmake).
+CONFIG_APP_REPRODUCIBLE_BUILD=y

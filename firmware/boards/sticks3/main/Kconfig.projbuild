@@ -3,11 +3,34 @@ config GUARDIAN_COUNTRY
     string "Regulatory country for passive 2.4 GHz listening"
     default "BR"
     help
-        Two upper-case letters passed to esp_wifi_set_country_code() with
-        802.11d adoption disabled before the companion starts passive,
+        Two upper-case letters, or "01" (ESP-IDF world safe mode), passed to
+        esp_wifi_set_country_code() before the companion starts passive,
         receive-only listening at boot. Empty leaves the radio off (the screen
-        says so). The owner lab's measured scope is BR. A console `select` with
-        a different country still requires a reboot (G13 rule).
+        says so). The owner lab's measured scope is BR (the lab build); the
+        public release image (G26, sdkconfig.release) uses "01". A console
+        `select` with a different country still requires a reboot (G13 rule).
+config GUARDIAN_COUNTRY_80211D
+    bool "Adopt the joined network's country (802.11d)"
+    default n
+    help
+        G26: the second argument of esp_wifi_set_country_code(). When set, the
+        Wi-Fi driver uses the country the access point advertises while the
+        stick is joined to it as a station (the update join, the setup's
+        password check) and returns to GUARDIAN_COUNTRY afterwards (ESP-IDF
+        v5.4 esp_wifi.h, esp_wifi_set_country_code, attention 1). Off in the
+        owner's lab build (BR, explicit); on in the public release image,
+        whose configured country is the world safe "01".
+config GUARDIAN_RELEASE
+    bool "RELEASE: the public image flashed from the website (G26)"
+    default n
+    help
+        Label of the public release image, built only by
+        `boards/sticks3/tools/build.sh build-release` (sdkconfig.release: the
+        world safe country "01" with 802.11d adoption, and ESP-IDF's
+        reproducible build) into its own build directory and archive (version
+        suffix -rel). tools/release_package.sh builds it twice from a clean
+        tree and refuses two different results. The code is the normal
+        Guardian; only the radio country differs from the lab build.
 config GUARDIAN_OTA_SELFTEST_FAIL
     bool "TEST ONLY: this image fails its boot self-test (G16B rollback proof)"
     default n

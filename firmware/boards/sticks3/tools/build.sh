@@ -63,6 +63,9 @@ do_build(){
   fi
   # G23: battery-life measurement image (the CPU frequency while dark follows TUNE power.dark_cpu_mhz; needs CONFIG_PM_ENABLE).
   if [ "$variant" = dark-cpu ]; then defaults="sdkconfig.defaults;sdkconfig.dark-cpu";suffix="-dcpu";fi
+  # G26: the public release image (sdkconfig.release: world safe country "01" with 802.11d adoption, ESP-IDF
+  # reproducible build). tools/release_package.sh runs it twice from a clean tree with one fixed version.
+  if [ "$variant" = release ]; then defaults="sdkconfig.defaults;sdkconfig.release";suffix="-rel";fi
   require_store;require_idf;require_key
   BUILD_DIR="$("$IDF_PYTHON" "$SUPPORT" init "$BUILD_DIR")"
   STAMP="$(date +%Y%m%d-%H%M%S)-$$"
@@ -115,6 +118,8 @@ case "$CMD" in
  build-art-bench) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-bench}";do_build art-bench ;;
  # G23 battery-life image: CONFIG_PM_ENABLE + CONFIG_GUARDIAN_DARK_CPU (sdkconfig.dark-cpu), own build directory and archive.
  build-dark-cpu) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-dcpu}";do_build dark-cpu ;;
+ # G26 public release image: CONFIG_GUARDIAN_RELEASE=y (sdkconfig.release), own build directory and archive.
+ build-release) BUILD_DIR="${GUARDIAN_BUILD_DIR:-/private/tmp/m5-guardian-sticks3-build-rel}";do_build release ;;
  keygen)
   [ ! -e "$SIGNING_KEY" ] || die "refusing to overwrite the existing signing key at $SIGNING_KEY"
   require_idf

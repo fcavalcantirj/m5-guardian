@@ -159,6 +159,17 @@ measurement::Monitor* monitor;
 Network selected{};
 bool configured{},radio_initialized{};
 char configured_country[3]{};
+// G26: two upper-case letters, or ESP-IDF's world safe "01" (the release image's country).
+bool country_code_ok(const char* c) {
+    if(!c || std::strlen(c)!=2)return false;
+    if(c[0]=='0' && c[1]=='1')return true;
+    return c[0]>='A' && c[0]<='Z' && c[1]>='A' && c[1]<='Z';
+}
+#if CONFIG_GUARDIAN_COUNTRY_80211D
+constexpr bool country_80211d=true;    // G26 release image: the joined network's country while a station
+#else
+constexpr bool country_80211d=false;   // lab build: the explicit country, always
+#endif
 Millis deadline{},last_cover{},stable_since{};
 std::uint32_t sequence{},output_drops{},deliberate_drops{},drop_budget{},previous_drops{};
 std::uint64_t boot;
@@ -172,7 +183,7 @@ struct TextBuffers {
     char wire_line[grx::max_packet*2+7];
     char state_line[8192];      // G16F: 14 detector records in the G13 JSON
     char snapshot_line[8256];   // one USB write keeps state prefix/body together
-    char status_line[8152];     // G25: the g24 fragment 272 -> 304 (settings= router:); the baseline_last= / channel_moves= tokens ride in `detect`; G24: + settings= / guard_cycle= / parts= (272); G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
+    char status_line[8192];     // G26: + ota_auto= / country= (40 more, the TUNE reply cap); G25: the g24 fragment 272 -> 304 (settings= router:); the baseline_last= / channel_moves= tokens ride in `detect`; G24: + settings= / guard_cycle= / parts= (272); G16E: + detector fragment (G16F: 14 detectors; G16G: 16 + data-path numbers); G16S: + burst records (the compiler's worst case was 5674); G16T: the burst buffer grew by 576; G23: + lock_loss_by (96); G23 battery: + energy (160); G23 silence log: + silence_log (384 and a space)
     char detect[2048];          // G16E/G16F: per-detector counters (14), air meter, area observations
     char bursts[measurement::Monitor::burst_text_max];   // G16S: last_burst_network= / last_burst_area= (its own buffer: never lost with `detect`)
     char frames_reply[1024];
@@ -439,6 +450,10 @@ std::uint8_t dim_backlight_pct(){return tuning && tune_dim_pct>=0?static_cast<st
 std::uint64_t poll_period_ms(bool on_battery) {
     if(!tuning || tune_ota_auto<0)return 0;
     return guardian::ota::poll_period_ms(tuning->get(tune_ota_auto),tune_ota_auto_batt>=0?tuning->get(tune_ota_auto_batt):guardian::ota::follow_auto_s,on_battery);
+}
+// G26: the automatic poll runs only while an update server is stored (STATUS ota_auto=on|off|off:no_server).
+guardian::ota::AutoMode ota_auto_mode() {
+    return guardian::ota::auto_mode(provisioner && provisioner->provisioned(),poll_period_ms(power_source.source()==gp::Source::Battery));
 }
 // G23: the CPU frequency this image runs while dark: the TUNE value in the dark-cpu image, 160 MHz otherwise.
 std::uint16_t dark_mhz() {
@@ -809,12 +824,18 @@ void companion_status() {
             guardian::setup::store_text(cred_store),sticks3::vault::state_text(),int(cred_migrated),int(cred_legacy_cleared));}
     char offers[288];   // G22A (worst case 245 characters with ten-digit counts): offers accepted / refused, the last reason and the count per reason
     if(!tune_offers.status(offers,sizeof offers))std::snprintf(offers,sizeof offers,"tune_offers=status_overflow");
+    // G26: the radio country the image was built with, whether the joined network's country is adopted (802.11d),
+    // and the channels the driver allows after init (the survey's range; "-" before the radio is up).
+    char country[32];
+    if(radio_initialized)std::snprintf(country,sizeof country,"%s,11d:%s,ch:%u-%u",CONFIG_GUARDIAN_COUNTRY,country_80211d?"on":"off",
+        unsigned(radio.first()),unsigned(radio.first()+radio.count()-1));
+    else std::snprintf(country,sizeof country,"%s,11d:%s,ch:-",CONFIG_GUARDIAN_COUNTRY,country_80211d?"on":"off");
     char tune_wifi[48];
     if(tune_session.active())std::snprintf(tune_wifi,sizeof tune_wifi,"active:%us",unsigned(tune_session.remaining_ms(static_cast<std::uint32_t>(clock_ptr->now()))/1000));
     else std::snprintf(tune_wifi,sizeof tune_wifi,"%s",tune_link.running()?"ending":"off");
     std::snprintf(line,sizeof line,"G14 STATUS control=%s onboarding=%u screen=%s mode=%s selected=%s radio=%d store=%d alert=%d face=%d overlay=%d picker=%u picker_dropped=%u heap_internal_min=%u task_stack_free=%u"
         " imu=%s imu_samples=%u imu_drops=%u orient=%s tune_version=%s tune_store=%s edge=%d"
-        " ota_slot=%s app_version=%s last_update_result=%s ota_provisioned=%s ota_auto_checks=%u ota_auto_last=%s ota_auto_deferred=%u ota_not_newer=%u selftest=display:%d,store:%d,radio:%d,imu:%d %s"
+        " ota_slot=%s app_version=%s last_update_result=%s ota_provisioned=%s ota_auto=%s country=%s ota_auto_checks=%u ota_auto_last=%s ota_auto_deferred=%u ota_not_newer=%u selftest=display:%d,store:%d,radio:%d,imu:%d %s"
         " art=%s motion=%s imu_map=%d,%d,%d pose=%d,%d,%d %s"
         " art_ram=%s art_ram_bytes=%u monitor_ram=%s radio_ram=%s text_ram=%s app_ram=%s tune_ram=%s reset=%s uptime_s=%u codec_boot=%s warps=%u warp_reuses=%u art_copies=%u push_rows_avg=%u full_pushes=%u"
         " shakes=%u bursts=%u burst_ram=%s burst_ram_bytes=%u"
@@ -827,7 +848,7 @@ void companion_status() {
         imu_text,unsigned(imu.samples),unsigned(imu.ring_drops),sticks3::orientation::display_name,tune_version,
         tuning?tune::store_text(tuning->store()):"none",edge_until?1:0,
         sticks3::ota::slot_text(sticks3::ota::boot_facts().running_slot),sticks3::ota::running_version(),update_text,
-        provisioner && provisioner->provisioned()?"yes":"no",unsigned(auto_poll.checks()),auto_last_text,unsigned(auto_poll.deferrals()),ota_not_newer,int(self_test.display),int(self_test.store),int(self_test.radio),int(self_test.imu),batt,
+        provisioner && provisioner->provisioned()?"yes":"no",guardian::ota::auto_mode_text(ota_auto_mode()),country,unsigned(auto_poll.checks()),auto_last_text,unsigned(auto_poll.deferrals()),ota_not_newer,int(self_test.display),int(self_test.store),int(self_test.radio),int(self_test.imu),batt,
         art_ok?"16":"missing",motion_text(),tuning?int(tuning->get(tune_imu_right)):0,tuning?int(tuning->get(tune_imu_up)):0,tuning?int(tuning->get(tune_imu_out)):0,
         int(std::lround(motion_model.output().roll_deg)),int(std::lround(motion_model.output().pitch_deg)),int(std::lround(motion_model.output().yaw_deg)),frames,
         art_ram,unsigned(art_ram_bytes),monitor_ram,radio.queue_ram(),text_ram,app_ram,tune_ram,reset_text,unsigned(esp_timer_get_time()/1000000),codec_boot,warp_cache?unsigned(warp_cache->warps):0u,warp_cache?unsigned(warp_cache->reuses):0u,warp_cache?unsigned(warp_cache->copies):0u,
@@ -1116,11 +1137,11 @@ void command(const char* input) {
     if(!std::strncmp(input,"select ",7)) {
         char bssid[13]{},ssid[65]{},country[3]{},extra;
         if(radio.listening() || std::sscanf(input+7,"%12s %64s %2s %c",bssid,ssid,country,&extra)!=3
-           || country[0]<'A' || country[0]>'Z' || country[1]<'A' || country[1]>'Z'
+           || !country_code_ok(country)
            || !measurement::decode_network(bssid,ssid,selected)) {text("GRX1 ERROR invalid selection; stop first\n");return;}
         if(radio_initialized && std::strcmp(country,configured_country)){text("GRX1 ERROR country change requires reboot\n");return;}
         if(!radio_initialized) {
-            if(!radio.init(clock_ptr->epoch(),country)){text("GRX1 ERROR radio initialization; reboot required\n");abort();}
+            if(!radio.init(clock_ptr->epoch(),country,country_80211d)){text("GRX1 ERROR radio initialization; reboot required\n");abort();}
             radio_initialized=true;std::memcpy(configured_country,country,3);
         }
         if(!monitor->select(selected)){text("GRX1 ERROR selected scope rejected\n");return;}
@@ -1163,14 +1184,14 @@ void tune_execute(const char* cmd) {
 }
 }
 namespace {
-// Receive-only start of the companion: explicit country (802.11d off), then
-// passive discovery over that country's 2.4 GHz channels 1..13.
+// Receive-only start of the companion: the built country (lab: BR with 802.11d off; G26 release image:
+// world safe "01" with 802.11d adoption while joined), then passive discovery over that country's channels.
 void companion_radio_start() {
     const char* country=CONFIG_GUARDIAN_COUNTRY;
-    if(std::strlen(country)!=2 || country[0]<'A' || country[0]>'Z' || country[1]<'A' || country[1]>'Z') {
+    if(!country_code_ok(country)) {
         companion_radio=companion::RadioState::Unconfigured;return;
     }
-    if(!radio.init(clock_ptr->epoch(),country)){companion_radio=companion::RadioState::Failed;return;}
+    if(!radio.init(clock_ptr->epoch(),country,country_80211d)){companion_radio=companion::RadioState::Failed;return;}
     radio_initialized=true;std::memcpy(configured_country,country,3);
 #if CONFIG_GUARDIAN_ART_BENCH
     // G16Q: the Wi-Fi driver is up for the self-fetch poll only. No survey, no tune: promiscuous
@@ -1988,7 +2009,9 @@ extern "C" void app_main() {
             // G22A: alert first. While a red ALERT is active a due poll is deferred (counted, STATUS ota_auto_deferred):
             // the incident stays on the glass and the radio keeps listening; the poll runs once the alert has ended.
             const bool busy=tune_session.active() || tune_link.running() || update_confirm.is_open() || setup_visible();
-            const auto period_ms=poll_period_ms(power_source.source()==gp::Source::Battery);   // G23: ota.auto_batt_s on battery
+            // G23: ota.auto_batt_s on battery. G26: no poll at all (no join, no TUNE offer fetch, no failure record or
+            // screen) while no update server is stored: a stick installed from the website has none.
+            const auto period_ms=guardian::ota::auto_period_ms(ota_auto_mode(),poll_period_ms(power_source.source()==gp::Source::Battery));
             if(auto_poll.sample(now,period_ms,busy,app && app->presenter().view().alert)==guardian::ota::AutoPoll::Decision::Run) {
                 burst_stop();update_quiet=true;run_update();update_quiet=false;
                 redraw=sticks3::RedrawSchedule{};continue;

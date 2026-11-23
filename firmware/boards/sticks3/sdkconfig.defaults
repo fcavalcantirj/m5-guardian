@@ -33,7 +33,11 @@ CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_APP_RETRIEVE_LEN_ELF_SHA=64
 
 # G14 passive companion listening country (owner lab scope BR; see Kconfig.projbuild).
+# G26: the lab build keeps the explicit BR with no 802.11d adoption; the public release
+# image overrides both in sdkconfig.release (world safe "01" with adoption).
 CONFIG_GUARDIAN_COUNTRY="BR"
+CONFIG_GUARDIAN_COUNTRY_80211D=n
+CONFIG_GUARDIAN_RELEASE=n
 
 # G16B signed OTA with automatic rollback, no hardware secure boot, no eFuses.
 # ESP32-S3 offers only the RSA-3072 (Secure Boot V2) app signature scheme in

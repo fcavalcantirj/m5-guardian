@@ -74,20 +74,30 @@ REQUIRED_OTA_CONFIG=['CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT','CONFIG_SECURE_S
 # Review 2026-11-17: the same staleness applies to every value in sdkconfig.defaults (a new
 # main task stack size never reached the image otherwise): each must be in the built sdkconfig.
 DEFAULTS=Path(__file__).resolve().parents[1]/'sdkconfig.defaults'
-def defaults_config():
-    out=[]
-    for line in DEFAULTS.read_text().splitlines():
-        line=line.strip()
-        if line.startswith('CONFIG_') and '=' in line:k,v=line.split('=',1);out.append((k,v))
-    return out
+# G26: the public release image is sdkconfig.defaults plus this overlay (applied after it, as idf.py does).
+RELEASE_OVERLAY=Path(__file__).resolve().parents[1]/'sdkconfig.release'
+def defaults_config(overlays=()):
+    """The (key, value) pairs a build must carry: sdkconfig.defaults, then each overlay's values replacing them."""
+    out={}
+    for path in (DEFAULTS,*overlays):
+        for line in Path(path).read_text().splitlines():
+            line=line.strip()
+            if line.startswith('CONFIG_') and '=' in line:k,v=line.split('=',1);out[k]=v
+    return list(out.items())
 def built_line(key,value):
     return '# '+key+' is not set' if value=='n' else key+'='+value
 def check_config(build,version):
     lines=set((build/'sdkconfig').read_text().splitlines())
     for key in REQUIRED_OTA_CONFIG:
         if key+'=y' not in lines:raise ValueError('build lacks '+key+'=y (stale sdkconfig in the build directory?)')
-    for key,value in defaults_config():
-        if built_line(key,value) not in lines:raise ValueError('build sdkconfig differs from sdkconfig.defaults: '+built_line(key,value)+' (stale sdkconfig in the build directory?)')
+    # G26: the public release image (built only by build-release, version suffix -rel) is checked against the
+    # defaults plus sdkconfig.release: world safe country "01", 802.11d adoption, reproducible build. Every
+    # other image against the defaults alone, so the lab build keeps "BR" without adoption.
+    release='CONFIG_GUARDIAN_RELEASE=y' in lines
+    if release!=version.endswith('-rel'):raise ValueError('release image must be built by build-release and carry the -rel version suffix')
+    overlays=(RELEASE_OVERLAY,) if release else ()
+    for key,value in defaults_config(overlays):
+        if built_line(key,value) not in lines:raise ValueError('build sdkconfig differs from sdkconfig.defaults'+(' + sdkconfig.release' if release else '')+': '+built_line(key,value)+' (stale sdkconfig in the build directory?)')
     forced='CONFIG_GUARDIAN_OTA_SELFTEST_FAIL=y' in lines
     if forced!=version.endswith('-stfail'):raise ValueError('self-test-fail test image must be built by build-selftest-fail and carry the -stfail version suffix')
     # G16H: the BLE coexistence spike image is never mistaken for (or installed as) a normal build.
@@ -100,7 +110,17 @@ def check_config(build,version):
     dark_cpu='CONFIG_GUARDIAN_DARK_CPU=y' in lines
     if dark_cpu!=version.endswith('-dcpu'):raise ValueError('dark-cpu image must be built by build-dark-cpu and carry the -dcpu version suffix')
     if dark_cpu and 'CONFIG_PM_ENABLE=y' not in lines:raise ValueError('dark-cpu image without CONFIG_PM_ENABLE=y: esp_pm_configure would refuse every change')
-    return forced,spike,bench,dark_cpu
+    if release and (forced or spike or bench or dark_cpu):raise ValueError('release image combined with a test/spike/bench/measurement variant')
+    return forced,spike,bench,dark_cpu,release
+
+def radio_country(build):
+    """G26: the radio country and 802.11d adoption the image was built with (COMPLETE.json, BUILD_INFO.txt)."""
+    country,adopt=None,False
+    for line in (Path(build)/'sdkconfig').read_text().splitlines():
+        if line.startswith('CONFIG_GUARDIAN_COUNTRY='):country=line.split('=',1)[1].strip('"')
+        if line=='CONFIG_GUARDIAN_COUNTRY_80211D=y':adopt=True
+    if country is None:raise ValueError('build sdkconfig has no CONFIG_GUARDIAN_COUNTRY')
+    return country,adopt
 
 def check_signing(build):
     """G16B: the archived flash image is the owner-signed app; its record and version agree."""
@@ -205,7 +225,8 @@ def archive(build,out):
     for name in required:
         if not (build/name).is_file():raise ValueError('missing required output: '+name)
     version=check_signing(build)
-    selftest_fail,ble_spike,art_bench_image,dark_cpu_image=check_config(build,version)
+    selftest_fail,ble_spike,art_bench_image,dark_cpu_image,release_image=check_config(build,version)
+    country,adopt_80211d=radio_country(build)
     head3d=check_head3d(build,expected=not art_bench_image)   # G21: before anything is written (G16Q: the bench leaves the head out)
     art_bench=check_bench(build,art_bench_image)
     out.mkdir(parents=True)
@@ -241,7 +262,7 @@ def archive(build,out):
     for name,h in hashes.items():
         if digest(out/name)!=h:raise ValueError('archive readback failed: '+name)
     (out/'SHA256SUMS').write_text(''.join(h+'  '+n+'\n' for n,h in sorted(hashes.items())))
-    (out/'COMPLETE.json').write_text(json.dumps({'complete':True,'app_version':version,'signed_app':SIGNED_APP,'selftest_fail_test_image':selftest_fail,'ble_spike_image':ble_spike,'art_bench_image':art_bench_image,'art_bench':art_bench,'dark_cpu_image':dark_cpu_image,'head3d':head3d,'sha256':hashes,'hardware_verified':False},indent=2)+'\n')
+    (out/'COMPLETE.json').write_text(json.dumps({'complete':True,'app_version':version,'signed_app':SIGNED_APP,'selftest_fail_test_image':selftest_fail,'ble_spike_image':ble_spike,'art_bench_image':art_bench_image,'art_bench':art_bench,'dark_cpu_image':dark_cpu_image,'release_image':release_image,'radio_country':country,'radio_80211d':adopt_80211d,'head3d':head3d,'sha256':hashes,'hardware_verified':False},indent=2)+'\n')
     return out
 
 # G16C rework: the default version names the build (date-time), never a task, so
@@ -254,7 +275,7 @@ def default_app_version(at=None,suffix=''):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['init','clean','archive','sdk','resolve','version-stamp']);parser.add_argument('path');parser.add_argument('destination',nargs='?');a=parser.parse_args()
-    if a.action=='version-stamp':print(default_app_version(suffix={'none':'','stfail':'-stfail','blespk':'-blespk','bench':'-bench','dcpu':'-dcpu'}[a.path]))
+    if a.action=='version-stamp':print(default_app_version(suffix={'none':'','stfail':'-stfail','blespk':'-blespk','bench':'-bench','dcpu':'-dcpu','rel':'-rel'}[a.path]))
     elif a.action=='resolve':print(checked_path(a.path))
     elif a.action=='sdk':print(json.dumps(qualify_sdk(a.path),indent=2))
     elif a.action=='init':print(initialize(a.path))

@@ -1,0 +1,7 @@
+{
+  "purpose": "M5 Guardian release manifest signature (manifest.sig over manifest.json, tools/release_publish.sh)",
+  "algorithm": "ECDSA P-256 with SHA-256",
+  "signature_encoding": "DER (openssl dgst -sha256 -sign)",
+  "spki_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWr8dES3PNVwl6qW1SNSTlTaHpitj\nbJXxitKaIAMJ/TtT2xNE4FfqvPlJAFrDqMREs3qGt+R3Y0E8TFEXUGMX4A==\n-----END PUBLIC KEY-----\n",
+  "spki_der_sha256": "070fda9b871a87bb7d45295016b1cfce5bb579957623fb121ce6c7af302ca17b"
+}

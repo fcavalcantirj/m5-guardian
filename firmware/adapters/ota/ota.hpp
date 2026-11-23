@@ -169,6 +169,15 @@ private:
 // (truncated); a value that is not a number, or 0 or less, is 0 (the poll is off).
 constexpr float follow_auto_s = -1.0f;
 std::uint64_t poll_period_ms(float auto_s, float auto_batt_s, bool on_battery);
+// G26 public image: the automatic poll (and the TUNE offer fetch it carries) runs only while an update
+// server is stored (`server_stored`: Provisioner::provisioned(), a network AND a server URL). Without one the
+// poll is off whatever ota.auto_s says (NoServer, STATUS ota_auto=off:no_server): no join, no failure record,
+// nothing on the glass. The owner's gesture still runs and says "No update server". `period_ms` is
+// poll_period_ms() for the power source now; 0 there is Off (gesture only).
+enum class AutoMode : std::uint8_t { On, Off, NoServer };
+AutoMode auto_mode(bool server_stored, std::uint64_t period_ms);
+const char* auto_mode_text(AutoMode);                         // "on", "off", "off:no_server"
+std::uint64_t auto_period_ms(AutoMode, std::uint64_t period_ms);   // the period AutoPoll::sample gets (0 = off)
 
 // ---- boot record (NVS key "ota") --------------------------------------------
 // Fixed record: magic "GOTA", format, state, reason, from/target slot,

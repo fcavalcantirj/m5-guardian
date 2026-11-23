@@ -7,7 +7,9 @@
 namespace sticks3 {
 class MeasurementRadio final : public guardian::FrameSource {
 public:
-    bool init(const guardian::TimeEpoch&, const char* country);
+    // `country`: two upper-case letters or "01" (world safe). `adopt_80211d` (G26 release image): the driver
+    // uses the joined access point's country while the stick is a station, then returns to `country`.
+    bool init(const guardian::TimeEpoch&, const char* country, bool adopt_80211d=false);
     bool tune(std::uint8_t channel);
     bool stop();
     // G16D: before deep sleep: stop() then esp_wifi_stop (sleep_modes.rst).

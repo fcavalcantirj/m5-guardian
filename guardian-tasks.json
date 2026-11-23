@@ -891,7 +891,7 @@
       "RELEASE TOOLING (owner runs --publish only): tools/release_package.sh (the reproducible double build, SHA256SUMS, BUILD_INFO.txt) and tools/release_publish.sh, modelled on Doutor VPD's: manifest.json {tag guardian-<ver>-b<build>-<sha12>, version, date, notes, parts[{file,offset,sha256,size}]} signed with a separate ECDSA P-256 release key kept in ~/.config/m5-guardian/ (mode 600, never in the repo; the public key is committed for the website), published as a GitHub Release of fcavalcantirj/m5-guardian with the four parts. --dry-run by default; tests with a throwaway key.",
       "PUBLIC TREE: public_check 0; no key material committed except the release PUBLIC key. No commit (the supervisor commits on the owner's word)."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "R1",

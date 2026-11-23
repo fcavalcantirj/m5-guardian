@@ -647,3 +647,49 @@ GUARDIAN_CASE(poll_period_on_battery_follows_ota_auto_s_unless_set) {
     CHECK_EQ(poll_period_ms(std::nanf(""), follow_auto_s, false), 0u);
     CHECK_EQ(poll_period_ms(120.0f, std::nanf(""), true), 120000u);    // not a number: not a battery period, follow
 }
+
+// G26 public image: a stick with no update server stored (a visitor's stick after the website install, or after
+// the phone setup without a server) never runs the automatic poll: no join, no TUNE offer fetch, no failure record
+// and nothing on the glass every 120 s. STATUS says ota_auto=off:no_server. The owner's provisioned stick is unchanged.
+GUARDIAN_CASE(auto_poll_is_off_while_no_update_server_is_stored) {
+    CHECK(auto_mode(false, 120000) == AutoMode::NoServer);
+    CHECK(auto_mode(false, 0) == AutoMode::NoServer);            // no server wins over ota.auto_s 0
+    CHECK(auto_mode(true, 120000) == AutoMode::On);
+    CHECK(auto_mode(true, 0) == AutoMode::Off);                  // ota.auto_s 0: gesture only, as before
+    CHECK_EQ(std::string(auto_mode_text(AutoMode::On)), std::string("on"));
+    CHECK_EQ(std::string(auto_mode_text(AutoMode::Off)), std::string("off"));
+    CHECK_EQ(std::string(auto_mode_text(AutoMode::NoServer)), std::string("off:no_server"));
+    CHECK_EQ(auto_period_ms(AutoMode::NoServer, 120000), 0u);
+    CHECK_EQ(auto_period_ms(AutoMode::Off, 0), 0u);
+    CHECK_EQ(auto_period_ms(AutoMode::On, 120000), 120000u);     // the owner's stick: the period it had
+
+    // A phone-set-up stick: a network and its password, no server URL. Six hours of loop samples: never a poll.
+    MemoryBlob blob; Provisioner p(blob); p.load();
+    Credentials wifi_only{}; wifi_only.ssid_len = 4; std::memcpy(wifi_only.ssid.data(), "home", 4);
+    std::snprintf(wifi_only.pass.data(), wifi_only.pass.size(), "%s", "password1"); wifi_only.pass_len = 9;
+    CHECK(p.store(wifi_only)); CHECK(p.wifi_provisioned()); CHECK(!p.provisioned());
+    AutoPoll poll; unsigned runs = 0;
+    const auto mode = auto_mode(p.provisioned(), poll_period_ms(120.0f, follow_auto_s, false));
+    CHECK(mode == AutoMode::NoServer);
+    for (std::uint64_t t = 0; t <= 6ull * 3600 * 1000; t += 250)
+        if (poll.sample(t, auto_period_ms(mode, poll_period_ms(120.0f, follow_auto_s, false)), false, false) == AutoPoll::Decision::Run) ++runs;
+    CHECK_EQ(runs, 0u); CHECK_EQ(poll.checks(), 0u); CHECK_EQ(poll.deferrals(), 0u);
+
+    // The owner adds the server over USB: the same loop polls every 120 s again.
+    char reply[96];
+    CHECK(p.command("OTA SSID 686f6d65", reply, sizeof reply)); CHECK(p.command("OTA PASS 70617373776f726431", reply, sizeof reply));
+    CHECK(p.command("OTA URL http://192.168.1.20:8070/ota", reply, sizeof reply));
+    CHECK(p.command("OTA SAVE", reply, sizeof reply)); CHECK(p.provisioned());
+    const auto owner = auto_mode(p.provisioned(), poll_period_ms(120.0f, follow_auto_s, false));
+    CHECK(owner == AutoMode::On);
+    AutoPoll owner_poll; runs = 0;
+    for (std::uint64_t t = 0; t <= 600000; t += 250)
+        if (owner_poll.sample(t, auto_period_ms(owner, poll_period_ms(120.0f, follow_auto_s, false)), false, false) == AutoPoll::Decision::Run) ++runs;
+    CHECK_EQ(runs, 5u);   // 120, 240, 360, 480, 600 s
+}
+
+// G26: the owner's FRONT x3 on a stick without a server says so plainly.
+GUARDIAN_CASE(update_without_a_server_says_no_update_server) {
+    CHECK_EQ(std::string(reason_line(Reason::NotProvisioned)), std::string("No update server"));
+    CHECK_EQ(std::string(reason_text(Reason::NotProvisioned)), std::string("not_provisioned"));   // the record token is unchanged
+}

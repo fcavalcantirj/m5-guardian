@@ -6,7 +6,7 @@
 #include <cstring>
 namespace sticks3 {
 MeasurementRadio* MeasurementRadio::instance_=nullptr;
-bool MeasurementRadio::init(const guardian::TimeEpoch& epoch,const char* country) {
+bool MeasurementRadio::init(const guardian::TimeEpoch& epoch,const char* country,bool adopt_80211d) {
     if(initialized_ || !epoch.valid() || !country || std::strlen(country)!=2)return false;
     epoch_=epoch;instance_=this;
     if(!storage_) {   // once per boot, never freed (psram.hpp)
@@ -21,10 +21,11 @@ bool MeasurementRadio::init(const guardian::TimeEpoch& epoch,const char* country
     wifi_init_config_t cfg=WIFI_INIT_CONFIG_DEFAULT();cfg.nvs_enable=0;
     if(esp_wifi_init(&cfg)!=ESP_OK || esp_wifi_set_storage(WIFI_STORAGE_RAM)!=ESP_OK
        || esp_wifi_set_mode(WIFI_MODE_NULL)!=ESP_OK
-       || esp_wifi_set_country_code(country,false)!=ESP_OK
+       || esp_wifi_set_country_code(country,adopt_80211d)!=ESP_OK
        || esp_wifi_get_country(&country_)!=ESP_OK)return false;
     // The adapter deliberately supports only 2.4 GHz channels 1..13, intersected
-    // with the SDK's explicitly configured country. No 802.11d auto-adoption.
+    // with the SDK's explicitly configured country (read back at init: the channels the
+    // survey walks). 802.11d adoption only in the G26 release image, and only while joined.
     if(!country_.schan || !country_.nchan || unsigned(country_.schan)+country_.nchan>14)return false;
     if(esp_wifi_start()!=ESP_OK || esp_wifi_set_ps(WIFI_PS_NONE)!=ESP_OK)return false;
     if(esp_wifi_set_promiscuous_rx_cb(receive)!=ESP_OK)return false;

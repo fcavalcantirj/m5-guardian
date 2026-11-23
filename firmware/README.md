@@ -39,6 +39,8 @@ python3 -I tools/public_check.py                           # the tree holds no p
   the signed app, ELF and map, sdkconfig, `flash_args`, the source tar with its hashes, the SDK
   revisions, `SHA256SUMS` and `COMPLETE.json`; the logs are in the sibling `-build-logs` folder. The app
   version is `guardian-<date>-<time>` and is what STATUS and the update manifest report.
+- The public release image (`build.sh build-release`: the world safe radio country, a reproducible build) and the
+  owner-run release tools are described in "G26 public release image" below.
 - The host check writes `$GUARDIAN_STORE/builds/<date>-<time>-host-<id>/` (toolchain, source hashes,
   build and test logs, `summary.txt`). Python tool tests: `python3 -m pytest tools/tests` with the
   interpreter that has pytest, Pillow 11.3.0 and numpy 1.26.4 (the versions the art manifest pins).
@@ -840,6 +842,61 @@ and host-tested; nothing of G25 has run on the stick.
 - **Not done here:** the device run (install, STATUS, a router channel move and a security change on the owner's own
   router, the glass). The lab harness's accepted live scenarios `settings` and `channel` (lab/live/assessment.py) still
   expect the old red `settings_changed`; they were not changed by this task.
+
+## G26 public release image (worker 2026-11-23; ledger G26 open)
+
+Owner, 2026-11-22: visitors flash the official Guardian from the website onto their own stick, and update it by
+flashing again there. The W07 spike (firmware/evidence/sticks3-W07-flash-spike-20261123.log) measured the four-part
+browser flash and found the bug below. Host-tested and built; nothing of G26 has run on a stick.
+
+- **No update server, no poll** (adapters/ota `AutoMode`, `auto_mode`, `auto_period_ms`; tests/ota_check.cpp
+  `auto_poll_is_off_while_no_update_server_is_stored`). The automatic poll runs only while an update server is stored
+  (`Provisioner::provisioned()`: a network and a server URL). A stick installed from the website, or set up from the
+  phone without a server, never joins for a poll, never fetches a TUNE offer, never writes a failure record and never
+  shows one (the W07 spike measured `failed:not_provisioned` every 120 s before). The owner's FRONT x3 still runs the
+  update and says **No update server** (`reason_line(NotProvisioned)`, was "Not set up over USB"; the record token
+  stays `not_provisioned`). A stick with a server behaves as before (`ota.auto_s`, `ota.auto_batt_s`, alert-first).
+  STATUS: `ota_auto=on|off|off:no_server` (`off` = `ota.auto_s` 0, gesture only).
+- **Radio country** (Kconfig `GUARDIAN_COUNTRY`, `GUARDIAN_COUNTRY_80211D`): the lab build keeps `"BR"` with no 802.11d
+  adoption (sdkconfig.defaults). The release image uses ESP-IDF's world safe `"01"` with adoption on
+  (`esp_wifi_set_country_code("01", true)`): while the stick is joined as a station (the update join, the setup's
+  password check) the driver uses the access point's advertised country and returns to `"01"` afterwards (ESP-IDF
+  v5.4 esp_wifi.h, `esp_wifi_set_country_code`, attention 1). esp_wifi.h lists world safe as channels 1-11; how many
+  channels the driver allows for the passive survey under `"01"` on this chip is **not measured**: STATUS prints it.
+  STATUS: `country=<code>,11d:<on|off>,ch:<first>-<last>` (`ch:-` before the radio is up). The board's STATUS buffer
+  is now 8192, the TUNE reply cap.
+- **Release build** (`firmware/boards/sticks3/tools/build.sh build-release`, overlay `sdkconfig.release`): the normal
+  image plus `CONFIG_GUARDIAN_RELEASE=y`, the country above and ESP-IDF's `CONFIG_APP_REPRODUCIBLE_BUILD=y` (no compile
+  date or time in the app descriptor, build and source paths mapped). Version `guardian-<date>-<time>-rel`, own build
+  directory and archive; `build_support.py archive` refuses a release image without the `-rel` label, the label on
+  another image, a release image with another country, without adoption or without the reproducible build, a lab image
+  with another country or with adoption, and a release image combined with a test variant. `COMPLETE.json` records
+  `release_image`, `radio_country` and `radio_80211d`. Signed with the owner's OTA key like every build: every
+  flashed stick then trusts the owner's later images (the vendor model, as Doutor VPD).
+- **Release tooling** (owner-run; tools/release_support.py with tools/tests/test_release_tools.py):
+
+```sh
+tools/release_keygen.sh                       # ONCE: ECDSA P-256 key ~/.config/m5-guardian/release-signing-p256.pem (600),
+                                              # its public half in release/release-public-key.json (commit that file)
+tools/release_package.sh                      # clean committed tree: git archive HEAD, two clean build-release runs,
+                                              # same sha256 or FAIL; <store>/releases/<tag>/ with only the four parts
+tools/release_publish.sh <store>/releases/<tag> --notes "<text>"             # dry run: checks, manifest.json + .sig
+tools/release_publish.sh <store>/releases/<tag> --notes "<text>" --publish   # the owner: GitHub Release, round trip
+```
+
+  The four parts are `bootloader.bin` 0x0, `partition-table.bin` 0x8000, `ota_data_initial.bin` 0x10000 and
+  `guardian_sticks3-signed.bin` 0x20000; never the ELF, map, source tarball or SDK inputs (they stay in the build
+  archives on the store). Both builds must give the same sha256 for the three plain parts and the **unsigned** app;
+  the signature block is not compared because espsecure's RSA-PSS salt is random, so the package ships build 1's
+  signed app, checked to be its unsigned app plus a signature block. The tag is
+  `guardian-<version>-b<build>-<first 12 hex of the signed app's sha256>` from release/version.txt, the app version
+  the commit's time on the local clock like every build stamp (`guardian-<date>-<time>-rel`), so both builds carry
+  the same one and a release never looks newer to the OTA order than the owner's later dev builds. `manifest.json` is
+  `{tag, version, build, date, notes, parts[{file, offset, sha256, size}]}`, signed with the release key as DER
+  (`openssl dgst -sha256 -sign`, `manifest.sig`); publish also checks the app against the owner's OTA key, the
+  release key against the committed public key, and that the build is higher than the latest published release
+  (verified by its signature), then switches gh to the personal account and back. `release_package.sh --worktree`
+  makes a TEST package from uncommitted files (`tree: dirty`), which publish refuses.
 
 ## G16I upright by gravity and the snow-globe burst (implemented 2026-11-17; ledger G16I: accepted 2026-11-18, upright mode off by default by the owner's ruling)
 

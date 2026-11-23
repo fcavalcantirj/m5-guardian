@@ -45,7 +45,8 @@ class BuildSupportTests(unittest.TestCase):
   return head+desc+bytes(64)+tail
  def seed(self,p,version='g16b-20261116-200000'):
   (p).mkdir(parents=True,exist_ok=True)
-  (p/'sdkconfig').write_text(''.join(m.built_line(k,v)+'\n' for k,v in m.defaults_config())+''.join(k+'=y\n' for k in m.REQUIRED_OTA_CONFIG)+('CONFIG_GUARDIAN_OTA_SELFTEST_FAIL=y\n' if version.endswith('-stfail') else '# CONFIG_GUARDIAN_OTA_SELFTEST_FAIL is not set\n')+('CONFIG_GUARDIAN_BLE_SPIKE=y\n' if version.endswith('-blespk') else '# CONFIG_GUARDIAN_BLE_SPIKE is not set\n')+('CONFIG_GUARDIAN_ART_BENCH=y\n' if version.endswith('-bench') else '# CONFIG_GUARDIAN_ART_BENCH is not set\n')+('CONFIG_PM_ENABLE=y\nCONFIG_GUARDIAN_DARK_CPU=y\n' if version.endswith('-dcpu') else ''))
+  config=m.defaults_config((m.RELEASE_OVERLAY,) if version.endswith('-rel') else ())   # G26: the release image is the defaults plus its overlay
+  (p/'sdkconfig').write_text(''.join(m.built_line(k,v)+'\n' for k,v in config)+''.join(k+'=y\n' for k in m.REQUIRED_OTA_CONFIG)+('CONFIG_GUARDIAN_OTA_SELFTEST_FAIL=y\n' if version.endswith('-stfail') else '# CONFIG_GUARDIAN_OTA_SELFTEST_FAIL is not set\n')+('CONFIG_GUARDIAN_BLE_SPIKE=y\n' if version.endswith('-blespk') else '# CONFIG_GUARDIAN_BLE_SPIKE is not set\n')+('CONFIG_GUARDIAN_ART_BENCH=y\n' if version.endswith('-bench') else '# CONFIG_GUARDIAN_ART_BENCH is not set\n')+('CONFIG_PM_ENABLE=y\nCONFIG_GUARDIAN_DARK_CPU=y\n' if version.endswith('-dcpu') else ''))
   for name in ['guardian_sticks3.elf','guardian_sticks3.map','toolchain.txt','sdk-worktree.txt','sdk-submodules.txt','size.txt','sdk-inputs/qualification.json','sdk-inputs/libnet80211.a','sdk-inputs/LICENSE','bootloader/bootloader.bin','partition_table/partition-table.bin','ota_data_initial.bin','ota-signing-public.pem']:
    f=p/name;f.parent.mkdir(parents=True,exist_ok=True);f.write_text(name)
   tail=self.BENCH_TAIL if version.endswith('-bench') else self.HEAD_SET   # G21: the frame set is in the image; G16Q: the bench image holds its frames instead
@@ -252,6 +253,50 @@ class BuildSupportTests(unittest.TestCase):
   block=kconfig[kconfig.index('config GUARDIAN_DARK_CPU'):]
   block=block[:block.index('\nconfig ',1)]
   self.assertIn('depends on PM_ENABLE',block);self.assertIn('default n',block)
+ # ---- G26: the public release image (world safe country, reproducible build, labelled) -----------
+ REL_VERSION='guardian-20261123-180000-rel'
+ def edit(self,b,old,new):
+  text=(b/'sdkconfig').read_text();self.assertEqual(text.count(old),1,old);(b/'sdkconfig').write_text(text.replace(old,new))
+ def test_release_image_is_labelled_world_safe_reproducible_and_never_a_normal_build(self):
+  with tempfile.TemporaryDirectory() as d:
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b,self.REL_VERSION);m.archive(b,o)
+   done=json.loads((o/'COMPLETE.json').read_text())
+   self.assertTrue(done['release_image']);self.assertEqual(done['radio_country'],'01');self.assertTrue(done['radio_80211d'])
+  with tempfile.TemporaryDirectory() as d:   # the lab build: BR, no adoption, not the release image
+   b=Path(d)/'b';o=Path(d)/'o';self.seed(b);m.archive(b,o)
+   done=json.loads((o/'COMPLETE.json').read_text())
+   self.assertFalse(done['release_image']);self.assertEqual(done['radio_country'],'BR');self.assertFalse(done['radio_80211d'])
+  cases=[   # (version, old line, new line, what the refusal names)
+   (None,'# CONFIG_GUARDIAN_RELEASE is not set','CONFIG_GUARDIAN_RELEASE=y','-rel'),                 # release config, no label
+   (self.REL_VERSION,'CONFIG_GUARDIAN_RELEASE=y','# CONFIG_GUARDIAN_RELEASE is not set','-rel'),      # label on a normal image
+   (self.REL_VERSION,'CONFIG_GUARDIAN_COUNTRY="01"','CONFIG_GUARDIAN_COUNTRY="BR"','COUNTRY'),        # release with the lab country
+   (self.REL_VERSION,'CONFIG_GUARDIAN_COUNTRY_80211D=y','# CONFIG_GUARDIAN_COUNTRY_80211D is not set','80211D'),
+   (self.REL_VERSION,'CONFIG_APP_REPRODUCIBLE_BUILD=y','# CONFIG_APP_REPRODUCIBLE_BUILD is not set','REPRODUCIBLE'),
+   (None,'CONFIG_GUARDIAN_COUNTRY="BR"','CONFIG_GUARDIAN_COUNTRY="01"','COUNTRY'),                    # the lab build keeps BR
+   (None,'# CONFIG_GUARDIAN_COUNTRY_80211D is not set','CONFIG_GUARDIAN_COUNTRY_80211D=y','80211D'),  # ... without adoption
+  ]
+  for version,old,new,named in cases:
+   with self.subTest(version=version,new=new),tempfile.TemporaryDirectory() as d:
+    b=Path(d)/'b';o=Path(d)/'o';self.seed(b,version or 'g16b-20261116-200000');self.edit(b,old,new)
+    with self.assertRaisesRegex(ValueError,named):m.archive(b,o)
+    self.assertFalse(o.exists())
+ def test_release_version_stamp_build_command_and_overlay(self):
+  out=subprocess.run([sys.executable,str(m.PROJECT/'tools/build_support.py'),'version-stamp','rel'],text=True,capture_output=True)
+  self.assertEqual(out.returncode,0,out.stderr)
+  self.assertRegex(out.stdout.strip(),r'^guardian-[0-9]{8}-[0-9]{6}-rel$');self.assertLessEqual(len(out.stdout.strip()),31)
+  script=(m.PROJECT/'tools/build.sh').read_text()
+  self.assertIn('build-release)',script);self.assertIn('sdkconfig.release',script)
+  overlay=dict(m.defaults_config((m.RELEASE_OVERLAY,)))
+  self.assertEqual(overlay['CONFIG_GUARDIAN_RELEASE'],'y');self.assertEqual(overlay['CONFIG_GUARDIAN_COUNTRY'],'"01"')
+  self.assertEqual(overlay['CONFIG_GUARDIAN_COUNTRY_80211D'],'y');self.assertEqual(overlay['CONFIG_APP_REPRODUCIBLE_BUILD'],'y')
+  lab=dict(m.defaults_config())
+  self.assertEqual(lab['CONFIG_GUARDIAN_COUNTRY'],'"BR"');self.assertEqual(lab['CONFIG_GUARDIAN_COUNTRY_80211D'],'n');self.assertEqual(lab['CONFIG_GUARDIAN_RELEASE'],'n')
+  # Only these four values differ from the lab build: the release image is the normal Guardian.
+  self.assertEqual(sorted(k for k,v in overlay.items() if lab.get(k)!=v),['CONFIG_APP_REPRODUCIBLE_BUILD','CONFIG_GUARDIAN_COUNTRY','CONFIG_GUARDIAN_COUNTRY_80211D','CONFIG_GUARDIAN_RELEASE'])
+  kconfig=(m.PROJECT/'main/Kconfig.projbuild').read_text()
+  for name in ('GUARDIAN_COUNTRY_80211D','GUARDIAN_RELEASE'):
+   block=kconfig[kconfig.index('config '+name+'\n'):];block=block[:block.index('\nconfig ',1)]
+   self.assertIn('default n',block)
  # ---- G24: power management in every image (the guard cycle's 80 MHz light sleep) -----------------
  def test_g24_power_management_and_tickless_idle_are_in_every_image(self):
   defaults=(m.PROJECT/'sdkconfig.defaults').read_text()

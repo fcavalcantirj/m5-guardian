@@ -215,7 +215,7 @@ const char* reason_text(Reason r) {
 const char* reason_line(Reason r) {   // <= 22 glyphs
     switch (r) {
     case Reason::None: return "Update installed";
-    case Reason::NotProvisioned: return "Not set up over USB";
+    case Reason::NotProvisioned: return "No update server";   // G26: a visitor's stick has none (and no USB setup)
     case Reason::JoinFailed: return "Wi-Fi join failed";
     case Reason::ManifestFetch: return "Mac server unreachable";
     case Reason::ManifestInvalid: return "Bad update manifest";
@@ -361,6 +361,20 @@ std::uint64_t poll_period_ms(float auto_s, float auto_batt_s, bool on_battery) {
     if (!(s > 0.0f)) return 0;                                                   // 0, below 0 or not a number: off
     return static_cast<std::uint64_t>(s * 1000.0f);                              // as the board converted it before G23
 }
+
+AutoMode auto_mode(bool server_stored, std::uint64_t period_ms) {
+    if (!server_stored) return AutoMode::NoServer;   // nothing to ask: never join, never record a failure
+    return period_ms ? AutoMode::On : AutoMode::Off;
+}
+const char* auto_mode_text(AutoMode m) {
+    switch (m) {
+    case AutoMode::On: return "on";
+    case AutoMode::Off: return "off";
+    case AutoMode::NoServer: return "off:no_server";
+    }
+    return "unknown";
+}
+std::uint64_t auto_period_ms(AutoMode m, std::uint64_t period_ms) { return m == AutoMode::On ? period_ms : 0; }
 
 AutoPoll::Decision AutoPoll::sample(std::uint64_t now_ms, std::uint64_t period_ms, bool busy, bool alert) {
     if (!period_ms) { deferred_ = false; return Decision::Wait; }
