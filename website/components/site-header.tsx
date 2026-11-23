@@ -27,7 +27,8 @@ export function Brand() {
   );
 }
 
-export function SiteHeader() {
+/** `base` prefixes the in-page links, so another page (/install) points them at the home page. */
+export function SiteHeader({ base = "" }: { base?: string } = {}) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
 
@@ -49,7 +50,7 @@ export function SiteHeader() {
         <Brand />
         <nav className="desktop-nav" aria-label="Main navigation">
           {links.map(([label, href]) => (
-            <a key={href} href={href}>
+            <a key={href} href={`${base}${href}`}>
               {label}
             </a>
           ))}
@@ -86,7 +87,7 @@ export function SiteHeader() {
           aria-label="Mobile navigation"
         >
           {links.map(([label, href]) => (
-            <a key={href} href={href} onClick={() => setOpen(false)}>
+            <a key={href} href={`${base}${href}`} onClick={() => setOpen(false)}>
               {label}
               <ArrowUpRight aria-hidden="true" />
             </a>

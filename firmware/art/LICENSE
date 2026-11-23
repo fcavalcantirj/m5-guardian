@@ -24,6 +24,14 @@ What you may do
   View the artwork, and use it unmodified to build this firmware for your own
   personal, non-commercial use on your own device.
 
+  Flash the official M5 Guardian image, which contains the artwork, from the
+  project website (https://m5-guardian.vercel.app/install) onto your own
+  device, for your own personal, non-commercial use. This covers the image as
+  the website delivers it (the signed release files of this repository's
+  GitHub Releases) and the backups of your own device that the website makes;
+  it grants no right to extract, copy or share the artwork from that image.
+  (Granted by the copyright holder, 2026-11-22.)
+
 What you may not do without written permission from the copyright holder
   Redistribute the artwork outside an unmodified copy of this repository,
   modify it for redistribution, use it commercially, use it in another

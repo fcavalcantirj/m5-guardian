@@ -86,6 +86,13 @@ export function GuardianExperience() {
               <ArrowDown data-icon="inline-end" aria-hidden="true" />
             </a>
             <a
+              href="/install"
+              className={buttonVariants({ variant: "outline", size: "hero" })}
+            >
+              Install on your StickS3{" "}
+              <ArrowRight data-icon="inline-end" aria-hidden="true" />
+            </a>
+            <a
               href={`${repositoryUrl}#build-and-install`}
               target="_blank"
               rel="noreferrer"

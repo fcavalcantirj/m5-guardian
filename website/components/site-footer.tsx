@@ -21,6 +21,7 @@ export function SiteFooter() {
         </span>
       </p>
       <div>
+        <a href="/install">Install on your StickS3</a>
         <a href={codeLicenseUrl} target="_blank" rel="noreferrer">
           Code license <ArrowUpRight aria-hidden="true" />
         </a>

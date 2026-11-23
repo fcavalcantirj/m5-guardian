@@ -109,6 +109,27 @@ LIGHTHOUSE_URL=https://m5-guardian.vercel.app node scripts/lighthouse.mjs
 
 Keep run outputs outside the tree (`BROWSER_CHECK_OUT`, `LIGHTHOUSE_OUT`).
 
+## Install page (W07)
+
+`/install` flashes the signed release onto a visitor's own StickS3 (Web Serial, esptool-js 0.7.0 loaded only
+after a click). What a deployment needs:
+
+- **The routes** `/api/firmware/latest` and `/api/firmware/[tag]/[file]` run on Node and read the GitHub
+  Releases of `fcavalcantirj/m5-guardian` (no token: a public repository). Before the first signed release
+  (G26, owner-run `tools/release_publish.sh --publish`) `/api/firmware/latest` answers 404
+  `{"kind":"no-release"}` and the page says so; Update and First install stay disabled, Restore works.
+  The release key is `lib/release-key.ts` (a copy of `release/release-public-key.json`, compared by
+  `lib/firmware-release.test.ts`); a new release key needs a new website deployment.
+- **Step counts** use Vercel Web Analytics (`@vercel/analytics`, cookieless), mounted on `/install` only and
+  only in a Vercel build (`process.env.VERCEL`). Enable Web Analytics in the project settings, or the page
+  requests a missing `/_vercel/insights/script.js`. The event is `guardian_install` with two properties,
+  `action` (update, install, restore, backup) and `result` (start, connected, done, cancel, error_plan,
+  error_<step>); nothing about the device.
+- **Live check after the first release**: `curl -s <url>/api/firmware/latest` names the published tag, and a
+  part URL from it answers 200 with `X-Content-SHA256` equal to the manifest. Flashing a real stick is the
+  owner-run smoke: `STICK_SMOKE=1 STICK_SMOKE_OUT=<store folder> STICK_FOREIGN_IMAGE=<8 MB non-Guardian image>
+  STICK_SMOKE_URL=<url> pnpm run test:stick` (headed Chrome; never in CI).
+
 ## Promotion and rollback
 
 Promote the checked preview: `vercel promote <preview-url> --scope flowcoders`

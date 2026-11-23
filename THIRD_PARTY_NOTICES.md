@@ -246,3 +246,29 @@ publishes the adapted portions here under this repository's MIT license. Nothing
 else is taken: no back sticker, Doutor VPD branding, product screens or button
 hotspots. The 3D view draws only the StickS3 and the simulated Guardian screen,
 whose artwork stays under `website/public/images/LICENSE`.
+
+## Browser flasher (website, W07)
+
+**Adapted flasher source.** The install page's flashing rules and release checks are ported from the owner's
+Doutor VPD website (private repository `fcavalcantirj/doutor-vpd`, commit
+`80dbced1106284e83ec71d84ec983827ba374f9a`), on the same basis as the 3D viewer above (the owner's own
+repository; the owner publishes the adapted portions here under this repository's MIT license):
+
+| Guardian file | Adapted from (Doutor VPD) | What is taken |
+|---|---|---|
+| `website/lib/flash-plan.ts` | `lib/flasher-core.ts` | the Espressif USB vendor filter, the ESP32-S3 check, the write and plan checks (rewritten for the Guardian's partition table and protected ranges), the measured fresh-connection reset (RTS pulse, DTR low), the friendly error mapping (translated to English and extended) and the download-mode hint |
+| `website/components/install/flasher.tsx` | `components/firmware/flasher.tsx` | the esptool-js 0.7.0 session (Web Serial port request, 460800 baud, writeFlash of the release parts with dio/80m/8MB and compression, MD5 read-back through spark-md5, byte-weighted progress), extended with the backup read, the restore and the double confirmations |
+| `website/lib/firmware-release.ts`, `website/lib/firmware-routes.ts` | `lib/firmware.ts`, `lib/firmware-http.ts` | the GitHub release proxy (manifest through `latest`, signature by tag, ECDSA P-256 over the exact bytes, redirect allowlist of HTTPS GitHub release hosts, at most five hops) and the error-to-HTTP mapping, rewritten for the G26 manifest format (`tools/release_support.py`) |
+
+No Doutor VPD branding, release key, firmware or text in Portuguese is taken.
+
+**Libraries the install page loads.** Installed with the website's pinned lockfile (`website/pnpm-lock.yaml`);
+licences as declared in each package's `package.json` (read 2026-11-23):
+
+| Package | Version | Licence | Use |
+|---|---|---|---|
+| esptool-js (Espressif, https://github.com/espressif/esptool-js) | 0.7.0 | Apache-2.0 | the serial flashing protocol; loaded only after a click on the install page |
+| pako (esptool-js dependency) | 2.2.0 | MIT AND Zlib | compression of the written data |
+| atob-lite (esptool-js dependency) | 2.0.0 | MIT | base64 decoding of the flasher stub |
+| spark-md5 | 3.0.2 | WTFPL OR MIT (used under MIT) | the MD5 the written data is compared with; loaded only after a click |
+| @vercel/analytics | 1.6.1 | MPL-2.0 | the cookieless step counts of the install page (unmodified) |

@@ -82,13 +82,14 @@ test("robots.txt allows crawling and names the sitemap", async ({ request }) => 
   expect(text).toContain(`Sitemap: ${siteUrl}/sitemap.xml`);
 });
 
-test("sitemap.xml lists the home page", async ({ request }) => {
+test("sitemap.xml lists the home page and the install page", async ({ request }) => {
   const response = await request.get("/sitemap.xml");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toContain("xml");
   const text = await response.text();
   expect(text).toContain(`<loc>${siteUrl}/</loc>`);
-  expect(text.match(/<url>/g)).toHaveLength(1);
+  expect(text).toContain(`<loc>${siteUrl}/install</loc>`);
+  expect(text.match(/<url>/g)).toHaveLength(2);
 });
 
 test("unknown paths get the custom 404 page with status 404, noindex and headers", async ({ page, browserLog }) => {
