@@ -10,6 +10,9 @@
 # the gate tests) is re-included; build outputs, local Vercel state and
 # environment files stay out.
 /*
+# Git deployments apply this file too: keep .git so the ignored build step (website/scripts/vercel-ignore-build.sh)
+# can compare commits; the CLI never uploads .git, so CLI deployments are unchanged.
+!/.git
 !/.vercelignore
 !/website
 !/website/.gitignore

@@ -183,3 +183,13 @@ test("the preview Lighthouse gate runs on successful Vercel Preview deployments 
   for (const use of text.matchAll(/uses: (\S+)/g))
     assert.match(use[1], /@[0-9a-f]{40}$/, `${use[1]} is pinned to a commit`);
 });
+
+// 2026-11-23, measured on a Git deployment: with only "/*" the Git build deleted .git, the ignored build
+// step printed "the website is not a Git checkout" and built a firmware-only commit. .git must stay.
+test(".vercelignore keeps .git so the ignored build step can compare commits on Git deployments", () => {
+  const lines = read(join(repo, ".vercelignore")).split("\n").map((l) => l.trim());
+  const dropAll = lines.indexOf("/*");
+  const keepGit = lines.indexOf("!/.git");
+  assert.ok(dropAll >= 0, "the upload set starts from /*");
+  assert.ok(keepGit > dropAll, "!/.git must follow /*");
+});
