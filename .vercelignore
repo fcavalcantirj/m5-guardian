@@ -1,3 +1,61 @@
-# Vercel CLI uploads only the website (project Root Directory = website)
+# Vercel CLI upload set for the website project (Root Directory website/).
+# A CLI deployment runs from the repository root, so this file decides what is
+# uploaded: website/ plus only the repository files the build command (the
+# website quality script, website/scripts/check.sh) reads in its unit tests:
+# the documentation the page cites or links to, the notices and licenses, and
+# the gate files. website/lib/deployment.test.ts checks this list against the
+# website-checks.yml trigger paths and the page's repository links, and
+# simulates the upload.
+# The CLI's own defaults drop every .gitignore, so website/.gitignore (read by
+# the gate tests) is re-included; build outputs, local Vercel state and
+# environment files stay out.
 /*
+!/.vercelignore
 !/website
+!/website/.gitignore
+/website/.vercel
+/website/.env*
+/website/test-results
+/website/playwright-report
+/website/lighthouse
+/website/out
+/website/*.tsbuildinfo
+!/.github
+/.github/*
+!/.github/workflows
+/.github/workflows/*
+!/.github/workflows/website-checks.yml
+!/.github/workflows/website-preview-lighthouse.yml
+!/Makefile
+!/LICENSE
+!/README.md
+!/THIRD_PARTY_NOTICES.md
+!/guardian-tasks.json
+!/tools
+/tools/*
+!/tools/public_check.py
+!/tools/public_check.allow
+!/docs
+/docs/*
+!/docs/G05-rating-freshness.md
+!/docs/G23-delivery.md
+!/docs/attack-coverage.md
+!/firmware
+/firmware/*
+!/firmware/README.md
+!/firmware/art
+/firmware/art/*
+!/firmware/art/LICENSE
+!/firmware/components
+/firmware/components/*
+!/firmware/components/guardian_core
+/firmware/components/guardian_core/*
+!/firmware/components/guardian_core/advice.cpp
+!/firmware/components/guardian_core/include
+/firmware/components/guardian_core/include/*
+!/firmware/components/guardian_core/include/guardian
+/firmware/components/guardian_core/include/guardian/*
+!/firmware/components/guardian_core/include/guardian/core.hpp
+!/firmware/components/guardian_presenter
+/firmware/components/guardian_presenter/*
+!/firmware/components/guardian_presenter/presenter.cpp

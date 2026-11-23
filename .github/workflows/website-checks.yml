@@ -14,6 +14,8 @@ on:
     paths:
       - "website/**"
       - ".github/workflows/website-checks.yml"
+      - ".github/workflows/website-preview-lighthouse.yml"
+      - ".vercelignore"
       - "Makefile"
       - "tools/public_check.py"
       - "tools/public_check.allow"
@@ -23,6 +25,7 @@ on:
       - "docs/G05-rating-freshness.md"
       - "docs/G23-delivery.md"
       - "docs/attack-coverage.md"
+      - "firmware/README.md"
       - "firmware/art/LICENSE"
       - "firmware/components/guardian_core/advice.cpp"
       - "firmware/components/guardian_core/include/guardian/core.hpp"
@@ -32,6 +35,8 @@ on:
     paths:
       - "website/**"
       - ".github/workflows/website-checks.yml"
+      - ".github/workflows/website-preview-lighthouse.yml"
+      - ".vercelignore"
       - "Makefile"
       - "tools/public_check.py"
       - "tools/public_check.allow"
@@ -41,6 +46,7 @@ on:
       - "docs/G05-rating-freshness.md"
       - "docs/G23-delivery.md"
       - "docs/attack-coverage.md"
+      - "firmware/README.md"
       - "firmware/art/LICENSE"
       - "firmware/components/guardian_core/advice.cpp"
       - "firmware/components/guardian_core/include/guardian/core.hpp"

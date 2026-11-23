@@ -1,10 +1,12 @@
 import type { Page, Response } from "@playwright/test";
-import { test, expect, enter3d, isViewerRequest, pauseMotion, viewerChunks } from "./fixtures";
+import { test, expect, enter3d, isViewerRequest, pauseMotion, viewerChunks, watchViewerScripts } from "./fixtures";
 
 // The 3D viewer is on demand: loading the page and waiting without any
 // interaction requests no viewer chunk and no model. After "See in 3D" the
 // viewer chunk, the three StickS3 models and the face texture load with 200,
 // and the screen artwork is photographed from the front, side and rear.
+// Viewer chunks are recognised by name from the local build and, on any
+// server (also a deployment, WEBSITE_URL), by the content of each script.
 
 const IDLE_WAIT_MS = 8_000;
 const chunks = viewerChunks();
@@ -21,11 +23,15 @@ for (const [name, profile] of Object.entries(profiles)) {
     test("no 3D chunk or model is requested on load or while waiting", async ({ page }) => {
       const requests: string[] = [];
       page.on("request", (request) => requests.push(request.url()));
+      const scripts = watchViewerScripts(page);
       await page.goto("/", { waitUntil: "networkidle" });
       await page.waitForTimeout(IDLE_WAIT_MS);
       await page.waitForLoadState("networkidle");
       expect(requests.length).toBeGreaterThan(5);
       expect(requests.filter((url) => isViewerRequest(url, chunks))).toEqual([]);
+      const loaded = await scripts();
+      expect(loaded.unreadable).toEqual([]);
+      expect(loaded.viewer, "no script carrying the viewer before activation").toEqual([]);
       await expect(page.locator("canvas")).toHaveCount(0);
     });
 
@@ -34,6 +40,7 @@ for (const [name, profile] of Object.entries(profiles)) {
       const responses: Response[] = [];
       const failed: string[] = [];
       page.on("response", (response) => responses.push(response));
+      const scripts = watchViewerScripts(page);
       page.on("requestfailed", (request) => failed.push(request.url()));
       await enter3d(page);
       await expect(page.locator(".stick-viewer")).toHaveAttribute("data-screen-face", "drawn");
@@ -49,7 +56,10 @@ for (const [name, profile] of Object.entries(profiles)) {
         expect(response!.status()).toBe(200);
         expect((await response!.body()).byteLength, `${model} has bytes`).toBeGreaterThan(10_000);
       }
-      expect(responses.some((r) => chunks.some((chunk) => path(r).endsWith(`/${chunk}`)))).toBe(true);
+      if (chunks.length) expect(responses.some((r) => chunks.some((chunk) => path(r).endsWith(`/${chunk}`)))).toBe(true);
+      const loaded = await scripts();
+      expect(loaded.unreadable).toEqual([]);
+      expect(loaded.viewer.length, "a script carrying the viewer loaded on activation").toBeGreaterThan(0);
       expect(statuses["/images/very-good.png"], "face texture").toBe(200);
       expect(Object.keys(statuses).filter((p) => /\.(glb|gltf|obj|fbx)$/i.test(p))).toEqual([]);
       await expect(page.locator("canvas")).toHaveCount(1);

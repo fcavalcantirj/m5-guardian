@@ -14,11 +14,15 @@
 //                    artifact; same thresholds and the same simulated mobile method)
 //   LIGHTHOUSE_BYPASS  Vercel "Protection Bypass for Automation" secret for a protected preview;
 //                    sent only as the x-vercel-protection-bypass header, never written to the record
+//   LIGHTHOUSE_PREVIEW=1  (with LIGHTHOUSE_URL) the URL is a Vercel preview: drop is-crawlable from the
+//                    SEO score when its only blocking directive is the preview's x-robots-tag header
+//                    (scripts/lighthouse-preview.mjs); recorded per run. Never set on production.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { previewSeo } from "./lighthouse-preview.mjs";
 
 const site = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = resolve(process.env.LIGHTHOUSE_OUT ?? join(site, "lighthouse"));
@@ -26,6 +30,7 @@ const port = Number(process.env.LIGHTHOUSE_PORT ?? 3211);
 const remote = process.env.LIGHTHOUSE_URL ? new URL(process.env.LIGHTHOUSE_URL).href : null;
 const url = remote ?? `http://127.0.0.1:${port}/`;
 const bypass = process.env.LIGHTHOUSE_BYPASS ?? "";
+const preview = process.env.LIGHTHOUSE_PREVIEW === "1";
 const RUNS = 3;
 
 // Ledger W05: median performance >= 90, accessibility 100, SEO >= 95,
@@ -91,10 +96,27 @@ const cli = join(site, "node_modules/.bin/lighthouse");
 if (!existsSync(cli)) die("lighthouse is not installed: run pnpm install --frozen-lockfile");
 const installed = spawnSync(cli, ["--version"], { encoding: "utf8" }).stdout.trim();
 if (installed !== pinned) die(`lighthouse ${pinned} pinned, ${installed} installed`);
+if (preview && !remote) die("LIGHTHOUSE_PREVIEW=1 needs LIGHTHOUSE_URL (a deployed preview)");
+if (preview && new URL(remote).host === "m5-guardian.vercel.app") die("LIGHTHOUSE_PREVIEW=1 is refused on the production URL");
 if (!remote && !existsSync(join(site, ".next/BUILD_ID"))) die("no production build: run next build first");
 if (!remote && !(await portFree(port))) die(`port ${port} is busy; stop the process using it or set LIGHTHOUSE_PORT`);
 
 mkdirSync(out, { recursive: true });
+// The bypass secret reaches Lighthouse through its config, so the config, every report and any run
+// error log carry it. Scrub them on every exit, including die() and a stop signal, so a failed run
+// never leaves the secret in the folder CI uploads.
+function scrubBypass() {
+  if (!bypass || !existsSync(out)) return;
+  for (const f of readdirSync(out)) {
+    const path = join(out, f);
+    if (!statSync(path).isFile()) continue;
+    const text = readFileSync(path, "utf8");
+    if (text.includes(bypass)) writeFileSync(path, text.split(bypass).join("<redacted>"));
+  }
+}
+process.on("exit", scrubBypass);
+process.on("SIGTERM", () => process.exit(143));
+
 const configPath = join(out, "lighthouse.config.json");
 writeFileSync(configPath, JSON.stringify(CONFIG, null, 2) + "\n");
 const chrome = await chromePath();
@@ -135,6 +157,18 @@ try {
       audits: Object.fromEntries(Object.keys(THRESHOLDS.audits).map((k) => [k, lhr.audits[k].numericValue])),
       runWarnings: lhr.runWarnings,
     };
+    if (preview) {
+      let adjustment;
+      try {
+        adjustment = previewSeo(lhr);
+      } catch (error) {
+        die(`run ${i}: ${error.message}`);
+      }
+      if (adjustment) {
+        run.categories.seo = adjustment.adjusted;
+        run.previewSeoAdjustment = adjustment;
+      }
+    }
     runs.push({ ...run, lhr });
     console.log(`run ${i}: ${JSON.stringify({ categories: run.categories, audits: run.audits })}`);
   }
@@ -164,6 +198,7 @@ const summary = {
   userAgent: first.environment?.hostUserAgent,
   benchmarkIndex: runs.map((r) => r.lhr.environment?.benchmarkIndex),
   chromeFlags,
+  preview,
   configSettings: { ...first.configSettings, extraHeaders: bypass ? { "x-vercel-protection-bypass": "<redacted>" } : first.configSettings.extraHeaders },
   thresholds: THRESHOLDS,
   runs: runs.map(({ lhr, ...rest }) => rest),
@@ -172,15 +207,7 @@ const summary = {
   failures,
 };
 writeFileSync(join(out, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
-// The bypass secret reaches Lighthouse through its config, so the config and every report carry it: scrub them.
-if (bypass) {
-  const { readdirSync } = await import("node:fs");
-  for (const f of readdirSync(out)) {
-    const path = join(out, f);
-    const text = readFileSync(path, "utf8");
-    if (text.includes(bypass)) writeFileSync(path, text.split(bypass).join("<redacted>"));
-  }
-}
+scrubBypass();
 console.log(`median: ${JSON.stringify(medians)}`);
 console.log(failures.length ? `lighthouse-check: FAIL\n  ${failures.join("\n  ")}` : "lighthouse-check: PASS");
 process.exit(failures.length ? 1 : 0);

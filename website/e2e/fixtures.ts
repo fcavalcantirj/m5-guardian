@@ -28,20 +28,56 @@ export { expect };
 
 const site = new URL("..", import.meta.url).pathname;
 
-/** Built chunks that carry the 3D viewer (three.js, Fiber or the STL paths). */
+/**
+ * The deployment under test when WEBSITE_URL is set (W06: a Vercel preview or
+ * production); null for the local production server that playwright.config.ts starts.
+ */
+export const remoteOrigin = process.env.WEBSITE_URL ? new URL(process.env.WEBSITE_URL).origin : null;
+
+/** Text that only the 3D viewer's code carries (three.js, Fiber or the STL paths). */
+export function isViewerSource(text: string) {
+  return text.includes("WebGLRenderer") || text.includes("sticks3-front.stl") || text.includes("PMREMGenerator");
+}
+
+/**
+ * Built chunks that carry the 3D viewer, read from the local build. Against a
+ * deployment the local build is not the code being served, so this returns no
+ * names there and watchViewerScripts() identifies the viewer by content instead.
+ */
 export function viewerChunks(): string[] {
+  if (remoteOrigin) return [];
   const dir = join(site, ".next/static/chunks");
-  const chunks = readdirSync(dir).filter((name) => {
-    if (!name.endsWith(".js")) return false;
-    const text = readFileSync(join(dir, name), "utf8");
-    return (
-      text.includes("WebGLRenderer") ||
-      text.includes("sticks3-front.stl") ||
-      text.includes("PMREMGenerator")
-    );
-  });
+  const chunks = readdirSync(dir).filter(
+    (name) => name.endsWith(".js") && isViewerSource(readFileSync(join(dir, name), "utf8")),
+  );
   if (chunks.length === 0) throw new Error("no viewer chunk found in the build");
   return chunks;
+}
+
+/**
+ * Reads the body of every script the page loads and records those that carry
+ * the 3D viewer, so the check works on any server, including a deployment.
+ * Call the returned function after the page settles; unreadable script bodies
+ * are reported separately and must be empty.
+ */
+export function watchViewerScripts(page: Page) {
+  const viewer: string[] = [];
+  const unreadable: string[] = [];
+  const pending: Promise<void>[] = [];
+  page.on("response", (response) => {
+    if (response.request().resourceType() !== "script") return;
+    const path = new URL(response.url()).pathname;
+    pending.push(
+      response.text().then(
+        (text) => void (isViewerSource(text) && viewer.push(path)),
+        (error) => void unreadable.push(`${path}: ${error}`),
+      ),
+    );
+  });
+  return async () => {
+    await Promise.all(pending);
+    return { viewer, unreadable };
+  };
 }
 
 /** True for any request that belongs to the 3D viewer: its chunks or a model file. */
