@@ -113,5 +113,26 @@
     ],
     "passes": false,
     "existing_work": ""
+  },
+  {
+    "id": "W07",
+    "category": "install",
+    "description": "Install page: flash the Guardian onto your own StickS3 from the browser (like the owner's Doutor VPD site), with a first install that offers a backup of the current firmware, an update that keeps settings, signed releases and honest errors.",
+    "depends_on": [
+      "W06"
+    ],
+    "existing_work": "",
+    "steps": [
+      "OWNER (2026-11-22/23): visitors may flash the official image from this website onto their own device, personal and non-commercial; updates are re-flashes from this page; 3D and art rules unchanged. Spike: firmware/evidence/sticks3-W07-flash-spike-20261123.log (MEASURED: update 24.9 s with settings kept, clean install 40.8 s, 8 MB backup 60.8 s, reset via a fresh-connection RTS pulse with DTR low). Requires G26's first GitHub Release to exist for the live check; build and test against fixtures until then.",
+      "Port the owner's Doutor VPD flasher core (MIT, attribute in THIRD_PARTY_NOTICES.md): esptool-js 0.7.0 pinned, Web Serial requestPort filtered to Espressif 0x303a, ESP32-S3 check, 460800 baud, writeFlash of the four parts at their offsets (dio, 80m, 8MB, compress), MD5 verify (spark-md5), byte-weighted progress, the fresh-connection reset sequence, friendly English errors (port in use, picker closed, MD5 mismatch, download-mode steps for the StickS3).",
+      "Protected ranges for 'Update': never write nvs 0x9000-0xEFFF, phy_init 0xF000 or nvs_cred 0x12000-0x15FFF; refuse any plan that would; 'First install' erases the chip after a double confirm.",
+      "Backup first: on 'First install' offer 'Download a backup of what is on the stick now' (esptool-js readFlash 8 MB, ~61 s measured) saved by the browser as a .bin with its sha256 shown; say plainly it can be restored with the same page later ('Restore a backup' writes it back whole, double confirm).",
+      "Signed releases: server routes /api/firmware/latest and /api/firmware/[tag]/[file] proxy the GitHub Release (no CORS there), verify the ECDSA P-256 manifest signature with the committed public key and each part's sha256, allow only the four expected parts at their offsets, redirects only to GitHub hosts; the browser re-checks sha256 before writing.",
+      "Page /install linked from the hero and the footer: Chrome or Edge on a desktop only (clear message elsewhere, https only); steps with the cable, the download-mode hint, progress, and 'done' text explaining first boot (welcome pages, pick your network); analytics per step with no device data.",
+      "LICENSE: firmware/art/LICENSE and website/public/images/LICENSE gain the owner's grant: flashing the official image from this website onto your own device for personal, non-commercial use is permitted; everything else stays reserved.",
+      "Tests: unit tests for the plan checks, protected ranges, manifest parsing and signature, error mapping and reset sequence with a fake port and signed fixtures (a throwaway key); the route tests with a mocked fetch. Owner-run real-stick smoke (Playwright + Chrome, not in CI): backup, first install from a non-Guardian image, update keeps settings, restore the backup byte-exact.",
+      "Gates: make website-check, the browser suite, the preview Lighthouse gate (the flasher loads esptool-js only after a click), public_check 0. No commit, push or deploy by the worker."
+    ],
+    "passes": false
   }
 ]

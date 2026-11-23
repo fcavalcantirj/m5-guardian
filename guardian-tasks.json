@@ -857,6 +857,24 @@
     "passes": false
   },
   {
+    "id": "G26",
+    "category": "core",
+    "description": "RELEASE 1 public image (owner, 2026-11-22: visitors flash the official Guardian from the website onto their own stick; updates by re-flashing on the site): a stick with no update server never polls or shows an update failure, a reproducible release build with a world-safe radio country, and the owner-run release tooling that publishes the four flash files with a signed manifest. Evidence: firmware/evidence/sticks3-W07-flash-spike-20261123.log.",
+    "depends_on": [
+      "G24"
+    ],
+    "steps": [
+      "Execution ownership: implement only this task. Use focused host TDD for library behavior changes, preserving actual failing-before and passing-after evidence; baseline existing code honestly. The supervising assistant independently validates, fixes and owns passes. Do not change this ledger, flash devices, run unrelated suites, add a Ralph verifier, initiate live RF interference, or start another task. The dedicated live harness is launched explicitly with configured lab scope for reviewer acceptance.",
+      "SPIKE (MEASURED, read the log first): esptool-js 0.7.0 flashed the four parts (bootloader 0x0, partition table 0x8000, ota_data_initial 0x10000, signed app 0x20000) in 24.9 s with MD5 verify and kept every setting; a clean install (erase all) booted to the welcome pages; an 8 MB esptool-js backup took 60.8 s and matched the chip.",
+      "BUG (MEASURED in S3): with no update server stored the update poll still runs every 120 s, fails with reason=not_provisioned, saves the failure to NVS and shows it on the glass (measurement_main.cpp:1987-1995 -> run_update -> NotProvisioned, not in the quiet list at :1435). Fix: no automatic poll and no TUNE offer fetch while no OTA URL is stored; the owner's FRONT x3 update still says 'No update server' plainly; STATUS ota_auto=off:no_server. Host TDD red first; the owner's provisioned stick behaves exactly as today.",
+      "RADIO COUNTRY: the release build uses the world-safe country (ESP-IDF '01' scheme, channels 1-11 active, 12-13 passive) with 802.11d adoption from the network's beacons, instead of the compiled 'BR'; the owner's lab build keeps 'BR'. Name the setting in firmware/README.md and print it in STATUS (country=).",
+      "RELEASE BUILD: build.sh build-release = the normal image plus the release country, built twice from a clean tree with identical sha256 (fail otherwise), signed with the owner's OTA key (the vendor model, like Doutor VPD: every flashed stick trusts the owner's later images). Only the four flash files ship; never the ELF, map, source tarball or SDK inputs.",
+      "RELEASE TOOLING (owner runs --publish only): tools/release_package.sh (the reproducible double build, SHA256SUMS, BUILD_INFO.txt) and tools/release_publish.sh, modelled on Doutor VPD's: manifest.json {tag guardian-<ver>-b<build>-<sha12>, version, date, notes, parts[{file,offset,sha256,size}]} signed with a separate ECDSA P-256 release key kept in ~/.config/m5-guardian/ (mode 600, never in the repo; the public key is committed for the website), published as a GitHub Release of fcavalcantirj/m5-guardian with the four parts. --dry-run by default; tests with a throwaway key.",
+      "PUBLIC TREE: public_check 0; no key material committed except the release PUBLIC key. No commit (the supervisor commits on the owner's word)."
+    ],
+    "passes": false
+  },
+  {
     "id": "G16U",
     "category": "core",
     "description": "RELEASE 2 (owner, 2026-11-19: 'we have to totally spec bluetooth before; defer for release 2; focus on wifi, graphics, battery lasting, finishing what we have'): radio guard toggle, Wi-Fi (default) or Bluetooth, one at a time. Needs a full Bluetooth spec first (what is watched, which radio, the C5 node or the stick, proofs). Not built in release 1.",

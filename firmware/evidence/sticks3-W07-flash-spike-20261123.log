@@ -1,0 +1,40 @@
+W07 spike: flashing the Guardian from a browser (esptool-js), 2026-11-23, LAB-STICK-1
+=====================================================================================
+Purpose: prove, before any row is written, that the website can install and update the Guardian the way the
+owner's Doutor VPD site does. Harness: the Doutor VPD spike runner (esptool-js 0.7.0 driven from Node through
+a Web Serial adapter over serialport 13.0.0), i.e. the same esptool-js code path a browser runs. Image:
+guardian-20261121-160856 (4 parts, sha256 equal to the build archive). Owner's stick, backed up first and
+restored byte-exact at the end.
+
+Step  What                                   Result (MEASURED)
+S0    full backup, esptool read 8 MB         2 min 6 s; verify_flash OK in the same download-mode session;
+                                             sha256 dedd104e74c858ff1948facb75009945527b9579442ca12e276bf4ab2ef95243
+                                             (kept locally only: it holds the Wi-Fi credential)
+S1    "Update" (no erase), 4 parts           chip ESP32-S3-PICO-1 (LGA56) rev v0.2 detected in 0.6 s; written
+                                             bootloader 0x0, partition table 0x8000, ota_data_initial 0x10000,
+                                             signed app 0x20000 (1,958,849 B compressed); MD5 verified for each
+                                             part; total 24.9 s at 460800 baud; reset into the firmware with
+                                             Doutor VPD's fresh-connection RTS pulse (DTR low) worked: booted
+                                             guardian-20261121-160856, selftest pass
+S2    settings kept after the update         STATUS: settings=guard:every_minute,bright:30,store:restored,
+                                             tune_version=1.49, the picked network kept, wifi_provisioned=yes
+                                             (writes avoid nvs 0x9000-0xEFFF, phy 0xF000, nvs_cred 0x12000-0x15FFF)
+S3    "First install" (erase all)            chip erase 9.6 s; write + verify done at 40.8 s; boots to the
+                                             welcome pages, wifi_provisioned=no, ota_provisioned=no.
+                                             BUG CONFIRMED: every 120 s "G16B UPDATE start" then "UPDATE failed
+                                             reason=not_provisioned record=saved" (2 in 270 s; ota_auto_checks=2,
+                                             last_update_result=failed:not_provisioned): a recurring failure on
+                                             the glass and an NVS write every 2 min on any stick without an
+                                             update server. Must be fixed before a public image (G26).
+S4    browser-side backup, esptool-js read   8 MB read in 60.8 s at 921600; esptool verify_flash of that file
+                                             against the chip: OK (byte-identical)
+S5    restore                                write 0x0 of the S0 backup + verify_flash OK; boots with
+                                             settings=guard:every_minute,bright:30,store:restored,
+                                             wifi_provisioned=yes, tune_version=1.49
+
+Not measured here (from reading, carried to the rows): the country is compiled "BR" (sdkconfig.defaults:36),
+so the setup access point and update joins transmit under the owner's regulatory scope; a public build
+needs the world-safe setting. The app image is signed with the owner's RSA-3072 key and every flashed stick
+then trusts that key for later images (vendor model, as Doutor VPD). The portraits are all-rights-reserved;
+the owner decided (2026-11-22) that visitors may flash the official image onto their own device for
+personal, non-commercial use.
