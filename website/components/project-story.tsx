@@ -156,8 +156,9 @@ export function HowItWorks() {
             <p>
               Receive-only monitoring: the stick transmits only for its phone
               setup access point and, as an ordinary Wi-Fi client, for its
-              signed update check. It stops listening for the seconds each
-              check takes, every 120 s by default.
+              signed update check. With an update server stored it stops
+              listening for the seconds each check takes, every 120 s by
+              default; installed from this website, it never checks by itself.
             </p>
             <p>
               Disconnect bursts on your network and nearby activity are proven

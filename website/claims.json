@@ -1,8 +1,13 @@
 {
   "about": "Claim-to-source record for the M5 Guardian website. Every factual statement the page makes about the device is listed with the website file that says it and a verbatim quotation from a repository file that supports it. Paths are relative to the repository root (sources) or to website/ (page). Status: current = what the device does now; host-only = validated by host tests, not on the device; deferred = not built yet. The page itself is a simulation: its moods, scenarios, names and counts are labelled demo or example values, not readings. lib/claims.test.ts checks that every page snippet and every quotation is still present.",
   "documents": {
-    "coverage": ["docs/attack-coverage.md"],
-    "limitations": ["README.md#what-it-cannot-see", "docs/G23-delivery.md"]
+    "coverage": [
+      "docs/attack-coverage.md"
+    ],
+    "limitations": [
+      "README.md#what-it-cannot-see",
+      "docs/G23-delivery.md"
+    ]
   },
   "claims": [
     {
@@ -10,63 +15,138 @@
       "statement": "The device shows one of five rated faces (Very good, Good, Medium, Bad, Horrible) for the settings the picked network advertises.",
       "status": "current",
       "page": [
-        { "file": "components/guardian-experience.tsx", "text": "Five rated faces for the settings your network advertises." },
-        { "file": "lib/guardian.ts", "text": "name: \"Very good\"," }
+        {
+          "file": "components/guardian-experience.tsx",
+          "text": "Five rated faces for the settings your network advertises."
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "name: \"Very good\","
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "a face with five moods for the network's advertised security settings" },
-        { "path": "README.md", "quote": "The rating of the settings the picked network advertises right now (protocol, cipher, management-frame protection). It is a rating of advertised settings, shown only while the evidence is fresh." }
+        {
+          "path": "README.md",
+          "quote": "a face with five moods for the network's advertised security settings"
+        },
+        {
+          "path": "README.md",
+          "quote": "The rating of the settings the picked network advertises right now (protocol, cipher, management-frame protection). It is a rating of advertised settings, shown only while the evidence is fresh."
+        }
       ]
     },
     {
       "id": "rating-very-good",
       "statement": "Very good means WPA3-Personal only, strong ciphers and protected management frames required.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "WPA3-Personal only, strong ciphers and protected management frames required." }],
-      "sources": [{ "path": "docs/G05-rating-freshness.md", "quote": "| Very good | SAE family only (SAE, FT-SAE, SAE-EXT-KEY), pairwise and group all in {CCMP-128, CCMP-256, GCMP-128, GCMP-256}, PMF Required | StrongSettings |" }]
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "WPA3-Personal only, strong ciphers and protected management frames required."
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Very good | SAE family only (SAE, FT-SAE, SAE-EXT-KEY), pairwise and group all in {CCMP-128, CCMP-256, GCMP-128, GCMP-256}, PMF Required | StrongSettings |"
+        }
+      ]
     },
     {
       "id": "rating-good",
       "statement": "Good means WPA2-Personal with CCMP and protected management frames required.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "WPA2-Personal with CCMP and protected management frames required." }],
-      "sources": [{ "path": "docs/G05-rating-freshness.md", "quote": "| Good | WPA2-Personal family only (PSK, PSK-SHA256, FT-PSK), pairwise and group exactly CCMP-128, PMF Required | Wpa2PmfRequired |" }]
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "WPA2-Personal with CCMP and protected management frames required."
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Good | WPA2-Personal family only (PSK, PSK-SHA256, FT-PSK), pairwise and group exactly CCMP-128, PMF Required | Wpa2PmfRequired |"
+        }
+      ]
     },
     {
       "id": "rating-medium",
       "statement": "Medium means WPA2-Personal without required management-frame protection, or a WPA2/WPA3 compatibility mode.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "WPA2-Personal without required management-frame protection, or a WPA2/WPA3 compatibility mode." }],
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "WPA2-Personal without required management-frame protection, or a WPA2/WPA3 compatibility mode."
+        }
+      ],
       "sources": [
-        { "path": "docs/G05-rating-freshness.md", "quote": "| Medium | WPA2-Personal family, CCMP-128, PMF Optional or Disabled | PmfNotRequired |" },
-        { "path": "docs/G05-rating-freshness.md", "quote": "| Medium | PSK family and SAE family together (transition), strong ciphers, PMF Optional or Required | CompatibilityMode |" }
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Medium | WPA2-Personal family, CCMP-128, PMF Optional or Disabled | PmfNotRequired |"
+        },
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Medium | PSK family and SAE family together (transition), strong ciphers, PMF Optional or Required | CompatibilityMode |"
+        }
       ]
     },
     {
       "id": "rating-bad",
       "statement": "Bad means original WPA or TKIP is advertised.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "Original WPA or TKIP is advertised." }],
-      "sources": [{ "path": "docs/G05-rating-freshness.md", "quote": "| Bad | a Valid original-WPA element (any cipher), or any TKIP option anywhere | Legacy |" }]
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "Original WPA or TKIP is advertised."
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Bad | a Valid original-WPA element (any cipher), or any TKIP option anywhere | Legacy |"
+        }
+      ]
     },
     {
       "id": "rating-horrible",
       "statement": "Horrible means an open network or WEP.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "An open network or WEP: the lowest advertised-settings rating." }],
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "An open network or WEP: the lowest advertised-settings rating."
+        }
+      ],
       "sources": [
-        { "path": "docs/G05-rating-freshness.md", "quote": "| Horrible | Privacy clear, no RSN/WPA/OWE-transition element (open) | Unencrypted |" },
-        { "path": "docs/G05-rating-freshness.md", "quote": "| Horrible | Privacy set, no RSN/WPA element (WEP), or any WEP-40/104 selector | Legacy |" }
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Horrible | Privacy clear, no RSN/WPA/OWE-transition element (open) | Unencrypted |"
+        },
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Horrible | Privacy set, no RSN/WPA element (WEP), or any WEP-40/104 selector | Legacy |"
+        }
       ]
     },
     {
       "id": "not-rated",
       "statement": "Advertised settings outside the five rows are shown as Not rated.",
       "status": "current",
-      "page": [{ "file": "components/guardian-experience.tsx", "text": "Settings outside those five rows read Not rated" }],
+      "page": [
+        {
+          "file": "components/guardian-experience.tsx",
+          "text": "Settings outside those five rows read Not rated"
+        }
+      ],
       "sources": [
-        { "path": "firmware/components/guardian_presenter/presenter.cpp", "quote": "case Mood::Unknown: return \"Not rated\";" },
-        { "path": "firmware/components/guardian_core/advice.cpp", "quote": "Valid settings this rating has no row for. Not rated." }
+        {
+          "path": "firmware/components/guardian_presenter/presenter.cpp",
+          "quote": "case Mood::Unknown: return \"Not rated\";"
+        },
+        {
+          "path": "firmware/components/guardian_core/advice.cpp",
+          "quote": "Valid settings this rating has no row for. Not rated."
+        }
       ]
     },
     {
@@ -74,13 +154,28 @@
       "statement": "After 29 seconds without hearing the network the device shows No fresh data, withholds the rated face and never calls silence an all-clear.",
       "status": "current",
       "page": [
-        { "file": "lib/guardian.ts", "text": "the network was not heard for 29 seconds. Rating withheld until fresh evidence returns." },
-        { "file": "components/guardian-experience.tsx", "text": "stale evidence shows No fresh data instead of a face." },
-        { "file": "components/guardian-stage.tsx", "text": "Silence isn’t an all-clear." }
+        {
+          "file": "lib/guardian.ts",
+          "text": "the network was not heard for 29 seconds. Rating withheld until fresh evidence returns."
+        },
+        {
+          "file": "components/guardian-experience.tsx",
+          "text": "stale evidence shows No fresh data instead of a face."
+        },
+        {
+          "file": "components/guardian-stage.tsx",
+          "text": "Silence isn’t an all-clear."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "The network was not heard for 29 seconds or more. No rated face is shown without fresh evidence, and silence is never reported as \"all clear\"." },
-        { "path": "firmware/components/guardian_core/include/guardian/core.hpp", "quote": "static constexpr Millis fresh_ms = 29000;" }
+        {
+          "path": "README.md",
+          "quote": "The network was not heard for 29 seconds or more. No rated face is shown without fresh evidence, and silence is never reported as \"all clear\"."
+        },
+        {
+          "path": "firmware/components/guardian_core/include/guardian/core.hpp",
+          "quote": "static constexpr Millis fresh_ms = 29000;"
+        }
       ]
     },
     {
@@ -88,29 +183,62 @@
       "statement": "The faces rate advertised settings only: not password strength, not absolute safety.",
       "status": "current",
       "page": [
-        { "file": "components/guardian-experience.tsx", "text": "Faces rate advertised settings, not password strength or absolute safety." },
-        { "file": "components/project-story.tsx", "text": "No password-strength testing," }
+        {
+          "file": "components/guardian-experience.tsx",
+          "text": "Faces rate advertised settings, not password strength or absolute safety."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "No password-strength testing,"
+        }
       ],
-      "sources": [{ "path": "README.md", "quote": "does not judge how strong a password is, does not name a tool or a person, and does not promise that a network is safe." }]
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "does not judge how strong a password is, does not name a tool or a person, and does not promise that a network is safe."
+        }
+      ]
     },
     {
       "id": "details-pages",
       "statement": "The device's details pages explain the reason for the rating.",
       "status": "current",
-      "page": [{ "file": "lib/guardian.ts", "text": "The details pages explain the settings behind the raised eyebrow." }],
-      "sources": [{ "path": "README.md", "quote": "The details pages give the reason for the rating, the evidence counts and a page named \"What it cannot see\"." }]
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "The details pages explain the settings behind the raised eyebrow."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "The details pages give the reason for the rating, the evidence counts and a page named \"What it cannot see\"."
+        }
+      ]
     },
     {
       "id": "red-incident-amber-nearby",
       "statement": "Red marks an incident on the picked network, amber marks nearby activity, and nearby activity does not change the rating.",
       "status": "current",
       "page": [
-        { "file": "components/project-story.tsx", "text": "Red for an incident on your network. Amber for nearby activity." },
-        { "file": "lib/guardian.ts", "text": "The selected network’s rating is unchanged." }
+        {
+          "file": "components/project-story.tsx",
+          "text": "Red for an incident on your network. Amber for nearby activity."
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "The selected network’s rating is unchanged."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "a red **ALERT** for an incident on your network, an amber notice for something nearby" },
-        { "path": "README.md", "quote": "Something nearby that is not aimed at the picked network, for example a probe flood. The rating does not change." }
+        {
+          "path": "README.md",
+          "quote": "a red **ALERT** for an incident on your network, an amber notice for something nearby"
+        },
+        {
+          "path": "README.md",
+          "quote": "Something nearby that is not aimed at the picked network, for example a probe flood. The rating does not change."
+        }
       ]
     },
     {
@@ -118,13 +246,28 @@
       "statement": "Alerts state counts and leave the cause unknown; the device does not name who is behind an event.",
       "status": "current",
       "page": [
-        { "file": "lib/guardian.ts", "text": "Cause unknown." },
-        { "file": "components/project-story.tsx", "text": "Not assumptions about identity." },
-        { "file": "components/project-story.tsx", "text": "not dramatic guesses about who is behind it." }
+        {
+          "file": "lib/guardian.ts",
+          "text": "Cause unknown."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "Not assumptions about identity."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "not dramatic guesses about who is behind it."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "The cause is stated as unknown." },
-        { "path": "README.md", "quote": "Who is behind an event. It names the behaviour and the counts, never a tool or a person." }
+        {
+          "path": "README.md",
+          "quote": "The cause is stated as unknown."
+        },
+        {
+          "path": "README.md",
+          "quote": "Who is behind an event. It names the behaviour and the counts, never a tool or a person."
+        }
       ]
     },
     {
@@ -132,22 +275,45 @@
       "statement": "Disconnect bursts on the picked network and nearby activity (including the probe-flood example count of 16 probes from 12 addresses in 10 s) are proven on the device.",
       "status": "current",
       "page": [
-        { "file": "components/project-story.tsx", "text": "Disconnect bursts on your network and nearby activity are proven on the device;" },
-        { "file": "lib/guardian.ts", "text": "Demo: 16 probes from 12 addresses nearby in 10 seconds." }
+        {
+          "file": "components/project-story.tsx",
+          "text": "Disconnect bursts on your network and nearby activity are proven on the device;"
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "Demo: 16 probes from 12 addresses nearby in 10 seconds."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "red on the owner's network and amber nearby proven live" },
-        { "path": "README.md", "quote": "| Probe flood | amber | yes: 2026-11-17, at 16 probes from 12 addresses in 10 s |" }
+        {
+          "path": "README.md",
+          "quote": "red on the owner's network and amber nearby proven live"
+        },
+        {
+          "path": "README.md",
+          "quote": "| Probe flood | amber | yes: 2026-11-17, at 16 probes from 12 addresses in 10 s |"
+        }
       ]
     },
     {
       "id": "host-only-families",
       "statement": "Several other detector families are validated by host tests only, not on the device.",
       "status": "host-only",
-      "page": [{ "file": "components/project-story.tsx", "text": "several other detector families are host-tested only." }],
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "several other detector families are host-tested only."
+        }
+      ],
       "sources": [
-        { "path": "README.md", "quote": "the other families are host-tested only" },
-        { "path": "docs/attack-coverage.md", "quote": "the rules below are implemented in the portable library and proven by host fixtures" }
+        {
+          "path": "README.md",
+          "quote": "the other families are host-tested only"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "the rules below are implemented in the portable library and proven by host fixtures"
+        }
       ]
     },
     {
@@ -155,119 +321,266 @@
       "statement": "Monitoring is receive-only; the stick transmits only for its phone setup access point and, as an ordinary Wi-Fi client, for its signed update check, and it does not join the network to monitor.",
       "status": "current",
       "page": [
-        { "file": "components/project-story.tsx", "text": "Receive-only monitoring: the stick transmits only for its phone setup access point and, as an ordinary Wi-Fi client, for its signed update check." },
-        { "file": "components/project-story.tsx", "text": "Guardian listens on its 2.4 GHz channel, without joining it to monitor." },
-        { "file": "components/guardian-stage.tsx", "text": "RX-ONLY MONITOR" },
-        { "file": "lib/social-card.tsx", "text": "Receive-only Wi-Fi monitoring on the M5 StickS3." }
+        {
+          "file": "components/project-story.tsx",
+          "text": "Receive-only monitoring: the stick transmits only for its phone setup access point and, as an ordinary Wi-Fi client, for its signed update check."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "Guardian listens on its 2.4 GHz channel, without joining it to monitor."
+        },
+        {
+          "file": "components/guardian-stage.tsx",
+          "text": "RX-ONLY MONITOR"
+        },
+        {
+          "file": "lib/social-card.tsx",
+          "text": "Receive-only Wi-Fi monitoring on the M5 StickS3."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call. It joins a network only as an ordinary client for its own signed update check, and raises a short-lived setup access point when you ask it to." },
-        { "path": "README.md", "quote": "The password is needed only for the update check; the guarding itself never joins a network." }
+        {
+          "path": "README.md",
+          "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call. It joins a network only as an ordinary client for its own signed update check, and raises a short-lived setup access point when you ask it to."
+        },
+        {
+          "path": "README.md",
+          "quote": "The password is needed only for the update check; the guarding itself never joins a network."
+        }
       ]
     },
     {
       "id": "update-listening-gap",
-      "statement": "The stick stops listening for the seconds each update check takes, every 120 s by default.",
+      "statement": "A stick with an update server stored stops listening for the seconds each update check takes, every 120 s by default; a stick installed from the website has no server and never checks by itself.",
       "status": "current",
-      "page": [{ "file": "components/project-story.tsx", "text": "It stops listening for the seconds each check takes, every 120 s by default." }],
-      "sources": [{ "path": "README.md", "quote": "The air during its own update check: by default every 120 s the stick stops listening for the seconds the check takes." }]
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "With an update server stored it stops listening for the seconds each check takes, every 120 s by default; installed from this website, it never checks by itself."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "on a stick with an update server stored, by default every 120 s the stick stops listening for the seconds the check takes."
+        },
+        {
+          "path": "README.md",
+          "quote": "A stick without an update server (installed from the website) never checks by itself."
+        }
+      ]
     },
     {
       "id": "band-and-channel",
       "statement": "It hears 2.4 GHz only, on the one channel of the picked network.",
       "status": "current",
       "page": [
-        { "file": "components/project-story.tsx", "text": "2.4 GHz only. One selected channel." },
-        { "file": "components/project-story.tsx", "text": "Choose your own access point on the StickS3." }
+        {
+          "file": "components/project-story.tsx",
+          "text": "2.4 GHz only. One selected channel."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "Choose your own access point on the StickS3."
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "5 GHz and 6 GHz. The ESP32-S3 radio is 2.4 GHz only." },
-        { "path": "README.md", "quote": "Other channels while it is locked to the picked network's channel." },
-        { "path": "README.md", "quote": "pick your network in the list (hold the side key)" }
+        {
+          "path": "README.md",
+          "quote": "5 GHz and 6 GHz. The ESP32-S3 radio is 2.4 GHz only."
+        },
+        {
+          "path": "README.md",
+          "quote": "Other channels while it is locked to the picked network's channel."
+        },
+        {
+          "path": "README.md",
+          "quote": "pick your network in the list (hold the side key)"
+        }
       ]
     },
     {
       "id": "no-application-traffic",
       "statement": "It does not inspect clients' application traffic.",
       "status": "current",
-      "page": [{ "file": "components/project-story.tsx", "text": "no inspection of clients’ application traffic" }],
-      "sources": [{ "path": "README.md", "quote": "Anything inside the network after a client has joined (no data inspection)." }]
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "no inspection of clients’ application traffic"
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Anything inside the network after a client has joined (no data inspection)."
+        }
+      ]
     },
     {
       "id": "hardware",
       "statement": "It runs on the M5 StickS3: ESP32-S3, 8 MB flash and 8 MB PSRAM, a 135x240 colour screen, two keys and a built-in battery, on native ESP-IDF.",
       "status": "current",
       "page": [
-        { "file": "components/project-story.tsx", "text": "8 MB + 8 MB<strong>Flash + PSRAM</strong>" },
-        { "file": "components/project-story.tsx", "text": "135 × 240<span>COLOR DISPLAY</span>" },
-        { "file": "components/project-story.tsx", "text": "ESP32-S3<strong>Native ESP-IDF</strong>" },
-        { "file": "components/project-story.tsx", "text": "A screen, a radio, two buttons" },
-        { "file": "components/project-story.tsx", "text": "Built-in battery" }
+        {
+          "file": "components/project-story.tsx",
+          "text": "8 MB + 8 MB<strong>Flash + PSRAM</strong>"
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "135 × 240<span>COLOR DISPLAY</span>"
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "ESP32-S3<strong>Native ESP-IDF</strong>"
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "A screen, a radio, two buttons"
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "Built-in battery"
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "**M5 StickS3**: ESP32-S3-PICO-1 with 8 MB flash and 8 MB PSRAM, a 135x240 ST7789 screen, a BMI270 motion sensor, the M5PM1 power chip, two keys and the built-in battery." },
-        { "path": "README.md", "quote": "Firmware: native ESP-IDF v5.4" }
+        {
+          "path": "README.md",
+          "quote": "**M5 StickS3**: ESP32-S3-PICO-1 with 8 MB flash and 8 MB PSRAM, a 135x240 ST7789 screen, a BMI270 motion sensor, the M5PM1 power chip, two keys and the built-in battery."
+        },
+        {
+          "path": "README.md",
+          "quote": "Firmware: native ESP-IDF v5.4"
+        }
       ]
     },
     {
       "id": "no-companion-computer-normal-monitoring",
       "statement": "Normal monitoring needs no companion computer; a computer does the first USB install and serves the signed updates.",
       "status": "current",
-      "page": [{ "file": "components/project-story.tsx", "text": "No companion computer for normal monitoring: a computer does the first USB install and serves the signed updates." }],
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "No companion computer for normal monitoring: a computer does the first USB install and serves the signed updates."
+        }
+      ],
       "sources": [
-        { "path": "README.md", "quote": "No SD card and no companion computer are needed to run it." },
-        { "path": "README.md", "quote": "# 4. first install over USB" },
-        { "path": "README.md", "quote": "python3 tools/ota_serve.py" }
+        {
+          "path": "README.md",
+          "quote": "No SD card and no companion computer are needed to run it."
+        },
+        {
+          "path": "README.md",
+          "quote": "# 4. first install over USB"
+        },
+        {
+          "path": "README.md",
+          "quote": "python3 tools/ota_serve.py"
+        }
       ]
     },
     {
       "id": "no-cloud-normal-monitoring",
       "statement": "Normal monitoring uses no cloud service: the guarding never joins a network.",
       "status": "current",
-      "page": [{ "file": "components/guardian-experience.tsx", "text": "No cloud for normal monitoring" }],
+      "page": [
+        {
+          "file": "components/guardian-experience.tsx",
+          "text": "No cloud for normal monitoring"
+        }
+      ],
       "sources": [
-        { "path": "README.md", "quote": "the guarding itself never joins a network." },
-        { "path": "guardian-tasks.json", "quote": "independent of a Pi, phone, website or SD card." }
+        {
+          "path": "README.md",
+          "quote": "the guarding itself never joins a network."
+        },
+        {
+          "path": "guardian-tasks.json",
+          "quote": "independent of a Pi, phone, website or SD card."
+        }
       ]
     },
     {
       "id": "signed-updates",
       "statement": "The first install is over USB; later updates are signed images the stick fetches over Wi-Fi.",
       "status": "current",
-      "page": [{ "file": "components/project-story.tsx", "text": "USB first install<strong>Signed updates after</strong>" }],
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "USB first install<strong>Signed updates after</strong>"
+        }
+      ],
       "sources": [
-        { "path": "README.md", "quote": "# 5. every later update over Wi-Fi: the stick fetches a signed, newer image by itself" },
-        { "path": "README.md", "quote": "good update installed; bad signature refused" }
+        {
+          "path": "README.md",
+          "quote": "# 5. every later update over Wi-Fi: the stick fetches a signed, newer image by itself"
+        },
+        {
+          "path": "README.md",
+          "quote": "good update installed; bad signature refused"
+        }
       ]
     },
     {
       "id": "portable-core",
       "statement": "The detection library is portable C++17.",
       "status": "current",
-      "page": [{ "file": "components/project-story.tsx", "text": "Portable C++17 core" }],
-      "sources": [{ "path": "README.md", "quote": "The detection library is portable C++17 with no board or SDK dependency" }]
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "Portable C++17 core"
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "The detection library is portable C++17 with no board or SDK dependency"
+        }
+      ]
     },
     {
       "id": "licenses",
       "statement": "Code is MIT-licensed; the Guardian artwork is all rights reserved.",
       "status": "current",
       "page": [
-        { "file": "components/site-footer.tsx", "text": "Code: MIT. Guardian artwork: all rights reserved." },
-        { "file": "components/project-story.tsx", "text": "Code license: MIT" }
+        {
+          "file": "components/site-footer.tsx",
+          "text": "Code: MIT. Guardian artwork: all rights reserved."
+        },
+        {
+          "file": "components/project-story.tsx",
+          "text": "Code license: MIT"
+        }
       ],
       "sources": [
-        { "path": "README.md", "quote": "**Code, scripts, tests and documentation:** MIT, see [LICENSE](LICENSE)." },
-        { "path": "firmware/art/LICENSE", "quote": "Copyright (c) 2026 Felipe Cavalcanti. All rights reserved." }
+        {
+          "path": "README.md",
+          "quote": "**Code, scripts, tests and documentation:** MIT, see [LICENSE](LICENSE)."
+        },
+        {
+          "path": "firmware/art/LICENSE",
+          "quote": "Copyright (c) 2026 Felipe Cavalcanti. All rights reserved."
+        }
       ]
     },
     {
       "id": "bluetooth-deferred",
       "statement": "A Bluetooth guard is not built; it is deferred to a second release.",
       "status": "deferred",
-      "page": [{ "file": "components/project-story.tsx", "text": "A Bluetooth guard is deferred to a second release." }],
+      "page": [
+        {
+          "file": "components/project-story.tsx",
+          "text": "A Bluetooth guard is deferred to a second release."
+        }
+      ],
       "sources": [
-        { "path": "README.md", "quote": "G16U (Bluetooth guard, deferred to a second release)" },
-        { "path": "README.md", "quote": "| Bluetooth guard | G16U | open, release 2 | not built |" }
+        {
+          "path": "README.md",
+          "quote": "G16U (Bluetooth guard, deferred to a second release)"
+        },
+        {
+          "path": "README.md",
+          "quote": "| Bluetooth guard | G16U | open, release 2 | not built |"
+        }
       ]
     }
   ]
