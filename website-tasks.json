@@ -111,7 +111,7 @@
       "Supervisor: mark W06 accepted only after live evidence is reviewed; preserve all firmware work and keep W04 absent from the ledger and shipped site.",
       "CARRY-OVER from the W05 acceptance (supervisor, 2026-11-22): the Lighthouse GATE is measured on the Vercel preview of the exact revision (website/scripts/lighthouse.mjs with LIGHTHOUSE_URL and LIGHTHOUSE_BYPASS = the project's Protection Bypass for Automation secret, never committed or printed). Measured on preview m5-guardian-eqekqsg7n at normal load: median performance 0.96, accessibility 1, best practices 1, LCP 2305 ms, CLS 0, TBT 172 ms; SEO 0.69 only because Vercel sends x-robots-tag: noindex on previews (is-crawlable). W06 must: (1) confirm SEO >= 0.95 on production; (2) make CI run the gate on the preview: a workflow on deployment_status (success, environment Preview) that runs lighthouse.mjs against the deployment URL with the bypass secret from a GitHub Actions secret; the local-server run in website-checks.yml stays informational. Project already created by the supervisor: m5-guardian (flowcoders scope), Root Directory website, Node 24.x, install 'corepack pnpm install --frozen-lockfile', build 'corepack pnpm run build' (Vercel's own pnpm could not read the pnpm 12 lockfile); root .vercelignore uploads only website/ on CLI deploys."
     ],
-    "passes": false,
+    "passes": true,
     "existing_work": ""
   },
   {
