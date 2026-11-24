@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { siteDescription, siteTitle, siteUrl } from "@/lib/guardian";
 import { jsonLd, structuredData } from "@/lib/structured-data";
+import { OutboundClicks } from "@/components/outbound-clicks";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({
@@ -51,6 +52,8 @@ export default function RootLayout({
         />
         {/* Vercel Web Analytics (cookieless page views and the install step counts), in Vercel builds only (VERCEL=1 at build time; the pages are prerendered). */}
         {process.env.VERCEL === "1" && <Analytics />}
+        {/* Counts clicks on links that leave the site; a no-op where the analytics script is absent. */}
+        <OutboundClicks />
       </body>
     </html>
   );

@@ -38,5 +38,5 @@ test("production is indexable at its canonical URL", async ({ page }) => {
   for (const content of await page.locator('meta[name="robots"]').evaluateAll((els) => els.map((el) => el.getAttribute("content"))))
     expect(content ?? "").not.toMatch(/noindex/i);
   expect(new URL((await page.locator('link[rel="canonical"]').getAttribute("href"))!).href).toBe(`${productionOrigin}/`);
-  await expect(page).toHaveTitle("M5 Guardian: your Wi-Fi, under watch");
+  await expect(page).toHaveTitle("M5 Guardian: Wi-Fi guard firmware for M5StickS3");
 });

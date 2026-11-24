@@ -1,8 +1,8 @@
 export const repositoryUrl = "https://github.com/fcavalcantirj/m5-guardian";
 export const siteUrl = "https://m5-guardian.vercel.app";
-export const siteTitle = "M5 Guardian: your Wi-Fi, under watch";
+export const siteTitle = "M5 Guardian: Wi-Fi guard firmware for M5StickS3";
 export const siteDescription =
-  "M5 StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
+  "M5StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
 export const codeLicenseUrl = `${repositoryUrl}/blob/main/LICENSE`;
 export const artworkLicenseUrl = `${repositoryUrl}/blob/main/website/public/images/LICENSE`;
 

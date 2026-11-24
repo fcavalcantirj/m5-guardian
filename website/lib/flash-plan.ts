@@ -225,10 +225,12 @@ export type StepResult =
   | `error_${Step}`;
 export const ANALYTICS_EVENT = "guardian_install";
 
-export type StepEvent = { action: Mode | "backup"; result: StepResult; step: `${Mode | "backup"}:${StepResult}` };
+export type StepEvent = { action: Mode | "backup"; step: `${Mode | "backup"}:${StepResult}` };
 
-/** The guardian_install event: what was done and how it ended, plus both joined as `step` (e.g. "update:done"),
- * because Vercel's analytics query groups by one property at a time (tools/site_stats.sh counts by step). */
+/** The guardian_install event: what was done, and what was done joined with how it ended as `step`
+ * (e.g. "update:done"), because Vercel's analytics query groups by one property at a time
+ * (tools/site_stats.sh counts by step). Exactly two properties: the Pro plan keeps 2 per custom event and does
+ * not document what happens to more. */
 export function stepEvent(mode: Mode | "backup", result: StepResult): StepEvent {
-  return { action: mode, result, step: `${mode}:${result}` };
+  return { action: mode, step: `${mode}:${result}` };
 }

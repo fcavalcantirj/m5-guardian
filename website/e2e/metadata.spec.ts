@@ -15,7 +15,7 @@ const configuredHeaders = {
 };
 
 const homeDescription =
-  "M5 StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
+  "M5StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
 const releaseVersion = /^version=(\S+)$/m.exec(readFileSync(new URL("../../release/version.txt", import.meta.url), "utf8"))![1];
 
 /**
@@ -54,7 +54,7 @@ test("home page: 200, configured headers, title, description and canonical link"
   for (const [name, value] of Object.entries(configuredHeaders)) expect(headers[name]).toBe(value);
   expect(headers["x-powered-by"]).toBeUndefined();
 
-  await expect(page).toHaveTitle("M5 Guardian: your Wi-Fi, under watch");
+  await expect(page).toHaveTitle("M5 Guardian: Wi-Fi guard firmware for M5StickS3");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   // W08: no simulation sentence in the snippet; the page itself still says it is a simulation.
   await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", homeDescription);

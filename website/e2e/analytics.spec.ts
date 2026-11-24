@@ -44,6 +44,28 @@ test("on Vercel, every page loads the analytics script from its own origin, allo
   expect(seen).toEqual(pages.map(() => `${insights}script.js`));
 });
 
+test("a click on a link that leaves the site sends one outbound_click with its target and page, an internal link none", async ({ page }) => {
+  test.skip(Boolean(remoteOrigin), "local build: the analytics queue is a stand-in");
+  await page.addInitScript(() => {
+    const w = window as unknown as { __va: unknown[]; va: (...a: unknown[]) => void };
+    w.__va = [];
+    w.va = (...a: unknown[]) => w.__va.push(a);
+  });
+  // The link opens a new tab; answer it locally so nothing leaves the test machine.
+  await page.context().route("https://github.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>stand-in</title>" }));
+  await page.goto("/what-it-detects");
+  const events = () => page.evaluate(() => (window as unknown as { __va: [string, { name: string; data: unknown }][] }).__va);
+
+  // An on-site link that keeps the page (and its event queue): Back to top.
+  await page.locator("footer").getByRole("link", { name: /Back to top/ }).click();
+  expect(await events()).toEqual([]);
+
+  const popup = page.waitForEvent("popup");
+  await page.locator("footer").getByRole("link", { name: /^GitHub/ }).click();
+  await (await popup).close();
+  await expect.poll(events).toEqual([["event", { name: "outbound_click", data: { target: "repo", from: "/what-it-detects" } }]]);
+});
+
 test("a deployment serves the analytics script on every page", async ({ page }) => {
   test.skip(!remoteOrigin, "deployment check: set WEBSITE_URL");
   for (const path of pages) {

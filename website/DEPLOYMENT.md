@@ -126,10 +126,20 @@ after a click). What a deployment needs:
 - **Step counts** use Vercel Web Analytics (`@vercel/analytics`, cookieless), mounted once in the root layout
   since W08 (page views on every page) and only in a Vercel build (`process.env.VERCEL === "1"` at build
   time: the pages are prerendered). Enable Web Analytics in the project settings, or every page requests a missing
-  `/_vercel/insights/script.js`. The event is `guardian_install` with three properties,
-  `action` (update, install, restore, backup), `result` (start, connected, done, cancel, error_plan,
-  error_<step>) and `step` = `<action>:<result>` (since 2026-11-24; the query API groups by one property at
-  a time, so `step` gives every combination in one count); nothing about the device.
+  `/_vercel/insights/script.js`. The event is `guardian_install` with two properties (the Pro plan keeps 2
+  per custom event and does not document what happens to more): `action` (update, install, restore, backup)
+  and `step` = `<action>:<result>`, where the result is start, connected, done, cancel, error_plan or
+  error_<step> (the query API groups by one property at a time, so `step` gives every combination in one
+  count); nothing about the device. Events sent before 2026-11-24 carry `action` and `result` only.
+- **Outbound clicks**: `outbound_click` with `target` (a link into the repository is `repo` plus its path and
+  anchor, e.g. `repo#build-and-install`; any other link is host and path, never the query string) and `from`
+  (the page's path). One listener in the root layout (`components/outbound-clicks.tsx`, `lib/outbound.ts`).
+- **Links in posts** (Hackster, forums, Reddit) carry UTM tags so the referrer survives apps that strip it:
+  `?utm_source=<site, e.g. hackster|m5stack-forum|reddit>&utm_medium=post&utm_campaign=<release, e.g. 1.0.0>`.
+  Lowercase, no spaces. The canonical link on every page keeps tagged URLs out of Google's index. Reading
+  visits by UTM needs the Web Analytics Plus add-on (measured 2026-11-24: the query API answers 402 "UTM
+  dimensions require an Enterprise plan or the Web Analytics Plus add-on" on the Pro plan); until then the
+  Referrers table counts posts by their site (hackster.io, reddit.com, ...); the tags cost nothing meanwhile.
 - **Reading the numbers**: `tools/site_stats.sh [days]` (repository root, read-only, Vercel CLI logged in,
   `.vercel/project.json` from `vercel link`) prints visitors, page views, pages, referrers, countries,
   devices and the install counts by `step` (e.g. `update:done`, `install:done`, `restore:done`,

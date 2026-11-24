@@ -499,7 +499,7 @@
         },
         {
           "file": "lib/guardian.ts",
-          "text": "M5 StickS3 guard for your own Wi-Fi"
+          "text": "M5StickS3 guard for your own Wi-Fi"
         }
       ],
       "sources": [

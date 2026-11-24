@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Website numbers from Vercel Web Analytics (read-only): visitors, page views, top pages, referrers,
-# countries, devices, and the install-page counts (guardian_install events by step, e.g. update:done).
+# countries, devices, the install-page counts (guardian_install events by step, e.g. update:done) and the
+# clicks on links that leave the site (outbound_click by target, e.g. repo#build-and-install).
 # Usage: tools/site_stats.sh [days]        (default 30)
 # Needs: the Vercel CLI logged in to the project's team, and .vercel/project.json (vercel link) at the
 # repository root, or VERCEL_PROJECT_ID. Counts are browser-side: a visitor who blocks the analytics
@@ -28,8 +29,10 @@ echo "M5 Guardian website, last $days days (since $since)"
 api "/v1/query/web-analytics/visits/count?$query" | python3 -I -c '
 import json,sys; d=json.load(sys.stdin)["data"]; print("  visitors %s   page views %s" % (d.get("visitors",0), d.get("pageviews",0)))'
 
-table() { # $1 endpoint, $2 dimension, $3 title, $4 limit, $5 label for an empty value
-  api "/v1/query/web-analytics/$1/aggregate?$query&by=$2&limit=$4" | python3 -I -c '
+table() { # $1 endpoint, $2 dimension, $3 title, $4 limit, $5 label for an empty value, $6 event name (events only)
+  local filter=""
+  [[ -n "${6:-}" ]] && filter="&filter=$(python3 -I -c 'import sys,urllib.parse; print(urllib.parse.quote("eventName eq %r" % sys.argv[1]))' "$6")"
+  api "/v1/query/web-analytics/$1/aggregate?$query&by=$2&limit=$4$filter" | python3 -I -c '
 import json,sys
 dim,title=sys.argv[1],sys.argv[2]; rows=json.load(sys.stdin).get("data",[])
 print(f"\n{title}")
@@ -41,4 +44,5 @@ table visits requestPath "Pages" 10 "(none)"
 table visits referrerHostname "Referrers" 10 "(direct)"
 table visits country "Countries" 10 "(unknown)"
 table visits deviceType "Devices" 5 "(unknown)"
-table events "eventData/step" "Install page (guardian_install by step: <action>:<result>)" 50 "(no step: sent before 2026-11-24)"
+table events "eventData/step" "Install page (guardian_install by step: <action>:<result>)" 50 "(no step: sent before 2026-11-24)" guardian_install
+table events "eventData/target" "Links out (outbound_click by target)" 20 "(no target)" outbound_click
