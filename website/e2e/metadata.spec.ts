@@ -205,10 +205,11 @@ test("sitemap.xml lists the home page and the install page, each with its last s
 
 test("unknown paths get the custom 404 page with status 404, noindex and headers", async ({ page, browserLog }) => {
   const response = await page.goto("/no-such-page");
-  // Chrome logs the document's own 404 status; that one line is expected here.
-  const expected = "console.error: Failed to load resource: the server responded with a status of 404 (Not Found)";
-  expect(browserLog.filter((line) => line === expected)).toHaveLength(1);
-  browserLog.splice(browserLog.indexOf(expected), 1);
+  // Chrome logs the document's own 404 status; that one line is expected here. Over HTTP/2 (a deployment)
+  // there is no reason phrase, so Chrome prints "404 ()"; locally (HTTP/1.1) it is "404 (Not Found)".
+  const expected = /^console\.error: Failed to load resource: the server responded with a status of 404 \((?:Not Found)?\)$/;
+  expect(browserLog.filter((line) => expected.test(line))).toHaveLength(1);
+  browserLog.splice(browserLog.findIndex((line) => expected.test(line)), 1);
   expect(response?.status()).toBe(404);
   const headers = response!.headers();
   for (const [name, value] of Object.entries(configuredHeaders)) expect(headers[name]).toBe(value);
