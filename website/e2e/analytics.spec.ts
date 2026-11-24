@@ -1,0 +1,54 @@
+import type { Page } from "@playwright/test";
+import { test, expect, remoteOrigin, vercelModeOrigin } from "./fixtures";
+
+// W08 Vercel Web Analytics: mounted once in the root layout, only when the
+// server runs on Vercel (VERCEL=1). Locally the suite has two servers of the
+// same build: the main one (no analytics at all) and a VERCEL=1 one, where the
+// script must load on every page under the enforced Content-Security-Policy
+// (the fixture fails on any violation). The script itself exists only on
+// Vercel, so there it is a stand-in served at its real same-origin path.
+
+const insights = "/_vercel/insights/";
+
+function watchInsights(page: Page) {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith(insights)) seen.push(path);
+  });
+  return seen;
+}
+
+test("a non-Vercel build loads no analytics script on any page", async ({ page }) => {
+  test.skip(Boolean(remoteOrigin), "local build only: a deployment runs on Vercel");
+  const seen = watchInsights(page);
+  for (const path of ["/", "/install"]) {
+    await page.goto(path, { waitUntil: "networkidle" });
+    await expect(page.locator(`script[src*="${insights}"]`)).toHaveCount(0);
+  }
+  expect(seen).toEqual([]);
+});
+
+test("on Vercel, every page loads the analytics script from its own origin, allowed by the CSP", async ({ page }) => {
+  test.skip(!vercelModeOrigin, "local VERCEL=1 server; a deployment is checked by the next test");
+  await page.route(`${vercelModeOrigin}${insights}script.js`, (route) =>
+    route.fulfill({ contentType: "application/javascript", body: "window.__insightsRan = (window.__insightsRan || 0) + 1;" }),
+  );
+  const seen = watchInsights(page);
+  for (const path of ["/", "/install"]) {
+    const response = await page.goto(`${vercelModeOrigin}${path}`);
+    expect(response!.headers()["content-security-policy"]).toBeTruthy();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __insightsRan?: number }).__insightsRan), { message: `${path}: script ran` }).toBe(1);
+  }
+  expect(seen).toEqual([`${insights}script.js`, `${insights}script.js`]);
+});
+
+test("a deployment serves the analytics script on every page", async ({ page }) => {
+  test.skip(!remoteOrigin, "deployment check: set WEBSITE_URL");
+  for (const path of ["/", "/install"]) {
+    const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === `${insights}script.js`);
+    await page.goto(path);
+    const response = await loaded;
+    expect(response.status(), `${path}: ${insights}script.js`).toBe(200);
+  }
+});

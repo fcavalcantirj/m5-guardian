@@ -34,6 +34,10 @@
 !/README.md
 !/THIRD_PARTY_NOTICES.md
 !/guardian-tasks.json
+# The release number the page's JSON-LD names (website/next.config.mjs reads it at build time).
+!/release
+/release/*
+!/release/version.txt
 !/tools
 /tools/*
 !/tools/public_check.py

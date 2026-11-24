@@ -76,7 +76,8 @@ for (const [name, profile] of Object.entries(profiles)) {
  */
 async function colouredPerMille(page: Page, png: Buffer) {
   return page.evaluate(async (base64) => {
-    const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+    // Decoded in memory: fetching a data: URL would be a connection the page's CSP (connect-src 'self') refuses.
+    const blob = new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: "image/png" });
     const bitmap = await createImageBitmap(blob);
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const context = canvas.getContext("2d")!;

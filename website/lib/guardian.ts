@@ -2,7 +2,7 @@ export const repositoryUrl = "https://github.com/fcavalcantirj/m5-guardian";
 export const siteUrl = "https://m5-guardian.vercel.app";
 export const siteTitle = "M5 Guardian: your Wi-Fi, under watch";
 export const siteDescription =
-  "A pocket radio guard for your own Wi-Fi on the M5 StickS3: receive-only monitoring, five rated faces for advertised settings, and red or amber alerts. This website is a simulation.";
+  "M5 StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
 export const codeLicenseUrl = `${repositoryUrl}/blob/main/LICENSE`;
 export const artworkLicenseUrl = `${repositoryUrl}/blob/main/website/public/images/LICENSE`;
 

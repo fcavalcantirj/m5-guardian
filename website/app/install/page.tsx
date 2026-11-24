@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Analytics } from "@vercel/analytics/next";
 import { ArrowUpRight, Cable, MonitorSmartphone, Power, ShieldCheck } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -14,7 +13,9 @@ export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: "/install" },
+  // The images come from opengraph-image.tsx and twitter-image.tsx beside this page.
   openGraph: { title, description, url: "/install", siteName: "M5 Guardian", locale: "en", type: "website" },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 const needs = [
@@ -97,7 +98,6 @@ export default function InstallPage() {
         </section>
       </main>
       <SiteFooter />
-      {process.env.VERCEL === "1" && <Analytics />}
     </>
   );
 }

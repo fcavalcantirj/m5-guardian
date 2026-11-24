@@ -73,3 +73,59 @@ export async function renderSocialCard() {
     { ...socialCardSize },
   );
 }
+
+// The /install card: the same layout and colours, text only (no artwork).
+export function renderInstallCard() {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          background: "#080b0c",
+          color: "#edf0ee",
+          padding: "0 72px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            fontSize: 26,
+            letterSpacing: 4,
+            color: "#b5f36a",
+          }}
+        >
+          M5 / GUARDIAN / INSTALL
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            fontSize: 84,
+            lineHeight: 1.05,
+            marginTop: 28,
+            fontWeight: 600,
+          }}
+        >
+          <span>Put the Guardian</span>
+          <span style={{ color: "#b5f36a" }}>on your own StickS3.</span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 28,
+            lineHeight: 1.4,
+            marginTop: 32,
+            color: "#b8c0c2",
+          }}
+        >
+          Signed firmware over USB, from Chrome or Edge on a desktop.
+        </div>
+      </div>
+    ),
+    { ...socialCardSize },
+  );
+}

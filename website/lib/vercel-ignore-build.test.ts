@@ -55,6 +55,8 @@ function makeRepo() {
   write(repo, "website/old-name.txt", "old\n");
   write(repo, "firmware/main.c", "int main(void) { return 0; }\n");
   write(repo, "firmware/notes.txt", "notes\n");
+  write(repo, "release/version.txt", "version=1.0.0\nbuild=1\n");
+  write(repo, "release/release-public-key.json", "{}\n");
   const base = commit(repo, "base");
   return { repo, base, cleanup: () => rmSync(repo, { recursive: true, force: true }) };
 }
@@ -91,7 +93,7 @@ test("a firmware-only change is skipped (exit 0)", () => {
     expectDecision(
       decide(repo, { VERCEL_GIT_COMMIT_SHA: head, VERCEL_GIT_PREVIOUS_SHA: base }),
       SKIP,
-      /no change under website\//,
+      /no change under website\/ or release\/version\.txt/,
     );
   } finally {
     cleanup();
@@ -141,6 +143,37 @@ for (const [name, change] of [
   });
 }
 
+// W08: the root layout's JSON-LD carries the version from release/version.txt, read at build time.
+test("a release version change builds (exit 1): the page names that version", () => {
+  const { repo, base, cleanup } = makeRepo();
+  try {
+    write(repo, "release/version.txt", "version=1.0.1\nbuild=2\n");
+    const head = commit(repo, "release 1.0.1");
+    expectDecision(
+      decide(repo, { VERCEL_GIT_COMMIT_SHA: head, VERCEL_GIT_PREVIOUS_SHA: base }),
+      BUILD,
+      /release\/version\.txt/,
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test("another release file alone is still skipped", () => {
+  const { repo, base, cleanup } = makeRepo();
+  try {
+    write(repo, "release/release-public-key.json", "{\"k\":1}\n");
+    const head = commit(repo, "key file only");
+    expectDecision(
+      decide(repo, { VERCEL_GIT_COMMIT_SHA: head, VERCEL_GIT_PREVIOUS_SHA: base }),
+      SKIP,
+      /no change under website\/ or release\/version\.txt/,
+    );
+  } finally {
+    cleanup();
+  }
+});
+
 test("a website change followed by a firmware-only commit still builds against the last deployment", () => {
   const { repo, base, cleanup } = makeRepo();
   try {
@@ -158,7 +191,7 @@ test("a website change followed by a firmware-only commit still builds against t
     expectDecision(
       decide(repo, { VERCEL_GIT_COMMIT_SHA: firmwareCommit, VERCEL_GIT_PREVIOUS_SHA: websiteCommit }),
       SKIP,
-      /no change under website\//,
+      /no change under website\/ or release\/version\.txt/,
     );
   } finally {
     cleanup();
@@ -228,7 +261,7 @@ test("in a depth-10 clone like Vercel's, an older last deployment builds and a r
     expectDecision(
       decide(clone, { VERCEL_GIT_COMMIT_SHA: head, VERCEL_GIT_PREVIOUS_SHA: recent }),
       SKIP,
-      /no change under website\//,
+      /no change under website\/ or release\/version\.txt/,
     );
   } finally {
     rmSync(clone, { recursive: true, force: true });

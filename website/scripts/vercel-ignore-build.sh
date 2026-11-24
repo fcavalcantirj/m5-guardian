@@ -11,7 +11,8 @@
 #
 # The build is skipped only when the two commits are both present and valid,
 # differ, and the diff between them, taken from the Git root and restricted to
-# the website directory, is empty: a firmware-only change. Everything else
+# the website directory and release/version.txt (the page's JSON-LD names that
+# version, read at build time), is empty: a firmware-only change. Everything else
 # builds: a website addition, modification, deletion or rename (in, out or
 # within), a first deployment, a missing or malformed commit id, a commit
 # absent from the clone, any comparison error, a redeploy of the same commit,
@@ -52,13 +53,14 @@ for id in "$previous" "$current"; do
   [ "$(git -C "$root" cat-file -t "$id" 2>/dev/null)" = commit ] || build "commit $id is not in this clone"
 done
 
-changes="$(git -C "$root" -c core.quotePath=false diff --no-ext-diff --no-textconv --name-status "$previous" "$current" -- "$prefix" 2>&1)"
+watched="$prefix or release/version.txt"
+changes="$(git -C "$root" -c core.quotePath=false diff --no-ext-diff --no-textconv --name-status "$previous" "$current" -- "$prefix" release/version.txt 2>&1)"
 status=$?
 [ "$status" -eq 0 ] || build "git diff failed (exit $status): $changes"
 
-echo "vercel-ignore-build: compared ${previous:0:12}..${current:0:12} under $prefix"
+echo "vercel-ignore-build: compared ${previous:0:12}..${current:0:12} under $watched"
 if [ -n "$changes" ]; then
   printf '%s\n' "$changes" | head -n 20
-  build "$(printf '%s\n' "$changes" | wc -l | tr -d ' ') change(s) under $prefix"
+  build "$(printf '%s\n' "$changes" | wc -l | tr -d ' ') change(s) under $watched"
 fi
-skip "no change under $prefix since the last deployment"
+skip "no change under $watched since the last deployment"

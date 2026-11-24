@@ -48,6 +48,8 @@ diffs the two commits restricted to `website/`:
   any comparison error; a redeploy of the same commit; or
   `WEBSITE_FORCE_BUILD=1` (or `true`).
 
+Since W08 a change to `release/version.txt` also builds: the page's JSON-LD names that version.
+
 The diff is from the last successful deployment, not from the previous commit:
 a website commit followed by a firmware-only commit still builds if the website
 commit was never deployed. `lib/vercel-ignore-build.test.ts` runs the real
@@ -120,15 +122,89 @@ after a click). What a deployment needs:
   `{"kind":"no-release"}` and the page says so; Update and First install stay disabled, Restore works.
   The release key is `lib/release-key.ts` (a copy of `release/release-public-key.json`, compared by
   `lib/firmware-release.test.ts`); a new release key needs a new website deployment.
-- **Step counts** use Vercel Web Analytics (`@vercel/analytics`, cookieless), mounted on `/install` only and
-  only in a Vercel build (`process.env.VERCEL`). Enable Web Analytics in the project settings, or the page
-  requests a missing `/_vercel/insights/script.js`. The event is `guardian_install` with two properties,
-  `action` (update, install, restore, backup) and `result` (start, connected, done, cancel, error_plan,
-  error_<step>); nothing about the device.
+- **Step counts** use Vercel Web Analytics (`@vercel/analytics`, cookieless), mounted once in the root layout
+  since W08 (page views on every page) and only when the server runs on Vercel (`process.env.VERCEL === "1"`,
+  read per request). Enable Web Analytics in the project settings, or every page requests a missing
+  `/_vercel/insights/script.js`. The event is `guardian_install` with three properties,
+  `action` (update, install, restore, backup), `result` (start, connected, done, cancel, error_plan,
+  error_<step>) and `step` = `<action>:<result>` (since 2026-11-24; the query API groups by one property at
+  a time, so `step` gives every combination in one count); nothing about the device.
+- **Reading the numbers**: `tools/site_stats.sh [days]` (repository root, read-only, Vercel CLI logged in,
+  `.vercel/project.json` from `vercel link`) prints visitors, page views, pages, referrers, countries,
+  devices and the install counts by `step` (e.g. `update:done`, `install:done`, `restore:done`,
+  `install:error_writing`). The query API counts whole UTC days. Counts are browser-side: a visitor who
+  blocks the analytics script is not counted.
 - **Live check after the first release**: `curl -s <url>/api/firmware/latest` names the published tag, and a
   part URL from it answers 200 with `X-Content-SHA256` equal to the manifest. Flashing a real stick is the
   owner-run smoke: `STICK_SMOKE=1 STICK_SMOKE_OUT=<store folder> STICK_FOREIGN_IMAGE=<8 MB non-Guardian image>
   STICK_SMOKE_URL=<url> pnpm run test:stick` (headed Chrome; never in CI).
+
+## Search, share cards and Content-Security-Policy (W08)
+
+- **Share cards.** Each page has its own Open Graph and Twitter image (1200x630 PNG): `app/opengraph-image.tsx`
+  and `app/twitter-image.tsx` for `/`, `app/install/opengraph-image.tsx` and `app/install/twitter-image.tsx`
+  for `/install` (text only, the site's colours, no artwork). `/install` sets its own `twitter` title and
+  description, so a shared install link no longer shows the home page's text.
+- **Structured data.** The root layout renders one JSON-LD block: schema.org `WebSite` and
+  `SoftwareApplication` (no ratings or reviews). `softwareVersion` is `version=` of `release/version.txt`, read
+  by `next.config.mjs` when the build starts; a missing or malformed file fails the build. **The upload must
+  therefore carry `release/version.txt`**: the root `.vercelignore` needs `!/release`, `/release/*`,
+  `!/release/version.txt`, and `.github/workflows/website-checks.yml` should list `release/version.txt` in both
+  trigger lists (outside the website folder: applied by the supervisor; until then a Vercel build stops at
+  `release/version.txt cannot be read`).
+- **Icons.** `app/favicon.ico` (16, 32, 48 px) and `app/apple-icon.png` (180 px) are generated from
+  `app/icon.svg` by `node scripts/icons.mjs` (resvg through `next/og`, byte-reproducible). Edit the SVG, then
+  rerun the script; `lib/icons.test.ts` fails on stale icons.
+- **Sitemap `lastmod`** is the commit date of the newest commit touching each page's sources
+  (`lib/last-modified.ts`), read at build time. A Git deployment has the history (Vercel clones 10 commits
+  deep; a page last changed before that has no `lastmod` rather than a wrong one). A CLI deployment uploads no
+  `.git`, so its sitemap has no `lastmod`.
+
+### Content-Security-Policy
+
+Set per request by `proxy.ts` (built by `lib/csp.ts`), not as a static `next.config` header: Next's inline
+bootstrap scripts (three per page: the Turbopack chunk list and two React Server Components payload pushes)
+need a nonce, and their content changes with every build, so no fixed hash list can cover them. Next reads the
+nonce from the request's policy and puts it on every script it renders. A nonce must be new for each response,
+so the pages are rendered per request (`app/layout.tsx` awaits `connection()`): `/`, `/install` and the 404
+page are no longer prerendered or edge-cached (`Cache-Control: private, no-store`). The images, icons,
+robots, sitemap, static files and the firmware API stay static and skip the proxy.
+
+Measured before enforcing (2026-11-24, local production build, Chromium 1.65.1 via Playwright, a strict
+Report-Only policy without inline allowances; `/` loaded, scrolled and switched to 3D, `/install` with a mocked
+release and a fake serial port clicked through to the port error): `/` 3 inline scripts and 21 `style`
+attributes, `/install` 3 inline scripts; nothing else (esptool-js, spark-md5, the 3D viewer chunks and STL
+models, fonts, images and the firmware API are all same-origin).
+
+The enforced production policy and why each source is there:
+
+| Directive | Sources | Why |
+| --- | --- | --- |
+| `default-src` | `'self'` | everything not named below: same origin only |
+| `script-src` | `'self'` `'nonce-…'` | Next chunks, the 3D viewer, esptool-js and spark-md5 (dynamic imports of same-origin chunks) and the Vercel Web Analytics script `/_vercel/insights/script.js` are same-origin; the nonce covers Next's inline bootstrap. No `'unsafe-inline'`, no `'unsafe-eval'` (added only under `next dev`, for React's error overlay) |
+| `style-src` | `'self'` `'unsafe-inline'` | the CSS files, and the `style` attributes React renders into the HTML (21 on `/`); a nonce would not cover attributes |
+| `img-src` | `'self'` | persona art, icons and Next's image route |
+| `font-src` | `'self'` | the self-hosted Geist fonts |
+| `connect-src` | `'self'` | `/api/firmware/*` (release manifest and parts), the STL models, and `/_vercel/insights/*` (analytics events) |
+| `object-src` | `'none'` | no plugins |
+| `base-uri` | `'self'` | no foreign `<base>` |
+| `form-action` | `'self'` | the site has no forms |
+| `frame-ancestors` | `'none'` | the site is never framed |
+
+Not needed, so not listed: `data:` and `blob:` (the backup download is a `blob:` URL opened as a download
+link, which `img-src`/`connect-src` do not govern), `worker-src`, `frame-src` and any other host.
+
+On a **Vercel preview** (`VERCEL_ENV=preview`) the policy adds the sources Vercel documents for its toolbar
+and comments (<https://vercel.com/docs/vercel-toolbar/managing-toolbar>): `script-src https://vercel.live`,
+`connect-src https://vercel.live wss://ws-us3.pusher.com`, `img-src https://vercel.live https://vercel.com
+data: blob:`, `frame-src https://vercel.live`, `style-src https://vercel.live`, `font-src https://vercel.live
+https://assets.vercel.com`. Production carries none of them; if the toolbar is enabled for production
+deployments it is blocked there (turn it off for production in the project settings).
+
+**Report-Only trial:** set `GUARDIAN_CSP_REPORT_ONLY=1` as an environment variable of a preview deployment and
+the same policy is sent as `Content-Security-Policy-Report-Only`; the browser console then lists what it would
+block. Remove the variable to enforce. The browser suite fails on any violation, enforced or report-only
+(`e2e/fixtures.ts`), and checks the header and the nonce on every script (`e2e/metadata.spec.ts`).
 
 ## Promotion and rollback
 

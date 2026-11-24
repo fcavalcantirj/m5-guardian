@@ -31,6 +31,7 @@ on:
       - "firmware/components/guardian_core/include/guardian/core.hpp"
       - "firmware/components/guardian_presenter/presenter.cpp"
       - "guardian-tasks.json"
+      - "release/version.txt"
   pull_request:
     paths:
       - "website/**"
@@ -52,6 +53,7 @@ on:
       - "firmware/components/guardian_core/include/guardian/core.hpp"
       - "firmware/components/guardian_presenter/presenter.cpp"
       - "guardian-tasks.json"
+      - "release/version.txt"
   workflow_dispatch:
 
 permissions:

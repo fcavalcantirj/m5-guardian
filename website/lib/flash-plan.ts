@@ -225,6 +225,10 @@ export type StepResult =
   | `error_${Step}`;
 export const ANALYTICS_EVENT = "guardian_install";
 
-export function stepEvent(mode: Mode | "backup", result: StepResult): { action: Mode | "backup"; result: StepResult } {
-  return { action: mode, result };
+export type StepEvent = { action: Mode | "backup"; result: StepResult; step: `${Mode | "backup"}:${StepResult}` };
+
+/** The guardian_install event: what was done and how it ended, plus both joined as `step` (e.g. "update:done"),
+ * because Vercel's analytics query groups by one property at a time (tools/site_stats.sh counts by step). */
+export function stepEvent(mode: Mode | "backup", result: StepResult): StepEvent {
+  return { action: mode, result, step: `${mode}:${result}` };
 }

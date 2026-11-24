@@ -1,7 +1,10 @@
-import { test, expect } from "./fixtures";
+import { readFileSync } from "node:fs";
+import { test, expect, remoteOrigin } from "./fixtures";
+import { lastCommitDate, pageSources } from "../lib/last-modified";
 
 // Response status, metadata, canonical link, social images, favicon, robots,
-// sitemap, the custom 404 and the configured headers, all from `next start`.
+// sitemap, the custom 404, the configured headers and (W08) the JSON-LD and the
+// Content-Security-Policy, all from `next start` (or WEBSITE_URL).
 
 const siteUrl = "https://m5-guardian.vercel.app";
 const configuredHeaders = {
@@ -10,6 +13,31 @@ const configuredHeaders = {
   "strict-transport-security": "max-age=63072000",
   "permissions-policy": "camera=(), microphone=(), geolocation=()",
 };
+
+const homeDescription =
+  "M5 StickS3 guard for your own Wi-Fi: receive-only monitoring, five rated faces for advertised settings, red or amber alerts. Open source; browser install.";
+const releaseVersion = /^version=(\S+)$/m.exec(readFileSync(new URL("../../release/version.txt", import.meta.url), "utf8"))![1];
+
+/**
+ * The page's Content-Security-Policy (W08): enforced, script-src limited to
+ * this origin plus a nonce, and every executable script in the HTML carries
+ * exactly that nonce. Returns the nonce.
+ */
+function checkCsp(headers: Record<string, string>, html: string) {
+  const policy = headers["content-security-policy"];
+  expect(policy, "Content-Security-Policy header").toBeTruthy();
+  expect(headers["content-security-policy-report-only"]).toBeUndefined();
+  const nonce = /(?:^|; )script-src 'self' 'nonce-([A-Za-z0-9+/]+={0,2})'(?: https:\/\/vercel\.live)?(?:;|$)/.exec(policy)?.[1];
+  expect(nonce, `script-src with a nonce: ${policy}`).toBeTruthy();
+  for (const directive of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "form-action 'self'"])
+    expect(policy).toContain(directive);
+  expect(policy).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline/);
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]);
+  const executable = scripts.filter((attrs) => !/type="application\/ld\+json"/.test(attrs));
+  expect(executable.length).toBeGreaterThan(0);
+  for (const attrs of executable) expect(attrs, "script carries the nonce").toContain(`nonce="${nonce}"`);
+  return nonce!;
+}
 
 /** Width and height from a PNG's IHDR chunk. */
 function pngSize(bytes: Buffer) {
@@ -33,7 +61,9 @@ test("home page: 200, configured headers, title, description and canonical link"
 
   await expect(page).toHaveTitle("M5 Guardian: your Wi-Fi, under watch");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /simulation/);
+  // W08: no simulation sentence in the snippet; the page itself still says it is a simulation.
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", homeDescription);
+  await expect(page.getByText("This website is a simulation.", { exact: false }).first()).toBeVisible();
   // Next writes the root URL without its trailing slash; both spell the same URL.
   const canonical = page.locator('link[rel="canonical"]');
   await expect(canonical).toHaveCount(1);
@@ -43,32 +73,104 @@ test("home page: 200, configured headers, title, description and canonical link"
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /width=device-width/);
 });
 
-test("social images: Open Graph and Twitter cards are 1200x630 PNGs that load", async ({ page, request }) => {
+for (const { path, image } of [
+  { path: "/", image: /^\/(opengraph|twitter)-image(\?|$)/ },
+  { path: "/install", image: /^\/install\/(opengraph|twitter)-image(\?|$)/ },
+]) {
+  test(`social cards of ${path}: its own 1200x630 PNG images, title and description`, async ({ page, request }) => {
+    await page.goto(path);
+    const title = await page.title();
+    const description = await page.locator('meta[name="description"]').getAttribute("content");
+    expect(description).toBeTruthy();
+    for (const prefix of ["og", "twitter"]) {
+      const attr = prefix === "og" ? "property" : "name";
+      await expect(page.locator(`meta[${attr}="${prefix}:image"]`), `one ${prefix}:image`).toHaveCount(1);
+      const url = await page.locator(`meta[${attr}="${prefix}:image"]`).getAttribute("content");
+      expect(local(url!), `${prefix}:image belongs to ${path}`).toMatch(image);
+      await expect(page.locator(`meta[${attr}="${prefix}:image:width"]`)).toHaveAttribute("content", "1200");
+      await expect(page.locator(`meta[${attr}="${prefix}:image:height"]`)).toHaveAttribute("content", "630");
+      await expect(page.locator(`meta[${attr}="${prefix}:image:alt"]`)).toHaveAttribute("content", /M5 Guardian/);
+      const response = await request.get(local(url!));
+      expect(response.status(), `${prefix} image status`).toBe(200);
+      expect(response.headers()["content-type"]).toBe("image/png");
+      expect(pngSize(await response.body())).toEqual({ width: 1200, height: 630 });
+      // Each page's card speaks for that page.
+      await expect(page.locator(`meta[${attr}="${prefix}:title"]`)).toHaveAttribute("content", title);
+      await expect(page.locator(`meta[${attr}="${prefix}:description"]`)).toHaveAttribute("content", description!);
+    }
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+    const ogUrl = await page.locator('meta[property="og:url"]').getAttribute("content");
+    expect(new URL(ogUrl!).pathname).toBe(path);
+  });
+}
+
+test("icons: favicon.ico (16/32/48), the SVG icon and the 180 px Apple touch icon are linked and served", async ({ page, request }) => {
   await page.goto("/");
-  for (const prefix of ["og", "twitter"]) {
-    const attr = prefix === "og" ? "property" : "name";
-    const image = await page.locator(`meta[${attr}="${prefix}:image"]`).getAttribute("content");
-    expect(image, `${prefix}:image`).toBeTruthy();
-    await expect(page.locator(`meta[${attr}="${prefix}:image:width"]`)).toHaveAttribute("content", "1200");
-    await expect(page.locator(`meta[${attr}="${prefix}:image:height"]`)).toHaveAttribute("content", "630");
-    await expect(page.locator(`meta[${attr}="${prefix}:image:alt"]`)).toHaveAttribute("content", /M5 Guardian/);
-    const response = await request.get(local(image!));
-    expect(response.status(), `${prefix} image status`).toBe(200);
-    expect(response.headers()["content-type"]).toBe("image/png");
-    expect(pngSize(await response.body())).toEqual({ width: 1200, height: 630 });
+  const icons = await page.locator('link[rel="icon"]').evaluateAll((links) =>
+    links.map((link) => ({ href: link.getAttribute("href")!, sizes: link.getAttribute("sizes"), type: link.getAttribute("type") })),
+  );
+  const ico = icons.find((icon) => /^\/favicon\.ico/.test(icon.href));
+  const svg = icons.find((icon) => /^\/icon\.svg/.test(icon.href));
+  expect(ico, JSON.stringify(icons)).toBeTruthy();
+  expect(svg, JSON.stringify(icons)).toBeTruthy();
+  expect(svg!.type).toBe("image/svg+xml");
+
+  // /favicon.ico itself (what browsers and crawlers ask for without a link) is a real icon file.
+  for (const href of ["/favicon.ico", ico!.href]) {
+    const response = await request.get(href);
+    expect(response.status(), href).toBe(200);
+    expect(response.headers()["content-type"]).toMatch(/image\/(x-icon|vnd\.microsoft\.icon)/);
+    const bytes = await response.body();
+    expect([bytes.readUInt16LE(0), bytes.readUInt16LE(2)]).toEqual([0, 1]);
+    expect(Array.from({ length: bytes.readUInt16LE(4) }, (_, i) => bytes[6 + 16 * i])).toEqual([16, 32, 48]);
   }
-  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "M5 Guardian: your Wi-Fi, under watch");
+  const svgResponse = await request.get(svg!.href);
+  expect(svgResponse.status()).toBe(200);
+  expect(svgResponse.headers()["content-type"]).toContain("image/svg+xml");
+  expect((await svgResponse.text()).trim()).toMatch(/^<svg[\s>]/);
+
+  const apple = page.locator('link[rel="apple-touch-icon"]');
+  await expect(apple).toHaveCount(1);
+  await expect(apple).toHaveAttribute("sizes", "180x180");
+  const appleResponse = await request.get((await apple.getAttribute("href"))!);
+  expect(appleResponse.status()).toBe(200);
+  expect(appleResponse.headers()["content-type"]).toBe("image/png");
+  expect(pngSize(await appleResponse.body())).toEqual({ width: 180, height: 180 });
 });
 
-test("favicon is linked and served as SVG", async ({ page, request }) => {
-  await page.goto("/");
-  const href = await page.locator('link[rel="icon"]').first().getAttribute("href");
-  expect(href).toMatch(/^\/icon\.svg/);
-  const response = await request.get(href!);
-  expect(response.status()).toBe(200);
-  expect(response.headers()["content-type"]).toContain("image/svg+xml");
-  expect((await response.text()).trim()).toMatch(/^<svg[\s>]/);
+test("structured data: one JSON-LD block with WebSite and SoftwareApplication, version from release/version.txt", async ({ page }) => {
+  for (const path of ["/", "/install"]) {
+    await page.goto(path);
+    const blocks = await page.locator('script[type="application/ld+json"]').allTextContents();
+    expect(blocks, path).toHaveLength(1);
+    const data = JSON.parse(blocks[0]);
+    expect(data["@context"]).toBe("https://schema.org");
+    const [website, app] = data["@graph"];
+    expect(website).toMatchObject({ "@type": "WebSite", name: "M5 Guardian", url: `${siteUrl}/` });
+    expect(app).toMatchObject({
+      "@type": "SoftwareApplication",
+      name: "M5 Guardian",
+      applicationCategory: "SecurityApplication",
+      operatingSystem: "ESP32-S3 firmware (M5Stack StickS3)",
+      license: "https://github.com/fcavalcantirj/m5-guardian/blob/main/LICENSE",
+      sameAs: ["https://github.com/fcavalcantirj/m5-guardian"],
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0" },
+      softwareVersion: releaseVersion,
+      downloadUrl: `${siteUrl}/install`,
+    });
+    expect(JSON.stringify(data)).not.toMatch(/aggregateRating|"review"/);
+  }
+});
+
+test("Content-Security-Policy: enforced on every page with a fresh nonce on each script", async ({ request }) => {
+  const nonces = new Set<string>();
+  for (const path of ["/", "/install", "/", "/no-such-page"]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(path === "/no-such-page" ? 404 : 200);
+    nonces.add(checkCsp(response.headers(), await response.text()));
+  }
+  expect(nonces.size, "a new nonce per response").toBe(4);
 });
 
 test("robots.txt allows crawling and names the sitemap", async ({ request }) => {
@@ -82,14 +184,26 @@ test("robots.txt allows crawling and names the sitemap", async ({ request }) => 
   expect(text).toContain(`Sitemap: ${siteUrl}/sitemap.xml`);
 });
 
-test("sitemap.xml lists the home page and the install page", async ({ request }) => {
+test("sitemap.xml lists the home page and the install page, each with its last source commit date", async ({ request }) => {
   const response = await request.get("/sitemap.xml");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toContain("xml");
   const text = await response.text();
-  expect(text).toContain(`<loc>${siteUrl}/</loc>`);
-  expect(text).toContain(`<loc>${siteUrl}/install</loc>`);
   expect(text.match(/<url>/g)).toHaveLength(2);
+  const site = new URL("..", import.meta.url).pathname;
+  for (const [path, loc] of [["/", `${siteUrl}/`], ["/install", `${siteUrl}/install`]] as const) {
+    const entry = text.split("<url>").find((block) => block.includes(`<loc>${loc}</loc>`));
+    expect(entry, loc).toBeTruthy();
+    const lastmod = /<lastmod>([^<]+)<\/lastmod>/.exec(entry!)?.[1];
+    if (remoteOrigin) {
+      // A Git deployment knows the dates; a CLI upload has no .git and leaves them out (lib/last-modified.ts).
+      if (lastmod) expect(new Date(lastmod).getTime()).toBeLessThanOrEqual(Date.now());
+      else test.info().annotations.push({ type: "note", description: `${loc}: no lastmod (no Git history in this build)` });
+    } else {
+      // The local build reads this checkout's history: the dates must be exactly Git's.
+      expect(lastmod, `${loc} lastmod`).toBe(lastCommitDate(pageSources[path], site)!.toISOString());
+    }
+  }
 });
 
 test("unknown paths get the custom 404 page with status 404, noindex and headers", async ({ page, browserLog }) => {
@@ -101,6 +215,7 @@ test("unknown paths get the custom 404 page with status 404, noindex and headers
   expect(response?.status()).toBe(404);
   const headers = response!.headers();
   for (const [name, value] of Object.entries(configuredHeaders)) expect(headers[name]).toBe(value);
+  checkCsp(headers, await response!.text());
   await expect(page).toHaveTitle("Page not found | M5 Guardian");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nothing heard at this address.");
   const robots = page.locator('meta[name="robots"]');

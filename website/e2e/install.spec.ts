@@ -112,8 +112,8 @@ test("esptool-js loads only after a click; a port in use gets a plain message an
   const events = await page.evaluate(() => (window as unknown as { __va: [string, { name: string; data: unknown }][] }).__va);
   expect(events.map(([, e]) => e.name)).toEqual(["guardian_install", "guardian_install"]);
   expect(events.map(([, e]) => e.data)).toEqual([
-    { action: "update", result: "start" },
-    { action: "update", result: "error_connecting" },
+    { action: "update", result: "start", step: "update:start" },
+    { action: "update", result: "error_connecting", step: "update:error_connecting" },
   ]);
 });
 
@@ -148,8 +148,8 @@ test("First install offers the backup and needs two confirmations before erasing
   await expect(page.getByTestId("flasher-picker-hint")).toBeVisible();
   const events = await page.evaluate(() => (window as unknown as { __va: [string, { data: unknown }][] }).__va.map(([, e]) => e.data));
   expect(events).toEqual([
-    { action: "install", result: "start" },
-    { action: "install", result: "cancel" },
+    { action: "install", result: "start", step: "install:start" },
+    { action: "install", result: "cancel", step: "install:cancel" },
   ]);
 });
 

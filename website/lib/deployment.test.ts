@@ -193,3 +193,12 @@ test(".vercelignore keeps .git so the ignored build step can compare commits on 
   assert.ok(dropAll >= 0, "the upload set starts from /*");
   assert.ok(keepGit > dropAll, "!/.git must follow /*");
 });
+
+// W08: next.config.mjs reads release/version.txt when the build starts (the JSON-LD softwareVersion) and a
+// missing file fails the build, so every upload must carry it, and website-checks must rerun when it changes.
+test("the upload carries release/version.txt (read by next.config at build time), nothing else of release/", () => {
+  const upload = uploaded(["release/version.txt", "release/release-public-key.json", "website/next.config.mjs"]);
+  assert.ok(upload.has("release/version.txt"), "release/version.txt is uploaded: add !/release, /release/* and !/release/version.txt to .vercelignore");
+  assert.ok(!upload.has("release/release-public-key.json"), "the rest of release/ stays out");
+  assert.ok(triggerPaths().includes("release/version.txt"), "release/version.txt is a website-checks trigger path");
+});

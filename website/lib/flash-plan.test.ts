@@ -237,9 +237,9 @@ test("browser support: https first, then desktop, then Web Serial", () => {
   assert.ok(!isMobileAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/142 Safari/537.36"));
 });
 
-test("an analytics event carries only the action and the step result, never device data", () => {
+test("an analytics event carries only the action, the step result and both joined, never device data", () => {
   assert.equal(ANALYTICS_EVENT, "guardian_install");
   const event = stepEvent("update", "error_writing");
-  assert.deepEqual(Object.keys(event).sort(), ["action", "result"]);
-  assert.deepEqual(event, { action: "update", result: "error_writing" });
+  assert.deepEqual(Object.keys(event).sort(), ["action", "result", "step"]);
+  assert.deepEqual(event, { action: "update", result: "error_writing", step: "update:error_writing" });
 });

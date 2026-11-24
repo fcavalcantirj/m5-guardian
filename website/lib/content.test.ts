@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { moods, getPresentation } from "./guardian.ts";
+import { moods, getPresentation, siteDescription } from "./guardian.ts";
 
 const site = new URL("..", import.meta.url).pathname;
 
@@ -62,4 +62,23 @@ test("the stale demo keeps its rating withheld and names no all-clear", () => {
   const view = getPresentation(moods[0], "stale");
   assert.equal(view.label, "No fresh data");
   assert.match(view.description, /withheld/);
+});
+
+test("the home meta description fits a search snippet and every phrase in it is a recorded claim", () => {
+  assert.ok(siteDescription.length <= 160, `${siteDescription.length} characters`);
+  assert.doesNotMatch(siteDescription, /simulation/i, "the simulation notice stays on the page, not in the snippet");
+  const claims: { id: string; page: { file: string; text: string }[] }[] = JSON.parse(
+    readFileSync(join(site, "claims.json"), "utf8"),
+  ).claims;
+  const backed = claims.flatMap((claim) =>
+    claim.page.filter((p) => p.file === "lib/guardian.ts").map((p) => ({ id: claim.id, text: p.text })),
+  );
+  // Split the description at its punctuation; each phrase must be page wording of a claim.
+  const phrases = siteDescription.split(/[:;,.]\s*/).map((p) => p.trim()).filter(Boolean);
+  assert.ok(phrases.length >= 5, phrases.join(" | "));
+  for (const phrase of phrases)
+    assert.ok(
+      backed.some((entry) => entry.text.replace(/[:;,.]$/, "") === phrase),
+      `"${phrase}" is not page wording (lib/guardian.ts) of any claim in claims.json`,
+    );
 });

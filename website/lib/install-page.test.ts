@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // W07 install page wiring, read as text: the heavy flasher code loads only after a click (the Lighthouse gate),
-// analytics only on Vercel, the real-stick smoke never in CI, and the owner's licence grant in both art notices.
+// analytics only on Vercel (root layout since W08), the real-stick smoke never in CI, and the owner's licence grant in both art notices.
 
 const site = new URL("..", import.meta.url).pathname;
 const repo = new URL("../..", import.meta.url).pathname;
@@ -27,10 +27,11 @@ test("the port request is filtered to Espressif's USB vendor and the analytics c
   assert.deepEqual(calls, ["ANALYTICS_EVENT, stepEvent(what, result"]);
 });
 
-test("Vercel Web Analytics is mounted on the install page only, and only in a Vercel build", () => {
-  const install = read(join(site, "app/install/page.tsx"));
-  assert.match(install, /\{process\.env\.VERCEL === "1" && <Analytics \/>\}/);
-  for (const path of ["app/layout.tsx", "app/page.tsx"]) assert.doesNotMatch(read(join(site, path)), /Analytics/);
+test("Vercel Web Analytics is mounted once, in the root layout (every page), and only on Vercel", () => {
+  const layout = read(join(site, "app/layout.tsx"));
+  assert.match(layout, /\{process\.env\.VERCEL === "1" && <Analytics \/>\}/);
+  assert.equal(layout.match(/<Analytics/g)?.length, 1);
+  for (const path of ["app/install/page.tsx", "app/page.tsx"]) assert.doesNotMatch(read(join(site, path)), /Analytics/);
 });
 
 test("the real-stick smoke is owner-run: its own config, headed Chrome, outside the CI test folder", () => {

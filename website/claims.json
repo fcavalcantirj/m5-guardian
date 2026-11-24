@@ -22,6 +22,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "name: \"Very good\","
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "five rated faces for advertised settings"
         }
       ],
       "sources": [
@@ -228,6 +232,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "The selected network’s rating is unchanged."
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "red or amber alerts"
         }
       ],
       "sources": [
@@ -336,6 +344,10 @@
         {
           "file": "lib/social-card.tsx",
           "text": "Receive-only Wi-Fi monitoring on the M5 StickS3."
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "receive-only monitoring"
         }
       ],
       "sources": [
@@ -440,6 +452,10 @@
         {
           "file": "components/project-story.tsx",
           "text": "Built-in battery"
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "M5 StickS3 guard for your own Wi-Fi"
         }
       ],
       "sources": [
@@ -521,6 +537,27 @@
       ]
     },
     {
+      "id": "browser-install",
+      "statement": "The official signed image can be flashed onto the owner's own device from the website's install page, in a desktop browser.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/guardian.ts",
+          "text": "browser install"
+        },
+        {
+          "file": "app/install/page.tsx",
+          "text": "This page writes the official, signed M5 Guardian firmware onto your StickS3 over USB, from your browser."
+        }
+      ],
+      "sources": [
+        {
+          "path": "firmware/art/LICENSE",
+          "quote": "Flash the official M5 Guardian image, which contains the artwork, from the project website (https://m5-guardian.vercel.app/install) onto your own device, for your own personal, non-commercial use."
+        }
+      ]
+    },
+    {
       "id": "portable-core",
       "statement": "The detection library is portable C++17.",
       "status": "current",
@@ -549,6 +586,10 @@
         {
           "file": "components/project-story.tsx",
           "text": "Code license: MIT"
+        },
+        {
+          "file": "lib/guardian.ts",
+          "text": "Open source"
         }
       ],
       "sources": [

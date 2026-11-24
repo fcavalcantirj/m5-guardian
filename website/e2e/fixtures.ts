@@ -4,12 +4,21 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 /**
  * Every page in the browser suite is watched for uncaught errors, console
- * errors and hydration failures; any one of them fails the test that saw it.
+ * errors, hydration failures and Content-Security-Policy violations (W08,
+ * enforced or report-only); any one of them fails the test that saw it.
  */
 export const test = base.extend<{ browserLog: string[] }>({
   browserLog: [
     async ({ page }, use, testInfo) => {
       const log: string[] = [];
+      await page.exposeBinding("__guardianCspViolation", (_source, line: string) => void log.push(line));
+      await page.addInitScript(() =>
+        document.addEventListener("securitypolicyviolation", (event) =>
+          (window as unknown as { __guardianCspViolation: (line: string) => void }).__guardianCspViolation(
+            `csp-violation: ${event.disposition} ${event.effectiveDirective} blocked ${event.blockedURI || "(inline)"} in ${event.sourceFile || "(document)"}`,
+          ),
+        ),
+      );
       page.on("pageerror", (error) => log.push(`pageerror: ${error.message}`));
       page.on("console", (message) => {
         const text = message.text();
@@ -33,6 +42,13 @@ const site = new URL("..", import.meta.url).pathname;
  * production); null for the local production server that playwright.config.ts starts.
  */
 export const remoteOrigin = process.env.WEBSITE_URL ? new URL(process.env.WEBSITE_URL).origin : null;
+
+/**
+ * W08: a second local server of the same build that runs as on Vercel
+ * (VERCEL=1), so the root layout mounts Vercel Web Analytics; started by
+ * playwright.config.ts on the next port. Null against a deployment.
+ */
+export const vercelModeOrigin = remoteOrigin ? null : `http://127.0.0.1:${Number(process.env.WEBSITE_PORT ?? 3210) + 1}`;
 
 /** Text that only the 3D viewer's code carries (three.js, Fiber or the STL paths). */
 export function isViewerSource(text: string) {
