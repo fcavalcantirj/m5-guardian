@@ -134,5 +134,44 @@
       "Gates: make website-check, the browser suite, the preview Lighthouse gate (the flasher loads esptool-js only after a click), public_check 0. No commit, push or deploy by the worker."
     ],
     "passes": true
+  },
+  {
+    "id": "W08",
+    "category": "seo",
+    "description": "Technical SEO and analytics fixes from the 2026-11-24 audit: correct share cards on /install, structured data, favicons, sitemap lastmod, a clearer home meta description, site-wide cookieless analytics, and a Content-Security-Policy.",
+    "depends_on": [
+      "W07"
+    ],
+    "existing_work": "",
+    "steps": [
+      "AUDIT (MEASURED 2026-11-24 on the live site): /install has no og:image and its twitter:title/description are the home page's (app/install/page.tsx:17 sets openGraph, which replaces the root object; twitter is not overridden); no JSON-LD on either page; /favicon.ico is 404 (only app/icon.svg); sitemap has changefreq/priority but no lastmod; the home meta description ends 'This website is a simulation.'; Vercel Web Analytics (enabled on the Pro team) is mounted on /install only; no Content-Security-Policy header. Lighthouse on the preview today: perf 0.96, a11y 1, best practices 1, SEO 1: keep these.",
+      "/install share card: its own Open Graph image (app/install/opengraph-image.tsx in the site's existing style, real text only, no new art) and twitter title, description and image matching the install page. Test: an e2e check per page that og:image and twitter:image resolve with 200 and image/png, and that each page's twitter:title equals its own title.",
+      "Structured data: JSON-LD in the root layout with schema.org WebSite (name, url) and SoftwareApplication (name 'M5 Guardian', applicationCategory 'SecurityApplication', operatingSystem 'ESP32-S3 firmware (M5Stack StickS3)', license MIT URL, codeRepository / sameAs the GitHub repo, isAccessibleForFree true, offers price 0, softwareVersion = the version in release/version.txt read at build time, downloadUrl /install). No ratings, reviews or invented values. Test: parses as JSON, required keys present, version equals release/version.txt.",
+      "Icons: favicon.ico (16/32/48) and apple-icon.png (180) generated from app/icon.svg by a committed script, so the site has no 404 for /favicon.ico. Sitemap: add lastModified from the last commit date of each page's source (build time), keep both URLs. Tests for both.",
+      "Home meta description: same length class (<= 160 chars), drop 'This website is a simulation.' from the description only (keep the on-page simulation labels the claims gate requires); e.g. '... five rated faces for advertised settings, and red or amber alerts. Open source, installs from your browser.' Every claim in it must already be in website/claims.json; update claims and tests together.",
+      "Analytics: mount Vercel Analytics in the root layout (Vercel builds only, as now), remove the /install-only mount, keep the guardian_install custom event payload unchanged (action, result only, no device data). Update the page text that describes analytics if it says install page only. Test: the e2e that checks no analytics script in a non-Vercel build still passes; the payload test still passes.",
+      "Content-Security-Policy in next.config (headers): first as Content-Security-Policy-Report-Only on a preview, list what it would block (Next inline bootstrap, esptool-js and spark-md5 dynamic imports, Vercel Analytics script and its /_vercel/insights endpoint, the /api/firmware routes, data:/blob: for the backup download), then enforce with exactly those sources (nonce or hash for inline if Next requires it). The install flow must still work under the enforced policy in the browser suite (mocked Web Serial as in W07). Record the final policy and why each source is there in website/DEPLOYMENT.md.",
+      "Gates (same as W07): make website-check green (unit tests first, red logs kept), the Playwright browser suite including axe and the 320/768/1440 px overflow checks, tools/public_check.py --require-map with 0 findings, and the preview Lighthouse gate on GitHub (website-preview-lighthouse.yml: performance >= 0.9, accessibility 1, SEO >= 0.95, LCP <= 2.5 s, CLS <= 0.1, TBT <= 200 ms). Never commit, push or deploy; hand off with READY FOR REVIEW.",
+      "Live check after deploy (reviewer): curl / and /install show og:image + matching twitter tags, JSON-LD present, /favicon.ico 200, CSP header present, Analytics script on /."
+    ],
+    "passes": false
+  },
+  {
+    "id": "W09",
+    "category": "content",
+    "description": "Content page /what-it-detects that answers the searches people make (deauth detector, evil twin detector, is my Wi-Fi WPA3, M5StickS3 firmware), every statement held to the claims gate.",
+    "depends_on": [
+      "W08"
+    ],
+    "existing_work": "",
+    "steps": [
+      "AUDIT (MEASURED 2026-11-24): a web search for the project returns nothing from the site; the niche searches return Periscope-OS (Hackster), Bruce, M5Stick-Nemo, Spacehuhn DeauthDetector and DSTIKE's deauth detector. The home page (~790 words) and /install (~470) do not answer 'can the StickS3 detect deauth / evil twin attacks', 'how do I check my Wi-Fi uses WPA3', or 'what firmware turns an M5StickS3 into a Wi-Fi monitor'.",
+      "Page /what-it-detects: short sections, each a plain question as an H2 with a direct first-sentence answer: what the Guardian rates (the five faces and the advertised settings they come from), what makes it red (disconnect bursts, another BSSID using your network's name, network-pattern alerts), what makes it amber (nearby activity, router changes and the ROUTER CHANGES setting), what it does not do (receive-only: it never transmits attacks, never joins other networks, cannot see inside encrypted traffic), and how it compares to transmit-capable multi-tool firmwares (no names of other projects needed; describe the category). Wording rule: radio events by counts, scope and alert colour only.",
+      "Every factual sentence is a website/claims.json entry with a verbatim source quote (README, firmware README, docs/attack-coverage.md); lib/claims.test.ts must pass. No invented numbers. Title <= 60 chars and a meta description <= 160 chars written for these searches, own Open Graph image in the W08 style, canonical, in the sitemap, linked from the home page (a visible link near the alert section) and the footer.",
+      "Structured data: none beyond the W08 site-wide JSON-LD (Google limits FAQ rich results to government and health sites, so no FAQPage markup).",
+      "Gates (same as W07): make website-check green (unit tests first, red logs kept), the Playwright browser suite including axe and the 320/768/1440 px overflow checks, tools/public_check.py --require-map with 0 findings, and the preview Lighthouse gate on GitHub (website-preview-lighthouse.yml: performance >= 0.9, accessibility 1, SEO >= 0.95, LCP <= 2.5 s, CLS <= 0.1, TBT <= 200 ms). Never commit, push or deploy; hand off with READY FOR REVIEW.",
+      "Live check after deploy (reviewer): the page is 200, in sitemap.xml, linked from / and the footer, Lighthouse gate green on its preview URL too (add the page to the gate's URL list)."
+    ],
+    "passes": false
   }
 ]
