@@ -9,6 +9,7 @@ import { test, expect, remoteOrigin, vercelModeOrigin } from "./fixtures";
 // Vercel, so there it is a stand-in served at its real same-origin path.
 
 const insights = "/_vercel/insights/";
+const pages = ["/", "/install", "/what-it-detects"];
 
 function watchInsights(page: Page) {
   const seen: string[] = [];
@@ -22,7 +23,7 @@ function watchInsights(page: Page) {
 test("a non-Vercel build loads no analytics script on any page", async ({ page }) => {
   test.skip(Boolean(remoteOrigin), "local build only: a deployment runs on Vercel");
   const seen = watchInsights(page);
-  for (const path of ["/", "/install"]) {
+  for (const path of pages) {
     await page.goto(path, { waitUntil: "networkidle" });
     await expect(page.locator(`script[src*="${insights}"]`)).toHaveCount(0);
   }
@@ -35,17 +36,17 @@ test("on Vercel, every page loads the analytics script from its own origin, allo
     route.fulfill({ contentType: "application/javascript", body: "window.__insightsRan = (window.__insightsRan || 0) + 1;" }),
   );
   const seen = watchInsights(page);
-  for (const path of ["/", "/install"]) {
+  for (const path of pages) {
     const response = await page.goto(`${vercelModeOrigin}${path}`);
     expect(response!.headers()["content-security-policy"]).toBeTruthy();
     await expect.poll(() => page.evaluate(() => (window as unknown as { __insightsRan?: number }).__insightsRan), { message: `${path}: script ran` }).toBe(1);
   }
-  expect(seen).toEqual([`${insights}script.js`, `${insights}script.js`]);
+  expect(seen).toEqual(pages.map(() => `${insights}script.js`));
 });
 
 test("a deployment serves the analytics script on every page", async ({ page }) => {
   test.skip(!remoteOrigin, "deployment check: set WEBSITE_URL");
-  for (const path of ["/", "/install"]) {
+  for (const path of pages) {
     const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === `${insights}script.js`);
     await page.goto(path);
     const response = await loaded;

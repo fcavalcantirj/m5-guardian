@@ -32,6 +32,15 @@ export const pageSources = {
     "components/site-footer.tsx",
     "lib/flash-plan.ts",
   ],
+  "/what-it-detects": [
+    "app/what-it-detects",
+    "app/layout.tsx",
+    "app/globals.css",
+    "components/site-header.tsx",
+    "components/site-footer.tsx",
+    "lib/what-it-detects.ts",
+    "lib/social-card.tsx",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 const git = (cwd: string, args: string[]) =>

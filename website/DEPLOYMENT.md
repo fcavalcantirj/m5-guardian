@@ -94,7 +94,8 @@ LIGHTHOUSE_URL=<preview-url> LIGHTHOUSE_BYPASS=<bypass> LIGHTHOUSE_PREVIEW=1 nod
   before activation, recognised by script content on a deployment), rotation,
   screen mapping, WebGL fallback and every GitHub link on the page (with its
   README section).
-- Lighthouse: three mobile runs, medians against the ledger thresholds. On a
+- Lighthouse: three mobile runs per page in the script's `PAGES` list (`/` and
+  `/what-it-detects`), each page's medians against the ledger thresholds. On a
   preview, `LIGHTHOUSE_PREVIEW=1` drops only the is-crawlable audit from SEO
   when its sole blocking directive is Vercel's `x-robots-tag: noindex` preview
   header. CI repeats this gate on every successful Preview deployment

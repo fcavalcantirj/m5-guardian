@@ -14,5 +14,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    {
+      url: `${siteUrl}/what-it-detects`,
+      lastModified: lastCommitDate(pageSources["/what-it-detects"], site),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
   ];
 }

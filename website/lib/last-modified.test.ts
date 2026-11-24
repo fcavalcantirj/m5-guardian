@@ -103,7 +103,7 @@ test("a shallow clone gives the date only when the last change is inside the clo
   }));
 
 test("each sitemap page names its own source files, all of which exist", () => {
-  assert.deepEqual(Object.keys(pageSources), ["/", "/install"]);
+  assert.deepEqual(Object.keys(pageSources), ["/", "/install", "/what-it-detects"]);
   for (const [page, paths] of Object.entries(pageSources) as [string, readonly string[]][]) {
     assert.ok(paths.length > 0, page);
     for (const path of paths.filter((p) => !p.startsWith(":("))) {
@@ -113,10 +113,13 @@ test("each sitemap page names its own source files, all of which exist", () => {
   }
   assert.ok(pageSources["/"].includes("app/page.tsx"));
   assert.ok(pageSources["/install"].includes("app/install"));
+  assert.ok(pageSources["/what-it-detects"].includes("app/what-it-detects"));
+  assert.ok(pageSources["/what-it-detects"].includes("lib/what-it-detects.ts"));
 });
 
-test("the sitemap takes lastModified from the page sources and keeps both URLs", () => {
+test("the sitemap takes lastModified from the page sources and keeps every URL", () => {
   const sitemap = readFileSync(join(site, "app/sitemap.ts"), "utf8");
   assert.match(sitemap, /lastCommitDate\(pageSources\[/);
   assert.match(sitemap, /\$\{siteUrl\}\/install/);
+  assert.match(sitemap, /\$\{siteUrl\}\/what-it-detects/);
 });

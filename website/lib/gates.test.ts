@@ -173,6 +173,8 @@ test("the Lighthouse gate records three mobile runs against the ledger threshold
   ])
     assert.match(text, threshold);
   assert.match(text, /median/);
+  // W09: every content page is gated, each with its own three runs and medians.
+  assert.match(text, /const PAGES = \["\/", "\/what-it-detects"\]/);
 });
 
 test("browser and Lighthouse output stays out of the tracked tree", () => {

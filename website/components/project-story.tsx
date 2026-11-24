@@ -168,6 +168,11 @@ export function HowItWorks() {
           </div>
           <ul className="limits-links" aria-label="Published limits and coverage">
             <li>
+              <a href="/what-it-detects">
+                What makes it red or amber <ArrowRight aria-hidden="true" />
+              </a>
+            </li>
+            <li>
               <a
                 href={`${repositoryUrl}#what-it-cannot-see`}
                 target="_blank"

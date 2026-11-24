@@ -74,8 +74,8 @@ export async function renderSocialCard() {
   );
 }
 
-// The /install card: the same layout and colours, text only (no artwork).
-export function renderInstallCard() {
+// A text-only card in the same layout and colours (no artwork), for a page's own share image.
+function renderTextCard(eyebrow: string, first: string, second: string, line: string) {
   return new ImageResponse(
     (
       <div
@@ -98,7 +98,7 @@ export function renderInstallCard() {
             color: "#b5f36a",
           }}
         >
-          M5 / GUARDIAN / INSTALL
+          {eyebrow}
         </div>
         <div
           style={{
@@ -110,8 +110,8 @@ export function renderInstallCard() {
             fontWeight: 600,
           }}
         >
-          <span>Put the Guardian</span>
-          <span style={{ color: "#b5f36a" }}>on your own StickS3.</span>
+          <span>{first}</span>
+          <span style={{ color: "#b5f36a" }}>{second}</span>
         </div>
         <div
           style={{
@@ -122,10 +122,30 @@ export function renderInstallCard() {
             color: "#b8c0c2",
           }}
         >
-          Signed firmware over USB, from Chrome or Edge on a desktop.
+          {line}
         </div>
       </div>
     ),
     { ...socialCardSize },
+  );
+}
+
+// The /install card.
+export function renderInstallCard() {
+  return renderTextCard(
+    "M5 / GUARDIAN / INSTALL",
+    "Put the Guardian",
+    "on your own StickS3.",
+    "Signed firmware over USB, from Chrome or Edge on a desktop.",
+  );
+}
+
+// The /what-it-detects card (W09).
+export function renderDetectsCard() {
+  return renderTextCard(
+    "M5 / GUARDIAN / WHAT IT DETECTS",
+    "Red for your network.",
+    "Amber for nearby.",
+    "Deauth bursts, evil twins, WPA3: what it rates, flags and cannot see.",
   );
 }

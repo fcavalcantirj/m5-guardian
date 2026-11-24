@@ -71,6 +71,7 @@ test("home page: 200, configured headers, title, description and canonical link"
 for (const { path, image } of [
   { path: "/", image: /^\/(opengraph|twitter)-image(\?|$)/ },
   { path: "/install", image: /^\/install\/(opengraph|twitter)-image(\?|$)/ },
+  { path: "/what-it-detects", image: /^\/what-it-detects\/(opengraph|twitter)-image(\?|$)/ },
 ]) {
   test(`social cards of ${path}: its own 1200x630 PNG images, title and description`, async ({ page, request }) => {
     await page.goto(path);
@@ -134,7 +135,7 @@ test("icons: favicon.ico (16/32/48), the SVG icon and the 180 px Apple touch ico
 });
 
 test("structured data: one JSON-LD block with WebSite and SoftwareApplication, version from release/version.txt", async ({ page }) => {
-  for (const path of ["/", "/install"]) {
+  for (const path of ["/", "/install", "/what-it-detects"]) {
     await page.goto(path);
     const blocks = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(blocks, path).toHaveLength(1);
@@ -160,7 +161,7 @@ test("structured data: one JSON-LD block with WebSite and SoftwareApplication, v
 
 test("Content-Security-Policy: the same enforced policy on every page, and the pages stay prerendered", async ({ request }) => {
   const policies = new Set<string>();
-  for (const path of ["/", "/install", "/", "/no-such-page"]) {
+  for (const path of ["/", "/install", "/what-it-detects", "/", "/no-such-page"]) {
     const response = await request.get(path);
     expect(response.status()).toBe(path === "/no-such-page" ? 404 : 200);
     policies.add(checkCsp(response.headers()));
@@ -181,14 +182,18 @@ test("robots.txt allows crawling and names the sitemap", async ({ request }) => 
   expect(text).toContain(`Sitemap: ${siteUrl}/sitemap.xml`);
 });
 
-test("sitemap.xml lists the home page and the install page, each with its last source commit date", async ({ request }) => {
+test("sitemap.xml lists the home, install and what-it-detects pages, each with its last source commit date", async ({ request }) => {
   const response = await request.get("/sitemap.xml");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toContain("xml");
   const text = await response.text();
-  expect(text.match(/<url>/g)).toHaveLength(2);
+  expect(text.match(/<url>/g)).toHaveLength(3);
   const site = new URL("..", import.meta.url).pathname;
-  for (const [path, loc] of [["/", `${siteUrl}/`], ["/install", `${siteUrl}/install`]] as const) {
+  for (const [path, loc] of [
+    ["/", `${siteUrl}/`],
+    ["/install", `${siteUrl}/install`],
+    ["/what-it-detects", `${siteUrl}/what-it-detects`],
+  ] as const) {
     const entry = text.split("<url>").find((block) => block.includes(`<loc>${loc}</loc>`));
     expect(entry, loc).toBeTruthy();
     const lastmod = /<lastmod>([^<]+)<\/lastmod>/.exec(entry!)?.[1];

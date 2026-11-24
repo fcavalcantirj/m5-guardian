@@ -47,6 +47,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "WPA3-Personal only, strong ciphers and protected management frames required."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Very good: WPA3-Personal only, strong ciphers and protected management frames required."
         }
       ],
       "sources": [
@@ -64,6 +68,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "WPA2-Personal with CCMP and protected management frames required."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Good: WPA2-Personal with CCMP and protected management frames required."
         }
       ],
       "sources": [
@@ -81,6 +89,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "WPA2-Personal without required management-frame protection, or a WPA2/WPA3 compatibility mode."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Medium: WPA2-Personal without required management-frame protection, or a WPA2/WPA3 compatibility mode."
         }
       ],
       "sources": [
@@ -102,6 +114,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "Original WPA or TKIP is advertised."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Bad: original WPA or TKIP is advertised."
         }
       ],
       "sources": [
@@ -119,6 +135,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "An open network or WEP: the lowest advertised-settings rating."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Horrible: an open network or WEP."
         }
       ],
       "sources": [
@@ -140,6 +160,10 @@
         {
           "file": "components/guardian-experience.tsx",
           "text": "Settings outside those five rows read Not rated"
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Settings outside those five rows read Not rated."
         }
       ],
       "sources": [
@@ -169,6 +193,10 @@
         {
           "file": "components/guardian-stage.tsx",
           "text": "Silence isn’t an all-clear."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "After 29 seconds without hearing the network the stick shows No fresh data instead of a face: silence is never an all-clear."
         }
       ],
       "sources": [
@@ -194,6 +222,10 @@
         {
           "file": "components/project-story.tsx",
           "text": "No password-strength testing,"
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "The faces rate advertised settings, not password strength or absolute safety."
         }
       ],
       "sources": [
@@ -211,6 +243,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "The details pages explain the settings behind the raised eyebrow."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "The details pages give the reason for the rating and the evidence counts."
         }
       ],
       "sources": [
@@ -369,6 +405,10 @@
         {
           "file": "components/project-story.tsx",
           "text": "With an update server stored it stops listening for the seconds each check takes, every 120 s by default; installed from this website, it never checks by itself."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "With an update server stored it stops listening for the seconds each check takes, every 120 s by default; installed from this website, it never checks by itself."
         }
       ],
       "sources": [
@@ -394,6 +434,10 @@
         {
           "file": "components/project-story.tsx",
           "text": "Choose your own access point on the StickS3."
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It hears 2.4 GHz only, on the one channel of your network: the ESP32-S3 radio cannot hear 5 GHz or 6 GHz."
         }
       ],
       "sources": [
@@ -590,6 +634,10 @@
         {
           "file": "lib/guardian.ts",
           "text": "Open source"
+        },
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Its code is MIT-licensed; the Guardian artwork is all rights reserved."
         }
       ],
       "sources": [
@@ -621,6 +669,688 @@
         {
           "path": "README.md",
           "quote": "| Bluetooth guard | G16U | open, release 2 | not built |"
+        }
+      ]
+    },
+    {
+      "id": "detects-what-it-is",
+      "statement": "M5 Guardian is firmware for the M5Stack StickS3 that listens to the 2.4 GHz air around one network the owner picks and shows how it advertises itself and whether something looks wrong.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "M5 Guardian is firmware for the M5Stack StickS3 that listens to the 2.4 GHz air around one Wi-Fi network you pick. Its screen shows how that network advertises its security and whether something on the air looks wrong."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "It runs on an M5 StickS3, listens to the 2.4 GHz air around one network that you pick, and shows on its screen how that network advertises itself and whether something on the air looks wrong"
+        }
+      ]
+    },
+    {
+      "id": "detects-firmware-answer",
+      "statement": "M5 Guardian is open-source firmware that makes the StickS3 a receive-only monitor of the owner's own Wi-Fi network.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "M5 Guardian does: open-source firmware that makes the StickS3 a receive-only monitor of your own Wi-Fi network."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "A pocket radio guard for your own Wi-Fi. It runs on an M5 StickS3"
+        },
+        {
+          "path": "README.md",
+          "quote": "**Code, scripts, tests and documentation:** MIT, see [LICENSE](LICENSE)."
+        },
+        {
+          "path": "README.md",
+          "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call."
+        }
+      ]
+    },
+    {
+      "id": "detects-install-or-build",
+      "statement": "The official signed image can be flashed from the website's install page onto the owner's own device, or built from the repository.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "You can flash the official signed image onto your own StickS3 from this website’s install page, or build it yourself from the repository."
+        }
+      ],
+      "sources": [
+        {
+          "path": "firmware/art/LICENSE",
+          "quote": "Flash the official M5 Guardian image, which contains the artwork, from the project website (https://m5-guardian.vercel.app/install) onto your own device, for your own personal, non-commercial use."
+        },
+        {
+          "path": "README.md",
+          "quote": "You need a Mac or Linux host with CMake and a C++17 compiler for the host checks, ESP-IDF v5.4 at the commit above for the firmware"
+        }
+      ]
+    },
+    {
+      "id": "detects-standalone",
+      "statement": "Normal monitoring needs no companion computer and no cloud service; the guarding never joins a network.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Normal monitoring needs no companion computer and no cloud service: the guarding itself never joins a network."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "No SD card and no companion computer are needed to run it."
+        },
+        {
+          "path": "README.md",
+          "quote": "The password is needed only for the update check; the guarding itself never joins a network."
+        }
+      ]
+    },
+    {
+      "id": "detects-native-portable",
+      "statement": "The firmware is native ESP-IDF without an Arduino runtime, and the detection library is portable C++17.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It runs on native ESP-IDF with no Arduino runtime, and its detection library is portable C++17."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Firmware: native ESP-IDF v5.4"
+        },
+        {
+          "path": "README.md",
+          "quote": "no Arduino runtime and no M5 library in the image"
+        },
+        {
+          "path": "README.md",
+          "quote": "The detection library is portable C++17 with no board or SDK dependency"
+        }
+      ]
+    },
+    {
+      "id": "detects-ratings-answer",
+      "statement": "The stick rates the advertised protocol, cipher and management-frame protection of the picked network with one of five faces; only WPA3-Personal alone with PMF required is Very good, and WPA2/WPA3 transition reads Medium.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Pick your network on the stick and it rates the security settings that network advertises (protocol, cipher and management-frame protection) with one of five faces. Only a network that advertises WPA3-Personal alone, with protected management frames required, gets Very good; a WPA2/WPA3 compatibility mode reads Medium."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "The rating of the settings the picked network advertises right now (protocol, cipher, management-frame protection)."
+        },
+        {
+          "path": "README.md",
+          "quote": "pick your network in the list (hold the side key)"
+        },
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Very good | SAE family only (SAE, FT-SAE, SAE-EXT-KEY), pairwise and group all in {CCMP-128, CCMP-256, GCMP-128, GCMP-256}, PMF Required | StrongSettings |"
+        },
+        {
+          "path": "docs/G05-rating-freshness.md",
+          "quote": "| Medium | PSK family and SAE family together (transition), strong ciphers, PMF Optional or Required | CompatibilityMode |"
+        }
+      ]
+    },
+    {
+      "id": "detects-red-answer",
+      "statement": "Red marks an incident on the picked network, on 2.4 GHz and its channel; disconnect bursts are proven on the device, the same-name (evil twin) watch is host-tested only.",
+      "status": "host-only",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It watches for both on 2.4 GHz, on your network’s channel, and a red ALERT marks an incident on the network you picked. Disconnect bursts (the deauth case) are proven on the device; the same-name watch (the evil twin case) is host-tested only."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "a red **ALERT** for an incident on your network"
+        },
+        {
+          "path": "README.md",
+          "quote": "5 GHz and 6 GHz. The ESP32-S3 radio is 2.4 GHz only."
+        },
+        {
+          "path": "README.md",
+          "quote": "Other channels while it is locked to the picked network's channel."
+        },
+        {
+          "path": "README.md",
+          "quote": "| Disconnect burst (deauthentication or disassociation frames) on the picked network, on any address heard under its name, or a nearby burst that also names it | red | yes: owner's runs of 2026-11-17 and 2026-11-19 |"
+        },
+        {
+          "path": "README.md",
+          "quote": "| Another device using the picked network's name (on by default) | red | no: host tests only |"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "| 6 | evil twin / evil portal with the owner's SSID, plus deauth |"
+        }
+      ]
+    },
+    {
+      "id": "detects-disconnect-red",
+      "statement": "A disconnect burst (deauthentication or disassociation frames) on the picked network is red, 20 in 10 s by default, proven on the device on 2026-11-17 and 2026-11-19, with count, window and cause unknown.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Disconnect bursts: deauthentication or disassociation frames on your network, 20 in 10 s by default. Proven on the device in the owner’s runs of 2026-11-17 and 2026-11-19: the alert gives the count and the time window, and states the cause as unknown."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Disconnect burst (deauthentication or disassociation frames) on the picked network, on any address heard under its name, or a nearby burst that also names it | red | yes: owner's runs of 2026-11-17 and 2026-11-19 |"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "the red burst (20 in 10 s)"
+        },
+        {
+          "path": "README.md",
+          "quote": "with the count and the time window. The cause is stated as unknown."
+        }
+      ]
+    },
+    {
+      "id": "detects-nearby-names-yours",
+      "statement": "A nearby disconnect burst that also names the picked network is red.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "A burst on nearby networks that also names yours is red too."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "or a nearby burst that also names it | red | yes: owner's runs of 2026-11-17 and 2026-11-19 |"
+        }
+      ]
+    },
+    {
+      "id": "detects-same-name",
+      "statement": "Another BSSID advertising the picked network's name is a red ALERT, on by default; the owner's own same-name APs alert until approved in the network list; host tests only.",
+      "status": "host-only",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Another device using your network’s name: an access point that is not yours advertising your network’s name is a red ALERT, on by default. Your own mesh node or extender with the same name alerts too, until you mark it as yours in the stick’s network list. Host-tested only: it has not fired on the device yet."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Another device using the picked network's name (on by default) | red | no: host tests only |"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "the same name from a BSSID that is neither the selected one nor approved is a red ALERT"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "A home with a mesh node, an extender or a second 2.4 GHz radio using the same name will ALERT until the owner approves it"
+        },
+        {
+          "path": "README.md",
+          "quote": "\"this AP is mine too\" on a same-name row"
+        }
+      ]
+    },
+    {
+      "id": "detects-network-patterns",
+      "statement": "Join floods, many disconnects aimed at one device on the picked network and channel-switch announcements the AP does not keep making are red on the picked network and amber nearby; host tests only.",
+      "status": "host-only",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Network-pattern alerts: join floods against your access point, many disconnects aimed at one device on your network, and channel-switch announcements your access point does not keep making itself are red on your network and amber nearby. Host-tested only."
+        }
+      ],
+      "sources": [
+        {
+          "path": "firmware/README.md",
+          "quote": "| `auth_flood`, `sae_commit`, `assoc_sleep` | join floods against one BSSID | red on yours, amber nearby |"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "**G16J: many aimed at one device on YOUR network too**"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "a switch your AP's own beacons do not keep announcing | red / amber |"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "network pattern \"Disconnects aimed at one device on your network\""
+        },
+        {
+          "path": "README.md",
+          "quote": "channel-switch and Quiet abuse, authentication and SAE floods, association floods | red or amber by scope | no: host tests only |"
+        }
+      ]
+    },
+    {
+      "id": "detects-perfect-copy",
+      "statement": "A transmitter copying the picked AP's address, name, settings and channel counts as the network itself.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "A transmitter that copies your access point’s own address, name, settings and channel is counted as the network itself."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "A transmitter that copies the picked access point's own address, name, settings and channel: it is counted as the network itself."
+        }
+      ]
+    },
+    {
+      "id": "detects-amber-answer",
+      "statement": "Amber marks nearby activity not aimed at the picked network; the rating does not change.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Amber marks activity nearby that is not aimed at your network, and the rating does not change."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Something nearby that is not aimed at the picked network, for example a probe flood. The rating does not change."
+        }
+      ]
+    },
+    {
+      "id": "detects-amber-disconnect",
+      "statement": "Nearby disconnect bursts are amber, proven on the device on 2026-11-17 and 2026-11-19.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Disconnect bursts on other networks: proven on the device on 2026-11-17 and 2026-11-19."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Disconnect burst nearby | amber | yes: 2026-11-17 and 2026-11-19 |"
+        }
+      ]
+    },
+    {
+      "id": "detects-amber-probe",
+      "statement": "Probe floods are amber, proven on the device at 16 probes from 12 addresses in 10 s.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Probe floods: proven on the device at 16 probes from 12 addresses in 10 s."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Probe flood | amber | yes: 2026-11-17, at 16 probes from 12 addresses in 10 s |"
+        }
+      ]
+    },
+    {
+      "id": "detects-amber-beacon",
+      "statement": "Beacon floods (many strong BSSIDs at once) are amber; it fired on the device, counts and time-to-alert not recorded.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Beacon floods: many strong access points beaconing at once. Fired on the device; its counts and time-to-alert were not recorded."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Beacon flood | amber | fired on 2026-11-17; counts and time-to-alert not recorded |"
+        },
+        {
+          "path": "firmware/README.md",
+          "quote": "| `beacon_flood` | many strong BSSIDs beaconing at once | amber |"
+        }
+      ]
+    },
+    {
+      "id": "detects-amber-noise",
+      "statement": "A noise-floor rise on the channel, from the radio's own noise estimate, is amber; host tests only.",
+      "status": "host-only",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Noise-floor rise: the radio’s own noise estimate for your channel. Host-tested only."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "| Noise-floor rise on the channel (the radio's own noise estimate, no frames needed) | amber | no: host tests only |"
+        }
+      ]
+    },
+    {
+      "id": "detects-router-changes",
+      "statement": "A security change of the owner's router is amber by default until accepted on the Details page, a channel move is one grey line, and the Router changes setting picks Details only, Amber or Strict; implemented and host-tested, not run on the stick (G25).",
+      "status": "host-only",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Router changes: when your own router changes its advertised security settings, for example after an update or a restart, the stick shows what changed in amber, and “a downgrade” when it got weaker, until you accept it on the Details page. A router that only moves channel is followed silently, as one grey line on the details page. The ROUTER CHANGES setting picks the colour: Details only (no colour), Amber (the default) or Strict (a security change is the red ALERT until you accept it). This is implemented and host-tested; it has not run on the stick yet."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Your own router changed its advertised security settings (for example after an update or a restart): what changed, old -> new, and \"a downgrade\" when it got weaker. It stays until you accept it on the Details page (hold the side key there). A router that only moves channel is followed silently and shown as one grey line on the details page."
+        },
+        {
+          "path": "README.md",
+          "quote": "| Router changes | **Details only**: listed on the Details page, no colour |"
+        },
+        {
+          "path": "README.md",
+          "quote": "| | **Amber** (default): a security change is amber until you accept it; a channel move is one grey line | | |"
+        },
+        {
+          "path": "README.md",
+          "quote": "| | **Strict**: a security change is the red ALERT until you accept it; a channel move is amber until you acknowledge it | | |"
+        },
+        {
+          "path": "README.md",
+          "quote": "**open**: implemented and host-tested, awaiting review"
+        },
+        {
+          "path": "README.md",
+          "quote": "nothing of G25 has run on the stick"
+        }
+      ]
+    },
+    {
+      "id": "detects-never-transmits",
+      "statement": "Monitoring is receive-only and the firmware has no raw-frame transmit call.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It never transmits attacks: monitoring is receive-only, and the firmware has no raw-frame transmit call."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call."
+        }
+      ]
+    },
+    {
+      "id": "detects-joins-only-for-updates",
+      "statement": "The stick joins a network only as an ordinary client for its signed update check, with the password the owner gives it, and raises a short-lived setup AP when asked; the guarding never joins a network.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It joins a network only as an ordinary Wi-Fi client, for its signed update check on the network whose password you give it, and raises a short-lived setup access point only when you ask it to. The guarding itself never joins a network."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "It joins a network only as an ordinary client for its own signed update check, and raises a short-lived setup access point when you ask it to."
+        },
+        {
+          "path": "README.md",
+          "quote": "to give the stick the Wi-Fi password from your phone. The password is needed only for the update check; the guarding itself never joins a network."
+        }
+      ]
+    },
+    {
+      "id": "detects-no-inspection",
+      "statement": "What clients send after joining the network is not inspected.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It does not look inside traffic: what clients send after they join the network is never inspected."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Anything inside the network after a client has joined (no data inspection)."
+        }
+      ]
+    },
+    {
+      "id": "detects-silent-listener",
+      "statement": "A listener that never transmits is invisible to it.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "A listener that never transmits leaves nothing for it to see."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "A listener that never transmits."
+        }
+      ]
+    },
+    {
+      "id": "detects-no-promises",
+      "statement": "It does not recover passwords, judge password strength, name a tool or person, or promise safety.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "It does not recover passwords, does not judge how strong a password is, does not name a tool or a person, and does not promise that a network is safe."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "It does not recover passwords, does not judge how strong a password is, does not name a tool or a person, and does not promise that a network is safe."
+        }
+      ]
+    },
+    {
+      "id": "detects-bluetooth",
+      "statement": "Bluetooth is not watched on the StickS3; the Bluetooth guard is deferred to a second release.",
+      "status": "deferred",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Bluetooth is not watched on this board; a Bluetooth guard is deferred to a second release."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Bluetooth, on this board."
+        },
+        {
+          "path": "README.md",
+          "quote": "| Bluetooth guard | G16U | open, release 2 | not built |"
+        }
+      ]
+    },
+    {
+      "id": "detects-compared-answer",
+      "statement": "The owner's test kit (transmit-capable multi-tool firmwares) sends disconnect bursts and beacon floods; the Guardian only listens and counts.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Multi-tool firmwares are built to transmit, and the kind of kit the Guardian is tested against can send disconnect bursts and beacon floods. M5 Guardian is a detector: it listens, counts and shows an alert colour."
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "The owner's kit versus the detectors"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "| 1 | deauth flood, broadcast, spoofed as the AP | all |"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "| 4 | beacon spam (random, list, rickroll) | all |"
+        },
+        {
+          "path": "README.md",
+          "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call."
+        }
+      ]
+    },
+    {
+      "id": "detects-tested-by-owner",
+      "statement": "Alerts are tested against the owner's kit, with test traffic started by the owner against the owner's network on a named channel for a bounded time.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Its alerts are tested against that kind of kit, started by the owner, against the owner’s own network, on a named channel, for a bounded time."
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "The owner runs every attack;"
+        },
+        {
+          "path": "README.md",
+          "quote": "Test traffic is started by the owner, against the owner's network, on a named channel, for a bounded time."
+        }
+      ]
+    },
+    {
+      "id": "detects-counts-scope",
+      "statement": "Detection is described by counts, scope and colour, with the cause stated as unknown.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Results are stated as counts, scope and colour, with the cause left unknown."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "Detection is described by counts, scope and uncertainty."
+        },
+        {
+          "path": "README.md",
+          "quote": "The cause is stated as unknown."
+        }
+      ]
+    },
+    {
+      "id": "detects-unproven",
+      "statement": "A detector that never fired on the device is listed as unproven.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "A detector that has never fired on the device is listed as unproven, not as protection."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "A detector that has never fired on the device is listed as unproven, not as protection."
+        }
+      ]
+    },
+    {
+      "id": "detects-coverage-matrix",
+      "statement": "The full coverage matrix with evidence files and threshold sources is in docs/attack-coverage.md.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "The full coverage matrix, with the evidence file of every proven row and the source of every threshold, is published in the repository."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "The full matrix, with the evidence file of every proven row and the source of every threshold, is in"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "# Attack coverage: what the Guardian sees, what it proves, what it cannot see"
+        }
+      ]
+    },
+    {
+      "id": "detects-description",
+      "statement": "Meta description of /what-it-detects: the questions the page answers (deauth bursts, evil twins, WPA3 on an M5StickS3) and that the receive-only Guardian rates, flags in red or amber, and has published limits.",
+      "status": "current",
+      "page": [
+        {
+          "file": "lib/what-it-detects.ts",
+          "text": "Can an M5StickS3 spot deauth bursts and evil twins, or tell if your Wi-Fi uses WPA3? What the receive-only Guardian rates, flags in red or amber and cannot see."
+        }
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "quote": "It runs on an M5 StickS3, listens to the 2.4 GHz air around one network that you pick"
+        },
+        {
+          "path": "README.md",
+          "quote": "a red **ALERT** for an incident on your network, an amber notice for something nearby"
+        },
+        {
+          "path": "README.md",
+          "quote": "Disconnect burst (deauthentication or disassociation frames) on the picked network"
+        },
+        {
+          "path": "docs/attack-coverage.md",
+          "quote": "evil twin / evil portal with the owner's SSID, plus deauth"
+        },
+        {
+          "path": "README.md",
+          "quote": "**Very good**, **Good**, **Medium**, **Bad**, **Horrible** | The rating of the settings the picked network advertises right now (protocol, cipher, management-frame protection)."
+        },
+        {
+          "path": "README.md",
+          "quote": "It is a detector. It listens and counts; the firmware has no raw-frame transmit call."
+        },
+        {
+          "path": "README.md",
+          "quote": "## What it cannot see"
         }
       ]
     }
