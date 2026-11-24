@@ -172,6 +172,6 @@
       "Gates (same as W07): make website-check green (unit tests first, red logs kept), the Playwright browser suite including axe and the 320/768/1440 px overflow checks, tools/public_check.py --require-map with 0 findings, and the preview Lighthouse gate on GitHub (website-preview-lighthouse.yml: performance >= 0.9, accessibility 1, SEO >= 0.95, LCP <= 2.5 s, CLS <= 0.1, TBT <= 200 ms). Never commit, push or deploy; hand off with READY FOR REVIEW.",
       "Live check after deploy (reviewer): the page is 200, in sitemap.xml, linked from / and the footer, Lighthouse gate green on its preview URL too (add the page to the gate's URL list)."
     ],
-    "passes": false
+    "passes": true
   }
 ]
