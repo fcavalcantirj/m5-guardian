@@ -2,8 +2,8 @@ import type { Page } from "@playwright/test";
 import { test, expect, remoteOrigin, vercelModeOrigin } from "./fixtures";
 
 // W08 Vercel Web Analytics: mounted once in the root layout, only when the
-// server runs on Vercel (VERCEL=1). Locally the suite has two servers of the
-// same build: the main one (no analytics at all) and a VERCEL=1 one, where the
+// build runs on Vercel (VERCEL=1, the pages are prerendered). Locally the suite
+// has two builds: the main one (no analytics at all) and a VERCEL=1 one, where the
 // script must load on every page under the enforced Content-Security-Policy
 // (the fixture fails on any violation). The script itself exists only on
 // Vercel, so there it is a stand-in served at its real same-origin path.

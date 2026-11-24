@@ -29,7 +29,8 @@ test("release/version.txt is parsed strictly; a missing or malformed version fai
 });
 
 test("next.config exposes the release version to the build", async () => {
-  const config = (await import(join(site, "next.config.mjs"))).default;
+  // next.config.mjs exports a function of the build phase (the CSP's dev allowance depends on it).
+  const config = (await import(join(site, "next.config.mjs"))).default("phase-production-build");
   assert.equal(config.env.GUARDIAN_RELEASE_VERSION, releaseVersion);
 });
 

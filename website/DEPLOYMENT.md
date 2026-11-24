@@ -123,8 +123,8 @@ after a click). What a deployment needs:
   The release key is `lib/release-key.ts` (a copy of `release/release-public-key.json`, compared by
   `lib/firmware-release.test.ts`); a new release key needs a new website deployment.
 - **Step counts** use Vercel Web Analytics (`@vercel/analytics`, cookieless), mounted once in the root layout
-  since W08 (page views on every page) and only when the server runs on Vercel (`process.env.VERCEL === "1"`,
-  read per request). Enable Web Analytics in the project settings, or every page requests a missing
+  since W08 (page views on every page) and only in a Vercel build (`process.env.VERCEL === "1"` at build
+  time: the pages are prerendered). Enable Web Analytics in the project settings, or every page requests a missing
   `/_vercel/insights/script.js`. The event is `guardian_install` with three properties,
   `action` (update, install, restore, backup), `result` (start, connected, done, cancel, error_plan,
   error_<step>) and `step` = `<action>:<result>` (since 2026-11-24; the query API groups by one property at
@@ -162,13 +162,13 @@ after a click). What a deployment needs:
 
 ### Content-Security-Policy
 
-Set per request by `proxy.ts` (built by `lib/csp.ts`), not as a static `next.config` header: Next's inline
-bootstrap scripts (three per page: the Turbopack chunk list and two React Server Components payload pushes)
-need a nonce, and their content changes with every build, so no fixed hash list can cover them. Next reads the
-nonce from the request's policy and puts it on every script it renders. A nonce must be new for each response,
-so the pages are rendered per request (`app/layout.tsx` awaits `connection()`): `/`, `/install` and the 404
-page are no longer prerendered or edge-cached (`Cache-Control: private, no-store`). The images, icons,
-robots, sitemap, static files and the firmware API stay static and skip the proxy.
+A static header set in `next.config.mjs` for every path (built by `lib/csp.ts`), so `/`, `/install` and the
+404 page stay prerendered and edge-cached. The W08 worker first built a per-request nonce (`proxy.ts`, pages
+rendered per request); measured on its preview on 2026-11-24 from Brazil, interleaved with production, the
+first byte took ~0.67 s instead of ~0.35 s (one cold start 1.9 s; the function runs in iad1, the edge in
+gru1), while the Lighthouse gate on the US GitHub runner could not see it. The site takes no user input and
+loads no third-party script, so the nonce bought little; the supervisor replaced it with `'unsafe-inline'` for
+scripts (Next's inline bootstrap changes with every build, so a fixed hash list cannot cover it).
 
 Measured before enforcing (2026-11-24, local production build, Chromium 1.65.1 via Playwright, a strict
 Report-Only policy without inline allowances; `/` loaded, scrolled and switched to 3D, `/install` with a mocked
@@ -181,7 +181,7 @@ The enforced production policy and why each source is there:
 | Directive | Sources | Why |
 | --- | --- | --- |
 | `default-src` | `'self'` | everything not named below: same origin only |
-| `script-src` | `'self'` `'nonce-…'` | Next chunks, the 3D viewer, esptool-js and spark-md5 (dynamic imports of same-origin chunks) and the Vercel Web Analytics script `/_vercel/insights/script.js` are same-origin; the nonce covers Next's inline bootstrap. No `'unsafe-inline'`, no `'unsafe-eval'` (added only under `next dev`, for React's error overlay) |
+| `script-src` | `'self'` `'unsafe-inline'` | Next chunks, the 3D viewer, esptool-js and spark-md5 (dynamic imports of same-origin chunks) and the Vercel Web Analytics script `/_vercel/insights/script.js` are same-origin; `'unsafe-inline'` covers Next's inline bootstrap (see above). No other host, no `'unsafe-eval'` (added only under `next dev`, for React's error overlay) |
 | `style-src` | `'self'` `'unsafe-inline'` | the CSS files, and the `style` attributes React renders into the HTML (21 on `/`); a nonce would not cover attributes |
 | `img-src` | `'self'` | persona art, icons and Next's image route |
 | `font-src` | `'self'` | the self-hosted Geist fonts |
@@ -201,10 +201,10 @@ data: blob:`, `frame-src https://vercel.live`, `style-src https://vercel.live`, 
 https://assets.vercel.com`. Production carries none of them; if the toolbar is enabled for production
 deployments it is blocked there (turn it off for production in the project settings).
 
-**Report-Only trial:** set `GUARDIAN_CSP_REPORT_ONLY=1` as an environment variable of a preview deployment and
+**Report-Only trial:** set `GUARDIAN_CSP_REPORT_ONLY=1` as a build environment variable of a preview deployment and
 the same policy is sent as `Content-Security-Policy-Report-Only`; the browser console then lists what it would
 block. Remove the variable to enforce. The browser suite fails on any violation, enforced or report-only
-(`e2e/fixtures.ts`), and checks the header and the nonce on every script (`e2e/metadata.spec.ts`).
+(`e2e/fixtures.ts`), and checks the header and that the pages stay prerendered (`e2e/metadata.spec.ts`).
 
 ## Promotion and rollback
 

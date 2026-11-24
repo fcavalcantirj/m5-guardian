@@ -1,11 +1,13 @@
-// Content-Security-Policy of every page (W08), applied by proxy.ts. Next's
-// inline bootstrap scripts carry the per-request nonce; everything else the
-// pages load (Next chunks, the 3D viewer, esptool-js and spark-md5, the
-// firmware API, Vercel Web Analytics at /_vercel/insights) is same-origin.
-// Each source is explained in website/DEPLOYMENT.md.
+// Content-Security-Policy of every page (W08), a static header set in
+// next.config.mjs, so the pages stay prerendered and edge-cached. Next's inline
+// bootstrap scripts change with every build and a nonce would force per-request
+// rendering (measured 2026-11-24: first byte from Brazil ~0.67 s instead of
+// ~0.35 s, cold 1.9 s), so script-src allows 'unsafe-inline'; every other
+// source (Next chunks, the 3D viewer, esptool-js and spark-md5, the firmware
+// API, Vercel Web Analytics at /_vercel/insights) is same-origin. Each source
+// is explained in website/DEPLOYMENT.md.
 
 type Options = {
-  nonce: string;
   /** next dev: React's error overlay needs eval. */
   dev?: boolean;
   /** A Vercel preview deployment: Vercel's documented sources for its toolbar and comments. */
@@ -21,10 +23,11 @@ const toolbar: Record<string, string[]> = {
   "font-src": ["https://vercel.live", "https://assets.vercel.com"],
 };
 
-export function contentSecurityPolicy({ nonce, dev = false, preview = false }: Options) {
+export function contentSecurityPolicy({ dev = false, preview = false }: Options = {}) {
   const policy: [string, string[]][] = [
     ["default-src", ["'self'"]],
-    ["script-src", ["'self'", `'nonce-${nonce}'`, ...(dev ? ["'unsafe-eval'"] : [])]],
+    // Next's inline bootstrap scripts (no user input reaches the page, no third-party script is loaded).
+    ["script-src", ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])]],
     // React renders style attributes into the HTML; no style elements are inlined.
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["img-src", ["'self'"]],
@@ -47,11 +50,4 @@ export function contentSecurityPolicy({ nonce, dev = false, preview = false }: O
 /** GUARDIAN_CSP_REPORT_ONLY=1 sends the policy as Report-Only (a trial on a preview); anything else enforces it. */
 export function cspHeaderName(reportOnly: string | undefined) {
   return reportOnly === "1" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
-}
-
-/** 128 random bits, base64. */
-export function newNonce() {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes));
 }

@@ -1,4 +1,6 @@
 import { fileURLToPath } from "node:url";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
+import { contentSecurityPolicy, cspHeaderName } from "./lib/csp.ts";
 import { readReleaseVersion } from "./lib/release-version.mjs";
 
 // The release number of release/version.txt, read once when the build starts
@@ -6,13 +8,16 @@ import { readReleaseVersion } from "./lib/release-version.mjs";
 // names it as softwareVersion.
 const releaseVersion = readReleaseVersion(fileURLToPath(new URL("..", import.meta.url)));
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+/** @type {(phase: string) => import('next').NextConfig} */
+const nextConfig = (phase) => ({
   poweredByHeader: false,
   env: { GUARDIAN_RELEASE_VERSION: releaseVersion },
   // AVIF first (smaller than WebP for the persona art), WebP as the fallback.
   images: { formats: ["image/avif", "image/webp"] },
-  // The Content-Security-Policy is set per request by proxy.ts: it carries a nonce, which a static header cannot.
+  // A second local build for the VERCEL=1 browser checks (playwright.config.ts) goes to its own folder.
+  distDir: process.env.GUARDIAN_DIST_DIR || ".next",
+  // The Content-Security-Policy is a static header (lib/csp.ts explains why), fixed when the build starts:
+  // a Vercel preview build adds the toolbar's sources; GUARDIAN_CSP_REPORT_ONLY=1 sends it as Report-Only.
   async headers() {
     return [
       {
@@ -25,10 +30,17 @@ const nextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
+          {
+            key: cspHeaderName(process.env.GUARDIAN_CSP_REPORT_ONLY),
+            value: contentSecurityPolicy({
+              dev: phase === PHASE_DEVELOPMENT_SERVER,
+              preview: process.env.VERCEL_ENV === "preview",
+            }),
+          },
         ],
       },
     ];
   },
-};
+});
 
 export default nextConfig;

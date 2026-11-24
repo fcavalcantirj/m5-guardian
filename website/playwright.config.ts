@@ -45,7 +45,8 @@ export default defineConfig({
       args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
     },
   },
-  // W08: the second server is the same build with VERCEL=1 (Vercel Web Analytics mounted), for e2e/analytics.spec.ts.
+  // W08: the second server is a second build made with VERCEL=1 (Vercel Web Analytics mounted at build time, the
+  // pages being prerendered) in .next-vercel, for e2e/analytics.spec.ts.
   webServer: remote ? undefined : [
     {
       command: `node_modules/.bin/next start --hostname 127.0.0.1 --port ${port}`,
@@ -56,11 +57,11 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: `node_modules/.bin/next start --hostname 127.0.0.1 --port ${port + 1}`,
-      env: { VERCEL: "1" },
+      command: `node_modules/.bin/next build && node_modules/.bin/next start --hostname 127.0.0.1 --port ${port + 1}`,
+      env: { VERCEL: "1", GUARDIAN_DIST_DIR: ".next-vercel" },
       url: `http://127.0.0.1:${port + 1}/robots.txt`,
       reuseExistingServer: false,
-      timeout: 60_000,
+      timeout: 300_000,
       stdout: "pipe",
       stderr: "pipe",
     },

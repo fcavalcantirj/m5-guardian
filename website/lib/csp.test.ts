@@ -2,11 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { contentSecurityPolicy, cspHeaderName, newNonce } from "./csp.ts";
+import { existsSync } from "node:fs";
+import { contentSecurityPolicy, cspHeaderName } from "./csp.ts";
 
-// W08 Content-Security-Policy. The pages are rendered per request so that
-// Next can put a fresh nonce on its inline bootstrap scripts (proxy.ts); every
-// other source is listed exactly. website/DEPLOYMENT.md explains each source.
+// W08 Content-Security-Policy: a static header from next.config.mjs, so the
+// pages stay prerendered; every source is listed exactly. website/DEPLOYMENT.md
+// explains each source and the measurement behind 'unsafe-inline' for scripts.
 
 const site = new URL("..", import.meta.url).pathname;
 
@@ -21,11 +22,11 @@ function directives(policy: string) {
   return map;
 }
 
-test("production policy: same-origin only, a nonce for inline scripts, nothing else inline", () => {
-  const policy = directives(contentSecurityPolicy({ nonce: "abc123==" }));
+test("production policy: same-origin only, inline allowed for Next's bootstrap scripts and React's style attributes", () => {
+  const policy = directives(contentSecurityPolicy());
   assert.deepEqual(Object.fromEntries(policy), {
     "default-src": ["'self'"],
-    "script-src": ["'self'", "'nonce-abc123=='"],
+    "script-src": ["'self'", "'unsafe-inline'"],
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'"],
     "font-src": ["'self'"],
@@ -35,13 +36,13 @@ test("production policy: same-origin only, a nonce for inline scripts, nothing e
     "form-action": ["'self'"],
     "frame-ancestors": ["'none'"],
   });
-  const text = contentSecurityPolicy({ nonce: "abc123==" });
+  const text = contentSecurityPolicy();
   assert.doesNotMatch(text, /unsafe-eval|strict-dynamic|\*|https?:|data:|blob:/);
 });
 
 test("development adds unsafe-eval (React's dev error overlay) and nothing else", () => {
-  const prod = directives(contentSecurityPolicy({ nonce: "n" }));
-  const dev = directives(contentSecurityPolicy({ nonce: "n", dev: true }));
+  const prod = directives(contentSecurityPolicy());
+  const dev = directives(contentSecurityPolicy({ dev: true }));
   assert.deepEqual(dev.get("script-src"), [...prod.get("script-src")!, "'unsafe-eval'"]);
   dev.delete("script-src");
   prod.delete("script-src");
@@ -49,8 +50,8 @@ test("development adds unsafe-eval (React's dev error overlay) and nothing else"
 });
 
 test("preview deployments add exactly Vercel's documented toolbar sources", () => {
-  const prod = directives(contentSecurityPolicy({ nonce: "n" }));
-  const preview = directives(contentSecurityPolicy({ nonce: "n", preview: true }));
+  const prod = directives(contentSecurityPolicy());
+  const preview = directives(contentSecurityPolicy({ preview: true }));
   const added = Object.fromEntries(
     [...preview].map(([name, sources]) => [name, sources.filter((s) => !(prod.get(name) ?? []).includes(s))]).filter(([, s]) => s.length),
   );
@@ -72,51 +73,17 @@ test("the header is enforced unless report-only is asked for", () => {
   assert.equal(cspHeaderName("1"), "Content-Security-Policy-Report-Only");
 });
 
-test("nonces are fresh, base64 and at least 128 bits", () => {
-  const seen = new Set<string>();
-  for (let i = 0; i < 50; i++) {
-    const nonce = newNonce();
-    assert.match(nonce, /^[A-Za-z0-9+/]+={0,2}$/);
-    assert.ok(Buffer.from(nonce, "base64").length >= 16);
-    seen.add(nonce);
-  }
-  assert.equal(seen.size, 50);
+test("next.config.mjs sends the policy on every path as a static header, and no proxy renders pages per request", () => {
+  const config = readFileSync(join(site, "next.config.mjs"), "utf8");
+  assert.match(config, /source: "\/\(\.\*\)"/);
+  assert.match(config, /key: cspHeaderName\(process\.env\.GUARDIAN_CSP_REPORT_ONLY\)/);
+  assert.match(config, /dev: phase === PHASE_DEVELOPMENT_SERVER/);
+  assert.match(config, /preview: process\.env\.VERCEL_ENV === "preview"/);
+  assert.ok(!existsSync(join(site, "proxy.ts")), "no proxy.ts");
+  assert.ok(!existsSync(join(site, "middleware.ts")), "no middleware.ts");
 });
 
-test("proxy.ts sets the policy on the request (for Next's nonce) and the response, and skips static files", () => {
-  const proxy = readFileSync(join(site, "proxy.ts"), "utf8");
-  assert.match(proxy, /export function proxy\(/);
-  assert.match(proxy, /requestHeaders\.set\("content-security-policy", policy\)/);
-  assert.match(proxy, /response\.headers\.set\(header, policy\)/);
-  assert.match(proxy, /process\.env\.GUARDIAN_CSP_REPORT_ONLY/);
-  assert.match(proxy, /process\.env\.VERCEL_ENV === "preview"/);
-  // The matcher's source, unescaped from the file and matched against real paths as Next does (whole pathname).
-  const source = JSON.parse(`"${/source:\s*"([^"]+)"/.exec(proxy)![1]}"`);
-  const matcher = new RegExp(`^${source}$`);
-  for (const path of ["/", "/install", "/no-such-page"]) assert.ok(matcher.test(path), `${path} gets the policy`);
-  for (const path of [
-    "/api/firmware/latest",
-    "/api/firmware/guardian-1.0.0-b1-cccccccccccc/bootloader.bin",
-    "/_next/static/chunks/main.js",
-    "/_next/image",
-    "/_vercel/insights/script.js",
-    "/favicon.ico",
-    "/icon.svg",
-    "/apple-icon.png",
-    "/opengraph-image",
-    "/twitter-image",
-    "/install/opengraph-image",
-    "/install/twitter-image",
-    "/robots.txt",
-    "/sitemap.xml",
-    "/images/very-good.png",
-    "/models/NOTICE.txt",
-  ])
-    assert.ok(!matcher.test(path), `${path} skips the proxy`);
-});
-
-test("the root layout waits for the request, so every page is rendered with its own nonce", () => {
+test("the root layout is prerendered: no request-time APIs", () => {
   const layout = readFileSync(join(site, "app/layout.tsx"), "utf8");
-  assert.match(layout, /await connection\(\)/);
-  assert.match(layout, /export default async function RootLayout/);
+  assert.doesNotMatch(layout, /connection\(\)|headers\(\)|cookies\(\)|export default async function/);
 });

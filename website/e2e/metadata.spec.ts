@@ -19,24 +19,19 @@ const homeDescription =
 const releaseVersion = /^version=(\S+)$/m.exec(readFileSync(new URL("../../release/version.txt", import.meta.url), "utf8"))![1];
 
 /**
- * The page's Content-Security-Policy (W08): enforced, script-src limited to
- * this origin plus a nonce, and every executable script in the HTML carries
- * exactly that nonce. Returns the nonce.
+ * The page's Content-Security-Policy (W08): enforced, a static header (the
+ * pages stay prerendered), scripts from this origin plus Next's inline
+ * bootstrap, nothing evaluated, no plugins, never framed. Returns the policy.
  */
-function checkCsp(headers: Record<string, string>, html: string) {
+function checkCsp(headers: Record<string, string>) {
   const policy = headers["content-security-policy"];
   expect(policy, "Content-Security-Policy header").toBeTruthy();
   expect(headers["content-security-policy-report-only"]).toBeUndefined();
-  const nonce = /(?:^|; )script-src 'self' 'nonce-([A-Za-z0-9+/]+={0,2})'(?: https:\/\/vercel\.live)?(?:;|$)/.exec(policy)?.[1];
-  expect(nonce, `script-src with a nonce: ${policy}`).toBeTruthy();
-  for (const directive of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "form-action 'self'"])
+  expect(policy).toMatch(/(?:^|; )script-src 'self' 'unsafe-inline'(?: https:\/\/vercel\.live)?(?:;|$)/);
+  for (const directive of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "form-action 'self'", "connect-src 'self'"])
     expect(policy).toContain(directive);
-  expect(policy).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline/);
-  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]);
-  const executable = scripts.filter((attrs) => !/type="application\/ld\+json"/.test(attrs));
-  expect(executable.length).toBeGreaterThan(0);
-  for (const attrs of executable) expect(attrs, "script carries the nonce").toContain(`nonce="${nonce}"`);
-  return nonce!;
+  expect(policy).not.toMatch(/unsafe-eval|nonce-/);
+  return policy;
 }
 
 /** Width and height from a PNG's IHDR chunk. */
@@ -163,14 +158,16 @@ test("structured data: one JSON-LD block with WebSite and SoftwareApplication, v
   }
 });
 
-test("Content-Security-Policy: enforced on every page with a fresh nonce on each script", async ({ request }) => {
-  const nonces = new Set<string>();
+test("Content-Security-Policy: the same enforced policy on every page, and the pages stay prerendered", async ({ request }) => {
+  const policies = new Set<string>();
   for (const path of ["/", "/install", "/", "/no-such-page"]) {
     const response = await request.get(path);
     expect(response.status()).toBe(path === "/no-such-page" ? 404 : 200);
-    nonces.add(checkCsp(response.headers(), await response.text()));
+    policies.add(checkCsp(response.headers()));
+    if (path !== "/no-such-page")
+      expect(response.headers()["cache-control"] ?? "", `${path} is not rendered per request`).not.toMatch(/private|no-store/);
   }
-  expect(nonces.size, "a new nonce per response").toBe(4);
+  expect(policies.size, "one static policy").toBe(1);
 });
 
 test("robots.txt allows crawling and names the sitemap", async ({ request }) => {
@@ -215,7 +212,7 @@ test("unknown paths get the custom 404 page with status 404, noindex and headers
   expect(response?.status()).toBe(404);
   const headers = response!.headers();
   for (const [name, value] of Object.entries(configuredHeaders)) expect(headers[name]).toBe(value);
-  checkCsp(headers, await response!.text());
+  checkCsp(headers);
   await expect(page).toHaveTitle("Page not found | M5 Guardian");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nothing heard at this address.");
   const robots = page.locator('meta[name="robots"]');
