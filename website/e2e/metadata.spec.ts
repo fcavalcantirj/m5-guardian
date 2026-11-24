@@ -202,8 +202,10 @@ test("sitemap.xml lists the home, install and what-it-detects pages, each with i
       if (lastmod) expect(new Date(lastmod).getTime()).toBeLessThanOrEqual(Date.now());
       else test.info().annotations.push({ type: "note", description: `${loc}: no lastmod (no Git history in this build)` });
     } else {
-      // The local build reads this checkout's history: the dates must be exactly Git's.
-      expect(lastmod, `${loc} lastmod`).toBe(lastCommitDate(pageSources[path], site)!.toISOString());
+      // The local build reads this checkout's history: the dates must be exactly Git's, and a page whose last
+      // change is outside a shallow clone has no lastmod rather than a wrong one (lib/last-modified.ts).
+      const expected = lastCommitDate(pageSources[path], site);
+      expect(lastmod, `${loc} lastmod`).toBe(expected?.toISOString());
     }
   }
 });

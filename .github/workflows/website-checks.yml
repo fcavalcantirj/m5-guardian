@@ -78,6 +78,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history: the sitemap's lastmod is each page's last source commit (website/lib/last-modified.ts),
+          # and the browser suite compares it with Git exactly.
+          fetch-depth: 0
 
       - name: Public check (generic rules; the private map stays with the owner)
         run: python3 tools/public_check.py
