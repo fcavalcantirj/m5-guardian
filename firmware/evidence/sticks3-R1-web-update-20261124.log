@@ -1,0 +1,19 @@
+R1 part: Update from the website keeps settings, 2026-11-24, LAB-STICK-1 (owner's stick)
+=====================================================================================
+Owner action: https://m5-guardian.vercel.app/install, "Connect and update to 1.0.0", Chrome on macOS,
+2026-11-24 00:28. Page result: "Done. The stick restarted with the Guardian 1.0.0. Your settings, picked
+network and stored Wi-Fi were kept." All four parts read back the same as the signed release (MD5).
+Chip reported: ESP32-S3-PICO-1 (LGA56) revision v0.2, 8 MB flash, 8 MB PSRAM.
+
+STATUS read over USB afterwards (MEASURED, 8 s boot wait after the port open reset):
+  app_version=guardian-20261123-201307-rel      the published release guardian-1.0.0-b1-eead6479ae50
+  settings=guard:every_minute,bright:30,store:restored,router:amber   kept
+  tune_version=1.49                                                   kept
+  wifi_provisioned=yes ota_provisioned=yes                            stored Wi-Fi and update server kept
+  country=01,11d:on,ch:1-11                                           world-safe release radio setting
+  selftest=display:1,store:1,radio:1,imu:0      imu:0 is the boot snapshot (see sticks3-G16S-20261119.log)
+  last_update_result=failed:manifest_fetch, ota_auto_checks=0 since boot: a saved record from an earlier
+  check against the owner's update server ("Mac server unreachable"), not from this update.
+
+Verdict: PASS for the website Update path on a real stick. Still open in R1: First install and Restore
+from the website, photos, keys, router cases, drains.
