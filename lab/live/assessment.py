@@ -40,7 +40,7 @@ def assess(scenario,states,witness,emitter,ack_us,end_us,uncertainty_us,groups,a
         gap=len(gaps)==2 and all(gaps)
         result['observed_channel_sequence']=channels;result['coverage_gap_visible']=gap
         result['transition_gaps']=gaps
-        ok=ok and channels==[13,6,13] and gap and not any(s.get('settings_changed') or s.get('alert') for s in states) and ap_stop_observed   # G25: the router moving channel is followed silently, never an incident and bool(emitter) and emitter.get('role')=='test_ap'
+        ok=ok and channels==[13,6,13] and gap and not any(s.get('settings_changed') or s.get('alert') for s in states) and ap_stop_observed and bool(emitter) and emitter.get('role')=='test_ap'   # G25: the router moving channel is followed silently, never an incident
     elif scenario in ('related-approved','related-unapproved'):
         observed=max((s.get('watched_advertisements',0) for s in states),default=0)
         unexpected=any(s.get('unexpected_ap') and s.get('incident_visible') for s in states)

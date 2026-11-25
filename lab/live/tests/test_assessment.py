@@ -51,6 +51,8 @@ class AssessmentTests(unittest.TestCase):
   self.assertFalse(self.check('channel',states,emitter=emitter)['pass'])
   flagged=[dict(x,settings_changed=True) if x.get('channel')==6 else x for x in states]
   self.assertFalse(self.check('channel',flagged,emitter=emitter,ap_stopped=True)['pass'])   # a channel move must not be an incident
+  self.assertFalse(self.check('channel',states,ap_stopped=True)['pass'])   # the moving AP must be the lab's own test AP
+  self.assertFalse(self.check('channel',states,emitter={'role':'deauth','completed_groups':0},ap_stopped=True)['pass'])
   no_gap=[s for s in states if s['coverage']==1]
   self.assertFalse(self.check('channel',no_gap,emitter=emitter,ap_stopped=True)['pass'])
   startup_only=[dict(quiet_states()[0],now_ms=0,coverage=3,mood=0)]+no_gap
